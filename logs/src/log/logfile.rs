@@ -1,55 +1,57 @@
+//! Лог файл
+//! 
+//! # Навигация по логу
+//! 
+//! Основаная идея в [заголовке блока](BlockHead) хранить ссылки на нексолько предыдущих блоков
+//! 
+//! Имя указатель на текущий блок, можно прыгнуть предыдущему или пропустить несколько и прыгнуть сразу к нужному
+//! 
+//! Вот содрежание первых 9 блоков
+//! 
+//! | #Блока  |  Ссылка (#блока, смещение)      | `[1]`        | `[2]`        | `[3]`       |
+//! |---------|---------------------------------|--------------|--------------|-------------|
+//! | #0      |                                 |              |              |             |
+//! | #1      | #0 off=0                        |              |              |             |
+//! | #2      | #1 off=33                       | #1 off=33    |              |             |
+//! | #3      | #2 off=78                       | #1 off=33    |              |             |
+//! | #4      | #3 off=135                      | #3 off=135   | #1 off=33    |             | 
+//! | #5      | #4 off=192                      | #3 off=135   | #1 off=33    |             | 
+//! | #6      | #5 off=261                      | #5 off=261   | #1 off=33    |             | 
+//! | #7      | #6 off=330                      | #5 off=261   | #1 off=33    |             | 
+//! | #8      | #7 off=399                      | #7 off=399   | #5 off=261   | #1 off=33   |
+//! 
+//! Допустим указатель находиться на #8, что бы перейти к #2 есть два варианта как это сделать
+//! 
+//! 1. пройти по смеженным путям: #8 -> #7 -> #6 -> #5 -> #4 -> #3 -> #2 (6 переходов)
+//! 2. либо по ссылкам #8 -> #5 -> #3 -> #2 (3 перехода)
+//! 
+//! # Запись в лог
+//! 
+//! При записи очередного блока также 
+//! - добавляется информация о ранее записаных блоках ([BlockId], [FileOffset]) в текущий записываемый блок ([Block], [BackRefs])
+//! - обновляется информация о ранее записанных блоках
+//! 
+//! Обновляется история по следующей схеме
+//! 
+//! - первая ссылка на предыдущий блок обновляется всегда
+//! - вторая ссылка только если идентификатор блока кратен 2: `block_id % 2 == 0`
+//! - треться ссылка только если идентификатор блока кратен 4: `block_id % 4 == 0`
+//! - четвертая ссылка только если идентификатор блока кратен 8: `block_id % 8 == 0`
+//! - ...
+//! - N ссылка толька если идентификатор блока кратен 2^N
+//! 
+//! Если надо обновить N ссылку, но ее нет, то копируется ссылка N-1
+//! 
+//! Получается такое хитрое дерево, по которому возможно быстрая навигация назад.
+//! см [BackRefs]
+
 use super::block::*;
 use super::super::bbuff::absbuff::*;
+use std::path::Path;
 use std::sync::{Arc, RwLock, PoisonError, RwLockReadGuard};
 use std::fmt;
 
 #[derive(Clone)]
-/// Лог файл
-/// 
-/// # Навигация по логу
-/// 
-/// Основаная идея в [заголовке блока](BlockHead) хранить ссылки на нексолько предыдущих блоков
-/// 
-/// Имя указатель на текущий блок, можно прыгнуть предыдущему или пропустить несколько и прыгнуть сразу к нужному
-/// 
-/// Вот содрежание первых 9 блоков
-/// 
-/// | #Блока  |  Ссылка (#блока, смещение)      | `[1]`        | `[2]`        | `[3]`       |
-/// |---------|---------------------------------|--------------|--------------|-------------|
-/// | #0      |                                 |              |              |             |
-/// | #1      | #0 off=0                        |              |              |             |
-/// | #2      | #1 off=33                       | #1 off=33    |              |             |
-/// | #3      | #2 off=78                       | #1 off=33    |              |             |
-/// | #4      | #3 off=135                      | #3 off=135   | #1 off=33    |             | 
-/// | #5      | #4 off=192                      | #3 off=135   | #1 off=33    |             | 
-/// | #6      | #5 off=261                      | #5 off=261   | #1 off=33    |             | 
-/// | #7      | #6 off=330                      | #5 off=261   | #1 off=33    |             | 
-/// | #8      | #7 off=399                      | #7 off=399   | #5 off=261   | #1 off=33   |
-/// 
-/// Допустим указатель находиться на #8, что бы перейти к #2 есть два варианта как это сделать
-/// 
-/// 1. пройти по смеженным путям: #8 -> #7 -> #6 -> #5 -> #4 -> #3 -> #2 (6 переходов)
-/// 2. либо по ссылкам #8 -> #5 -> #3 -> #2 (3 перехода)
-/// 
-/// # Запись в лог
-/// 
-/// При записи очередного блока также 
-/// - добавляется информация о ранее записаных блоках ([BlockId], [FileOffset]) в текущий записываемый блок ([Block], [BackRefs])
-/// - обновляется информация о ранее записанных блоках
-/// 
-/// Обновляется история по следующей схеме
-/// 
-/// - первая ссылка на предыдущий блок обновляется всегда
-/// - вторая ссылка только если идентификатор блока кратен 2: `block_id % 2 == 0`
-/// - треться ссылка только если идентификатор блока кратен 4: `block_id % 4 == 0`
-/// - четвертая ссылка только если идентификатор блока кратен 8: `block_id % 8 == 0`
-/// - ...
-/// - N ссылка толька если идентификатор блока кратен 2^N
-/// 
-/// Если надо обновить N ссылку, но ее нет, то копируется ссылка N-1
-/// 
-/// Получается такое хитрое дерево, по которому возможно быстрая навигация назад.
-/// см [BackRefs]
 pub struct LogFile<FlatBuff> 
 where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
 {
@@ -118,7 +120,6 @@ impl<A> From<PoisonError<RwLockReadGuard<'_, A>>> for LogErr {
 impl<FlatBuff> LogFile<FlatBuff> 
 where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
 {
-  #[allow(dead_code)]
   pub fn new( buff:FlatBuff ) -> Result<Self, LogErr> {
     let buff_size = buff.bytes_count()?;
     if buff_size == 0 {
@@ -142,6 +143,16 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
         last_blocks: last_blocks,
       }
     )
+  }
+
+  pub fn open_file_for_write<P: AsRef<Path>>( path: P ) -> Result<LogFile<FileBuff>, LogErr> {
+    let buff = FileBuff::open_read_write(path)?;
+    LogFile::new(buff)
+  }
+
+  pub fn open_file_for_read<P: AsRef<Path>>( path: P ) -> Result<LogFile<FileBuff>, LogErr> {
+    let buff = FileBuff::open_read_only(path)?;
+    LogFile::new(buff)
   }
 
   /// Добавление блока в лог файл
@@ -395,7 +406,7 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
   }
 
   /// Добавление данных в лог
-  fn append_data( &mut self, data_id: DataId, data: &[u8] ) -> Result<(), LogErr> {
+  pub fn append_data( &mut self, data_id: DataId, data: &[u8] ) -> Result<(), LogErr> {
     let block = self.build_next_block(data_id, data);
     self.append_block( &block )
   }
@@ -479,9 +490,9 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
     }
 
     // Перемещение к предыдущему
-    if (block_id.value() - self.current_head().head.block_id.value()) == 1 {
-      return self.previous();
-    }
+    // if (block_id.value() - self.current_head().head.block_id.value()) == 1 {
+    //   return self.previous();
+    // }
 
     // Указываем прыжок в перед ?
     if self.current_head().head.block_id.value() < block_id.value() {
@@ -498,17 +509,17 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
 
     let found
       = back_refs.iter().zip(back_refs.iter().skip(1))
-      .filter(|((a_id,a_off),(b_id,b_off))| 
+      .filter(|((a_id,_),(b_id,_))| 
         {
-          let (a_id, a_off, b_id, b_off) = 
+          let (a_id, b_id) = 
           if b_id < a_id {
-            (b_id, b_off, a_id, a_off)
+            (b_id, a_id)
           } else {
-            (a_id, a_off, b_id, b_off)
+            (a_id, b_id)
           };
           *a_id < block_id && block_id <= *b_id
         }
-    ).map(|((a_id,a_off),(b_id,b_off))| 
+    ).map(|((_a_id,a_off),(_b_id,b_off))| 
       FileOffset::new(a_off.value().max(b_off.value()))
     ).next();
 
@@ -550,9 +561,9 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
     }
 
     // Прыжок к следующему
-    if (block_id.value() - self.current_head().head.block_id.value()) == 1 {
-      return self.next();
-    }
+    // if (block_id.value() - self.current_head().head.block_id.value()) == 1 {
+    //   return self.next();
+    // }
 
     // Прыжок вперед
     {
@@ -613,6 +624,12 @@ fn test_pointer() {
   ).unwrap();
   assert!(ptr.current_head().head.block_id == ptr1.current_head().head.block_id);
 
-  let ptr1 = ptr.jump_back(BlockId::new(9)).unwrap();
+  let _ptr1 = ptr.jump_back(BlockId::new(9)).unwrap();
 
+}
+
+#[test]
+fn test_file() {
+  let file = FileBuff::open_read_write("path").unwrap();
+  let log = LogFile::new(file).unwrap();
 }

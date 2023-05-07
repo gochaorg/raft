@@ -1,10 +1,11 @@
 use std::{
   sync::{Arc, RwLock, PoisonError, RwLockWriteGuard, RwLockReadGuard}, 
   fs::File,
+  fs::OpenOptions,
   io::{
     SeekFrom,
     prelude::*
-  }, fmt,
+  }, fmt, path::Path,
 };
 
 /// Ошибка чтения/записи
@@ -223,6 +224,21 @@ pub struct FileBuff {
   pub file: Arc<RwLock<File>>
 }
 
+impl FileBuff {
+  pub fn open_read_write<P: AsRef<Path>>(path: P) -> Result<Self,ABuffError> {
+    let file = OpenOptions::new().read(true).write(true).create(true).open(path)?;
+    Ok(Self { 
+      file: Arc::new(RwLock::new(file))
+    })
+  }
+  
+  pub fn open_read_only<P: AsRef<Path>>(path: P) -> Result<Self,ABuffError> {
+    Ok(Self {
+      file: Arc::new(RwLock::new(OpenOptions::new().read(true).write(false).create(false).open(path)?))
+    })
+  }
+}
+
 impl WriteBytesTo for FileBuff {
   fn write_to( &mut self, pos:u64, data_provider: &[u8] ) -> Result<(),ABuffError> {
     let mut file = self.file.write()?;
@@ -274,8 +290,9 @@ impl BytesCount for FileBuff {
 
 impl ResizeBytes for FileBuff {
   fn resize_bytes( &mut self, new_size:u64 ) -> Result<(),ABuffError> {
-    let file = self.file.write()?;
+    let mut file = self.file.write()?;
     file.set_len(new_size as u64)?;
+    file.flush()?;
     Ok(())
   }
 }

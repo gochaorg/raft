@@ -15,7 +15,7 @@ pub trait Metrics {
 pub struct DummyCounters;
 
 impl Metrics for DummyCounters {
-    fn inc<'a,'b>( &'a mut self, name:&'b str ) {        
+    fn inc<'a,'b>( &'a mut self, _name:&'b str ) {        
     }
 
     fn snapshot( &self ) -> Self {
