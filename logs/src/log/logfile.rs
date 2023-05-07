@@ -631,5 +631,5 @@ fn test_pointer() {
 #[test]
 fn test_file() {
   let file = FileBuff::open_read_write("path").unwrap();
-  let log = LogFile::new(file).unwrap();
+  let _log = LogFile::new(file).unwrap();
 }
