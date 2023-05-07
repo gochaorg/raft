@@ -160,6 +160,10 @@ impl DataId {
   pub fn value( self ) -> u32 {
     self.0
   }
+
+  pub fn user_data() -> Self {
+    Self::new(1024)
+  }
 }
 
 
@@ -252,11 +256,23 @@ const TAIL_SIZE : u16 = 8;
 #[derive(Debug,Clone, Copy)]
 pub struct BlockHeadSize(u32);
 
+impl BlockHeadSize {
+    pub fn value(self) -> u32 { self.0 }
+}
+
 #[derive(Debug,Clone, Copy)]
 pub struct BlockDataSize(u32);
 
+impl BlockDataSize {
+  pub fn value(self) -> u32 { self.0 }
+}
+
 #[derive(Debug,Clone, Copy)]
 pub struct BlockTailSize(u16);
+
+impl BlockTailSize {
+  pub fn value(self) -> u16 { self.0 }
+}
 
 /// Результат чтения заголовка
 #[derive(Debug,Clone)]
