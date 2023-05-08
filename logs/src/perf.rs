@@ -1,15 +1,17 @@
-use std::{collections::HashMap};
+use std::{collections::HashMap, fmt::Display};
 
 /// Метрики
 /// 
 /// Содержит счетчики которые монотонно увеличиваются
-pub trait Metrics {
+pub trait Metrics: IntoIterator<Item = (String, u64)> {
     /// Увеличивает значение конкретной метрики
     fn inc<'a,'b>( &'a mut self, name:&'b str );
 
     /// Создает снимок метрик
     fn snapshot( &self ) -> Self;
 }
+
+///////////////////////////////////////////////////////////////////////
 
 #[derive(Debug,Clone)]
 pub struct DummyCounters;
@@ -23,6 +25,25 @@ impl Metrics for DummyCounters {
     }
 }
 
+pub struct DummyIterator;
+
+impl IntoIterator for DummyCounters {
+    type IntoIter = DummyIterator;
+    type Item = (String, u64);
+    fn into_iter(self) -> Self::IntoIter {
+        DummyIterator
+    }
+}
+
+impl Iterator for DummyIterator {
+    type Item = (String, u64);
+    fn next(&mut self) -> Option<Self::Item> {
+        None
+    }
+}
+
+///////////////////////////////////////////////////////////////////////
+
 /// Счетчики расположенные в памяти
 #[derive(Debug,Clone)]
 pub struct Counters {
@@ -32,6 +53,28 @@ pub struct Counters {
 impl Counters {
     pub fn new() -> Self {
         Self { map: Box::new(HashMap::new()) }
+    }
+
+    pub fn diff( &self, other:&Counters ) -> Self {
+        let mut map = Box::new(HashMap::<String,u64>::new());
+        for key in self.map.keys() {
+            let v1 = *self.map.get(key).unwrap();
+            let diff_v = match other.map.get(key) {
+                Some(v2) => {
+                    let v2 = *v2;
+                    v2.max(v1) - v2.min(v1)
+                },
+                None => { v1 }
+            };
+            map.insert(key.clone(), diff_v);
+        }
+
+        other.map.keys().filter(|k| !self.map.contains_key(*k) ).for_each(|k| {
+            let v = *other.map.get(k).unwrap();
+            map.insert(k.clone(), v);
+        });
+
+        Self { map: map }
     }
 }
 
@@ -127,5 +170,18 @@ fn test_counters() {
     
     for (name,cnt) in &counters {
         println!("{name}={cnt}")
+    }
+}
+
+impl Display for Counters {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let counters = self.clone();
+        let mut msg = String::new();
+
+        for (name, cnt) in counters {
+            msg.push_str( &format!("{name} {cnt}") );
+        }
+
+        write!(f,"{}",msg)
     }
 }
