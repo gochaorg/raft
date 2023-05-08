@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display, time::{Duration, Instant}};
 
 /// Метрики
 /// 
@@ -47,12 +47,14 @@ impl Iterator for DummyIterator {
 /// Счетчики расположенные в памяти
 #[derive(Debug,Clone)]
 pub struct Counters {
-    pub map: Box<HashMap<String,u64>>
+    pub map: Box<HashMap<String,u64>>,
 }
 
 impl Counters {
     pub fn new() -> Self {
-        Self { map: Box::new(HashMap::new()) }
+        Self { 
+            map: Box::new(HashMap::new()) ,
+        }
     }
 
     pub fn diff( &self, other:&Counters ) -> Self {
@@ -74,7 +76,11 @@ impl Counters {
             map.insert(k.clone(), v);
         });
 
-        Self { map: map }
+        //.....
+
+        Self { 
+            map: map,
+        }
     }
 }
 
@@ -142,7 +148,7 @@ impl From<Counters> for CountersItrBySnapshot {
 impl Iterator for CountersItrBySnapshot {
     type Item = (String,u64);
     fn next(&mut self) -> Option<Self::Item> {
-        if self.pointer > self.keys.len() {
+        if self.pointer >= self.keys.len() {
             None
         } else {
             let k = self.keys[self.pointer].clone();
@@ -179,7 +185,7 @@ impl Display for Counters {
         let mut msg = String::new();
 
         for (name, cnt) in counters {
-            msg.push_str( &format!("{name} {cnt}") );
+            msg.push_str( &format!("{name} {cnt}\n") );
         }
 
         write!(f,"{}",msg)

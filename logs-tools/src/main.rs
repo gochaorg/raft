@@ -10,12 +10,12 @@
 
 mod err;
 
-use logs::{bbuff::absbuff::*, logfile::{LogFile, GetPointer}, block::DataId};
+use logs::{bbuff::absbuff::*, logfile::{LogFile, GetPointer}, block::DataId, perf::Counters};
 use std::{
     env, 
     path::{Path, PathBuf}, 
     fs::OpenOptions,
-    io::prelude::*, sync::{RwLock, Arc}
+    io::prelude::*, sync::{RwLock, Arc}, time::Instant
 };
 use err::LogToolErr;
 
@@ -104,10 +104,20 @@ impl Action {
                 let mut p1 = PathBuf::new();
                 p1.push(entry_file);
                 
-                append_file(
+                let atiming = append_file(
                     p0, 
                     p1 
-                )
+                )?;
+
+                println!("duration:");
+                let timing = atiming.timing;
+                timing.iter().skip(1).zip( 
+                    timing.iter() ).map( |(a,b)| a.duration_since(*b) 
+                ).enumerate().for_each( |(idx,dur)| println!("{idx} {:?}",dur) );
+
+                println!("metrics:\n {}", atiming.log_counters );
+
+                Ok(())
             },
             Action::ViewHeads { log_file } => {
                 let mut p0 = PathBuf::new();
@@ -119,11 +129,26 @@ impl Action {
     }
 }
 
-fn append_file<P: AsRef<Path>, P2: AsRef<Path>>( log_file: P, entry_file: P2 ) -> Result<(), LogToolErr> {
+const READ_BUFF_SZIE: usize = 1024*1024;
+
+struct AppendFileTiming {
+    pub timing : Box<Vec<Instant>>,
+    pub log_counters: Box<Counters>,
+}
+
+fn append_file<P: AsRef<Path>, P2: AsRef<Path>>( log_file: P, entry_file: P2 ) -> Result<AppendFileTiming, LogToolErr> {
+    let mut timing : Box<Vec<Instant>> = Box::new(Vec::<Instant>::new());
+
+    timing.push(Instant::now());
+
     let buff = FileBuff::open_read_write(log_file)?;
+    timing.push(Instant::now());
+
     let mut log = LogFile::new(buff)?;
+    timing.push(Instant::now());
 
     let mut entry_file = OpenOptions::new().read(true).create(false).write(false).open(entry_file)?;
+    timing.push(Instant::now());
 
     let file_size = entry_file.metadata()?.len();
     if file_size > usize::MAX as u64 {
@@ -136,7 +161,8 @@ fn append_file<P: AsRef<Path>, P2: AsRef<Path>>( log_file: P, entry_file: P2 ) -
     let mut block_ptr = 0usize;
 
     entry_file.seek(std::io::SeekFrom::Start(0))?;
-    let mut read_buff: [u8; 1024*8] = [0; 1024*8];    
+    let mut read_buff: [u8; READ_BUFF_SZIE] = [0; READ_BUFF_SZIE];    
+    timing.push(Instant::now());
 
     while block_ptr < file_size {
         let reads = entry_file.read(&mut read_buff)?;
@@ -150,9 +176,14 @@ fn append_file<P: AsRef<Path>, P2: AsRef<Path>>( log_file: P, entry_file: P2 ) -
         }
     }
 
+    timing.push(Instant::now());
     log.append_data(DataId::user_data(), &block_data[0..block_data.len()])?;
 
-    Ok(())
+    timing.push(Instant::now());
+    Ok(AppendFileTiming { 
+        timing: timing,
+        log_counters: Box::new(log.counters.clone().read()?.clone())
+    })
 }
 
 fn view_logfile<P: AsRef<Path>>( log_file: P ) -> Result<(), LogToolErr> {

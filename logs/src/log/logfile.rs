@@ -49,7 +49,6 @@ use crate::perf::Metrics;
 
 use super::block::*;
 use super::super::bbuff::absbuff::*;
-use std::path::Path;
 use std::sync::{Arc, RwLock, PoisonError, RwLockReadGuard, RwLockWriteGuard};
 use std::fmt;
 use super::super::perf::Counters;
@@ -60,7 +59,7 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
 {
   buff: FlatBuff,  
   last_blocks: Box<Vec<BlockHeadRead>>,
-  pub metrics: Arc<RwLock<Counters>>,
+  pub counters: Arc<RwLock<Counters>>,
 }
 
 impl<A> fmt::Display for LogFile<A> 
@@ -137,7 +136,7 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
         LogFile {
           buff: buff,
           last_blocks: Box::new(Vec::<BlockHeadRead>::new()),
-          metrics: Arc::new(RwLock::new(Counters::new()))
+          counters: Arc::new(RwLock::new(Counters::new()))
         }
       )
     }
@@ -152,28 +151,27 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
       LogFile {
         buff: buff,
         last_blocks: last_blocks,
-        metrics: Arc::new(RwLock::new(Counters::new()))
+        counters: Arc::new(RwLock::new(Counters::new()))
       }
     )
   }
 
-  pub fn open_file_for_write<P: AsRef<Path>>( path: P ) -> Result<LogFile<FileBuff>, LogErr> {
-    let buff = FileBuff::open_read_write(path)?;
-    LogFile::new(buff)
-  }
+  // pub fn open_file_for_write<P: AsRef<Path>>( path: P ) -> Result<LogFile<FileBuff>, LogErr> {
+  //   let buff = FileBuff::open_read_write(path)?;
+  //   LogFile::new(buff)
+  // }
 
-  pub fn open_file_for_read<P: AsRef<Path>>( path: P ) -> Result<LogFile<FileBuff>, LogErr> {
-    let buff = FileBuff::open_read_only(path)?;
-    LogFile::new(buff)
-  }
+  // pub fn open_file_for_read<P: AsRef<Path>>( path: P ) -> Result<LogFile<FileBuff>, LogErr> {
+  //   let buff = FileBuff::open_read_only(path)?;
+  //   LogFile::new(buff)
+  // }
 
   /// Добавление блока в лог файл
   /// 
   /// # Аргументы
   /// - `block` - добавляемый блок
-  #[allow(dead_code)]
   fn append_block( &mut self, block: &Block ) -> Result<(), LogErr> {
-    { self.metrics.write()?.inc("append_next_block"); }
+    { self.counters.write()?.inc("append_next_block"); }
 
     if self.last_blocks.is_empty() {
       self.append_first_block(block)
@@ -203,7 +201,7 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
       self.last_blocks[0] = writed_block;
     }
 
-    { self.metrics.write()?.inc("append_next_block.succ"); }
+    { self.counters.write()?.inc("append_next_block.succ"); }
 
     Ok(())
   }
@@ -250,20 +248,19 @@ fn test_raw_append_block() {
   println!("log {}", log);
 }
 
-#[allow(dead_code)]
 impl<FlatBuff> LogFile<FlatBuff> 
 where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
 {
   /// Чтение заголовка в указанной позиции
   fn read_head_at<P:Into<FileOffset>>( &self, position:P ) -> Result<BlockHeadRead,LogErr> {  
-    { self.metrics.write()?.inc("read_head_at"); }
+    { self.counters.write()?.inc("read_head_at"); }
 
     let res = BlockHead::read_form(
       position.into(), 
       &self.buff
     )?;
 
-    { self.metrics.write()?.inc("read_head_at.succ"); }
+    { self.counters.write()?.inc("read_head_at.succ"); }
 
     Ok(res)
   }
@@ -276,35 +273,35 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
   /// # Результат
   /// ( Блок, позиция следующего блока )
   fn read_block_at<P:Into<FileOffset>>( &self, position:P ) -> Result<(Block,u64), LogErr> {
-    { self.metrics.write()?.inc("read_block_at"); }
+    { self.counters.write()?.inc("read_block_at"); }
 
     let res = Block::read_from(
       position.into().value(), 
       &self.buff
     )?;
 
-    { self.metrics.write()?.inc("read_block_at.succ"); }
+    { self.counters.write()?.inc("read_block_at.succ"); }
 
     Ok(res)
   }
 
   /// Получение предшедствующего заголовка перед указанным
   fn read_previous_head( &self, current_block: &BlockHeadRead ) -> Result<Option<BlockHeadRead>, LogErr> {
-    { self.metrics.write()?.inc("read_previous_head"); }
+    { self.counters.write()?.inc("read_previous_head"); }
 
     let res = Tail::try_read_head_at(current_block.position.value(), &self.buff);
     match res {
       Ok(res) => {
-        { self.metrics.write()?.inc("read_previous_head.succ"); }
+        { self.counters.write()?.inc("read_previous_head.succ"); }
         Ok(Some(res))
       },
       Err(err) => match err {
         BlockErr::PositionToSmall { min_position: _, actual: _ } => {
-          { self.metrics.write()?.inc("read_previous_head.succ"); }
+          { self.counters.write()?.inc("read_previous_head.succ"); }
           Ok(None)
         },
         BlockErr::TailPointerOuside { pointer: _ } => {
-          { self.metrics.write()?.inc("read_previous_head.succ"); }
+          { self.counters.write()?.inc("read_previous_head.succ"); }
           Ok(None)
         },
         _ => {
@@ -316,18 +313,18 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
 
   /// Получение заголовка следующего блока за указанным
   fn read_next_head( &self, current_block: &BlockHeadRead ) -> Result<Option<BlockHeadRead>, LogErr> {
-    { self.metrics.write()?.inc("read_next_head"); }
+    { self.counters.write()?.inc("read_next_head"); }
 
     let next_ptr = current_block.block_size() + current_block.position.value();
     let buff_size = self.buff.bytes_count()?;
     if next_ptr >= buff_size { 
-      { self.metrics.write()?.inc("read_next_head.succ"); }
+      { self.counters.write()?.inc("read_next_head.succ"); }
       return Ok(None) 
     }
 
     let res = self.read_head_at(next_ptr).map(|r| Some(r))?;
 
-    { self.metrics.write()?.inc("read_next_head.succ"); }
+    { self.counters.write()?.inc("read_next_head.succ"); }
     Ok(res)
   }
 }
@@ -454,12 +451,19 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
 
   /// Добавление данных в лог
   pub fn append_data( &mut self, data_id: DataId, data: &[u8] ) -> Result<(), LogErr> {
-    { self.metrics.write()?.inc("append_data"); }
+    let res = { 
+      let mut metric = self.counters.write()?;
+      metric.inc("append_data"); 
+
+      // let block = metric.track("build_next_block", || self.clone().build_next_block(data_id, data) );      
+      // metric.track("append_block", || self.clone().append_block(&block) )
+    };
+    // let res = res?;
 
     let block = self.build_next_block(data_id, data);
     let res = self.append_block( &block )?;
 
-    { self.metrics.write()?.inc("append_data.succ"); }
+    { self.counters.write()?.inc("append_data.succ"); }
 
     Ok(res)
   }
