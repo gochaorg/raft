@@ -5,7 +5,7 @@ pub struct Tracker {
 }
 
 impl Tracker {
-  fn track<F,R>( &self, name:&str, tracked:F ) -> R 
+  pub fn track<F,R>( &self, name:&str, tracked:F ) -> R 
   where F: FnOnce() -> R
   {
     let t0 = Instant::now();
@@ -13,7 +13,7 @@ impl Tracker {
     let t1 = Instant::now();
     let dur = t1.duration_since(t0);
     {
-      let mut tracks = self.tracks.write();
+      let tracks = self.tracks.write();
       match tracks {
         Err(_) => {},
         Ok(mut tracks) => {

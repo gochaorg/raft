@@ -451,7 +451,7 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
 
   /// Добавление данных в лог
   pub fn append_data( &mut self, data_id: DataId, data: &[u8] ) -> Result<(), LogErr> {
-    let res = { 
+    { 
       let mut metric = self.counters.write()?;
       metric.inc("append_data"); 
 
