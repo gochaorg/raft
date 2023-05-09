@@ -1,10 +1,17 @@
 use std::{sync::{RwLock, Arc}, collections::HashMap, time::{Duration, Instant}, fmt::Display};
 
+#[derive(Debug, Clone)]
 pub struct Tracker {
   pub tracks: Arc<RwLock<HashMap<String,(u64, Duration)>>>
 }
 
 impl Tracker {
+  pub fn new() -> Self {
+    Self {
+      tracks: Arc::new(RwLock::new(HashMap::new()))
+    }
+  }
+
   pub fn track<F,R>( &self, name:&str, tracked:F ) -> R 
   where F: FnOnce() -> R
   {
@@ -46,7 +53,9 @@ impl Display for Tracker {
         for key in keys {
           match tracks.get(&key) {
             Some( (cnt,dur) ) => {
-              msg.push_str(&format!("{key} {cnt} {dur:?}\n"))
+              let avg = Duration::from_nanos( (dur.as_nanos() / (*cnt as u128)) as u64 );
+
+              msg.push_str(&format!("{key} cnt={cnt} dur.sum={dur:?} dur.avg={avg:?}\n"))
             },
             None => {}
           }

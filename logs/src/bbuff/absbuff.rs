@@ -8,6 +8,8 @@ use std::{
   }, fmt, path::Path,
 };
 
+use crate::perf::Tracker;
+
 /// Ошибка чтения/записи
 #[derive(Debug,Clone)]
 pub enum ABuffError{
@@ -221,20 +223,27 @@ impl ResizeBytes for ByteBuff {
 /// Файловый буффер
 #[derive(Debug,Clone)]
 pub struct FileBuff {
-  pub file: Arc<RwLock<File>>
+  pub file: Arc<RwLock<File>>,
+  pub tracker: Arc<Tracker>,
 }
 
 impl FileBuff {
+  pub fn change_tracker( &mut self, new_tracker: Arc<Tracker> ) {
+    self.tracker = new_tracker;
+  }
+
   pub fn open_read_write<P: AsRef<Path>>(path: P) -> Result<Self,ABuffError> {
     let file = OpenOptions::new().read(true).write(true).create(true).open(path)?;
     Ok(Self { 
-      file: Arc::new(RwLock::new(file))
+      file: Arc::new(RwLock::new(file)),
+      tracker: Arc::new(Tracker::new()),
     })
   }
   
   pub fn open_read_only<P: AsRef<Path>>(path: P) -> Result<Self,ABuffError> {
     Ok(Self {
-      file: Arc::new(RwLock::new(OpenOptions::new().read(true).write(false).create(false).open(path)?))
+      file: Arc::new(RwLock::new(OpenOptions::new().read(true).write(false).create(false).open(path)?)),
+      tracker: Arc::new(Tracker::new()),
     })
   }
 }
@@ -247,12 +256,13 @@ impl WriteBytesTo for FileBuff {
     let min_size = pos + data_provider.len() as u64;
 
     if file_len < min_size {
-      file.set_len( min_size as u64 )?
+      self.tracker.track("file.set_len", || file.set_len( min_size as u64 ))?;
+      //file.set_len( min_size as u64 )?
     }
 
-    file.seek(SeekFrom::Start(pos as u64))?;
+    self.tracker.track( "file.seek", || file.seek(SeekFrom::Start(pos as u64)) )?;
 
-    let writed = file.write(data_provider)?;
+    let writed = self.tracker.track("file.write", || file.write(data_provider) )?;
     if writed < data_provider.len() {
       let expect = data_provider.len();      
       return Err(
@@ -260,7 +270,7 @@ impl WriteBytesTo for FileBuff {
       );
     }
 
-    file.flush()?;
+    self.tracker.track("file.flush", || file.flush())?;
     
     Ok(())
   }

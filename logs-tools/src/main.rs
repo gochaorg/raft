@@ -10,7 +10,7 @@
 
 mod err;
 
-use logs::{bbuff::absbuff::*, logfile::{LogFile, GetPointer}, block::DataId, perf::Counters};
+use logs::{bbuff::absbuff::*, logfile::{LogFile, GetPointer}, block::DataId, perf::{Counters, Tracker}};
 use std::{
     env, 
     path::{Path, PathBuf}, 
@@ -116,6 +116,7 @@ impl Action {
                 ).enumerate().for_each( |(idx,dur)| println!("{idx} {:?}",dur) );
 
                 println!("metrics:\n {}", atiming.log_counters );
+                println!("buff tracks:\n{}", atiming.buff_tracker);
 
                 Ok(())
             },
@@ -134,6 +135,7 @@ const READ_BUFF_SZIE: usize = 1024*1024;
 struct AppendFileTiming {
     pub timing : Box<Vec<Instant>>,
     pub log_counters: Box<Counters>,
+    pub buff_tracker: Arc<Tracker>,
 }
 
 fn append_file<P: AsRef<Path>, P2: AsRef<Path>>( log_file: P, entry_file: P2 ) -> Result<AppendFileTiming, LogToolErr> {
@@ -142,6 +144,7 @@ fn append_file<P: AsRef<Path>, P2: AsRef<Path>>( log_file: P, entry_file: P2 ) -
     timing.push(Instant::now());
 
     let buff = FileBuff::open_read_write(log_file)?;
+    let buff_track = buff.tracker.clone();
     timing.push(Instant::now());
 
     let mut log = LogFile::new(buff)?;
@@ -180,9 +183,11 @@ fn append_file<P: AsRef<Path>, P2: AsRef<Path>>( log_file: P, entry_file: P2 ) -
     log.append_data(DataId::user_data(), &block_data[0..block_data.len()])?;
 
     timing.push(Instant::now());
+
     Ok(AppendFileTiming { 
         timing: timing,
-        log_counters: Box::new(log.counters.clone().read()?.clone())
+        log_counters: Box::new(log.counters.clone().read()?.clone()),
+        buff_tracker: buff_track
     })
 }
 
