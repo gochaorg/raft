@@ -117,6 +117,7 @@ impl Action {
 
                 println!("metrics:\n {}", atiming.log_counters );
                 println!("buff tracks:\n{}", atiming.buff_tracker);
+                println!("log tracks:\n{}", atiming.log_tacker);
 
                 Ok(())
             },
@@ -136,6 +137,7 @@ struct AppendFileTiming {
     pub timing : Box<Vec<Instant>>,
     pub log_counters: Box<Counters>,
     pub buff_tracker: Arc<Tracker>,
+    pub log_tacker: Arc<Tracker>,
 }
 
 fn append_file<P: AsRef<Path>, P2: AsRef<Path>>( log_file: P, entry_file: P2 ) -> Result<AppendFileTiming, LogToolErr> {
@@ -187,7 +189,8 @@ fn append_file<P: AsRef<Path>, P2: AsRef<Path>>( log_file: P, entry_file: P2 ) -
     Ok(AppendFileTiming { 
         timing: timing,
         log_counters: Box::new(log.counters.clone().read()?.clone()),
-        buff_tracker: buff_track
+        buff_tracker: buff_track,
+        log_tacker: log.tracker.clone(),
     })
 }
 

@@ -1,3 +1,5 @@
+use crate::perf::Tracker;
+
 /// Потоковая работа с байтовым буфером
 
 /// Запись байтового представления в текщую позиции и перемещение позиции
@@ -11,19 +13,22 @@ pub struct ByteBuff {
   pub buff: Box<Vec<u8>>,
 
   /// Позиция записи
-  pub position: usize
+  pub position: usize,
+
+  /// Метрики
+  pub tracker: Tracker
 }
 
 #[allow(dead_code)]
 impl ByteBuff {
   /// Создание пустого буфера
   pub fn new() -> Self {
-    ByteBuff { buff: Box::new(Vec::<u8>::new()), position: 0 }
+    ByteBuff { buff: Box::new(Vec::<u8>::new()), position: 0, tracker:Tracker::new() }
   }
 
   /// Создание буфера из вектора
   pub fn from( buff: Box<Vec<u8>> ) -> Self {
-    ByteBuff { buff: Box::clone(&buff), position: 0 }
+    ByteBuff { buff: Box::clone(&buff), position: 0, tracker:Tracker::new() }
   }
 
   /// Запись массива байт в текущую позицию и смещение позиции
@@ -32,12 +37,16 @@ impl ByteBuff {
     // extends if need
     if data.len() > available {
       let add = data.len() - available;
-      self.buff.resize(self.buff.len() + add, 0);
+      self.tracker.track("bytebuff/write_byte_arr/resize", ||
+        self.buff.resize(self.buff.len() + add, 0) );
     }
-    for i in 0..data.len() {
-      self.buff[i + self.position] = data[i];
-    }
-    self.position += data.len();
+
+    self.tracker.track("bytebuff/write_byte_arr/write data", || {
+      for i in 0..data.len() {
+        self.buff[i + self.position] = data[i];
+      }
+      self.position += data.len();
+    })
   }
 }
 

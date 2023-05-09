@@ -45,12 +45,13 @@
 //! Получается такое хитрое дерево, по которому возможно быстрая навигация назад.
 //! см [BackRefs]
 
-use crate::perf::Metrics;
+use crate::perf::{Metrics, Tracker};
 
 use super::block::*;
 use super::super::bbuff::absbuff::*;
 use std::sync::{Arc, RwLock, PoisonError, RwLockReadGuard, RwLockWriteGuard};
 use std::fmt;
+use std::time::{Instant};
 use super::super::perf::Counters;
 
 #[derive(Clone)]
@@ -60,6 +61,7 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
   buff: FlatBuff,  
   last_blocks: Box<Vec<BlockHeadRead>>,
   pub counters: Arc<RwLock<Counters>>,
+  pub tracker: Arc<Tracker>,
 }
 
 impl<A> fmt::Display for LogFile<A> 
@@ -136,7 +138,8 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
         LogFile {
           buff: buff,
           last_blocks: Box::new(Vec::<BlockHeadRead>::new()),
-          counters: Arc::new(RwLock::new(Counters::new()))
+          counters: Arc::new(RwLock::new(Counters::new())),
+          tracker: Arc::new(Tracker::new())
         }
       )
     }
@@ -151,20 +154,11 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
       LogFile {
         buff: buff,
         last_blocks: last_blocks,
-        counters: Arc::new(RwLock::new(Counters::new()))
+        counters: Arc::new(RwLock::new(Counters::new())),
+        tracker: Arc::new(Tracker::new())
       }
     )
   }
-
-  // pub fn open_file_for_write<P: AsRef<Path>>( path: P ) -> Result<LogFile<FileBuff>, LogErr> {
-  //   let buff = FileBuff::open_read_write(path)?;
-  //   LogFile::new(buff)
-  // }
-
-  // pub fn open_file_for_read<P: AsRef<Path>>( path: P ) -> Result<LogFile<FileBuff>, LogErr> {
-  //   let buff = FileBuff::open_read_only(path)?;
-  //   LogFile::new(buff)
-  // }
 
   /// Добавление блока в лог файл
   /// 
@@ -193,7 +187,12 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
   /// 
   /// Обновляет/вставляет ссылку на записанный блок в `last_blocks[0]`
   fn append_next_block( &mut self, position:u64, block:&Block ) -> Result<(), LogErr> {
-    let writed_block = block.write_to(position, &mut self.buff)?;
+    let sub_track = self.tracker.sub_tracker("append_next_block/block.write_to/");
+
+    let t0 = Instant::now();        
+    let writed_block = block.write_to(position, &mut self.buff, &sub_track)?;
+
+    let t1 = Instant::now();
 
     if self.last_blocks.is_empty() {
       self.last_blocks.push(writed_block)
@@ -203,6 +202,9 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
 
     { self.counters.write()?.inc("append_next_block.succ"); }
 
+    let t2 = Instant::now();
+    self.tracker.add("append_next_block/update_last_block", t2.duration_since(t1));
+    self.tracker.add("append_next_block", t2.duration_since(t0));
     Ok(())
   }
 }
@@ -382,17 +384,18 @@ impl<FlatBuff> LogFile<FlatBuff>
 where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
 {
   fn build_next_block(  &mut self, data_id: DataId, data: &[u8] ) -> Block {
+
     // build BlockData
     let mut block_data = Vec::<u8>::new();
     block_data.resize( data.len(), 0 );
-    for i in 0..data.len() { block_data[i] = data[i] }
+    for i in 0..data.len() { block_data[i] = data[i] }    
     let block_data = Box::new(block_data);
 
     // build BlockOptions
     let block_opt = BlockOptions::default();
     
     if self.last_blocks.is_empty() {
-      return Block {
+      let res = Block {
         head: BlockHead { 
           block_id: BlockId::new(0), 
           data_type_id: data_id, 
@@ -400,7 +403,8 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
           block_options: block_opt 
         },
         data: block_data
-      }
+      };
+      return res;
     }
 
     let last_block = &self.last_blocks[0];
@@ -454,14 +458,14 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
     { 
       let mut metric = self.counters.write()?;
       metric.inc("append_data"); 
-
-      // let block = metric.track("build_next_block", || self.clone().build_next_block(data_id, data) );      
-      // metric.track("append_block", || self.clone().append_block(&block) )
     };
-    // let res = res?;
 
-    let block = self.build_next_block(data_id, data);
-    let res = self.append_block( &block )?;
+    let tracker = self.tracker.clone();
+
+    let block = tracker.track("append_data.build_next_block", || self.build_next_block(data_id, data) );
+    let res = tracker.track("append_data.append_block", || self.append_block( &block ) );
+
+    let res = res?;
 
     { self.counters.write()?.inc("append_data.succ"); }
 

@@ -24,9 +24,9 @@
 //! | head.back_ref.b_id   | u32          | Идентификатор блока |
 //! | head.back_ref.b_off  | u64          | Смещение блока |
 //! | head.block_options   | BlockOptions | Опции блока    |
-use std::fmt;
+use std::{fmt, time::Instant};
 
-use crate::bbuff::{streambuff::{ByteBuff, ByteReader, ByteWriter}, absbuff::{ABuffError}};
+use crate::{bbuff::{streambuff::{ByteBuff, ByteReader, ByteWriter}, absbuff::{ABuffError}}, perf::Tracker};
 use crate::bbuff::absbuff::{ ReadBytesFrom, WriteBytesTo };
 
 /// Блок лога
@@ -340,9 +340,11 @@ fn read_block_head( data: Box<Vec<u8>> ) -> Result<(BlockHead, BlockHeadSize, Bl
 }
 
 #[allow(dead_code)]
-fn write_block_head( head:BlockHead, data_size:u32, tail_size:u16 ) -> Box<Vec<u8>> {
+fn write_block_head( head:&BlockHead, data_size:u32, tail_size:u16, tracker:&Tracker ) -> Box<Vec<u8>> {
   let mut bbuf = ByteBuff::new();
+  bbuf.tracker = tracker.clone();
 
+  let t0 = Instant::now();
   bbuf.position = 0;
   bbuf.write(0u32);
   bbuf.write(data_size);
@@ -361,6 +363,9 @@ fn write_block_head( head:BlockHead, data_size:u32, tail_size:u16 ) -> Box<Vec<u
   bbuf.position = 0;
   bbuf.write(size as u32);
 
+  let t99 = Instant::now();
+  tracker.add("write_block_head", t99.duration_since(t0));
+
   bbuf.buff
 }
 
@@ -376,7 +381,8 @@ fn test_block() {
     block_options: BlockOptions::default()
   };
 
-  let block_data = write_block_head(bh, 134, TAIL_SIZE);
+  let tracker = Tracker::new();
+  let block_data = write_block_head(&bh, 134, TAIL_SIZE, &tracker);
   println!("{:?}",read_block_head(block_data));
 }
 
@@ -451,8 +457,10 @@ impl Tail {
 impl Block {
   /// Формирование массива байтов представлющих блок
   #[allow(dead_code)]
-  pub fn to_bytes( &self ) -> (Box<Vec<u8>>, BlockHeadSize, BlockDataSize, BlockTailSize) {
+  pub fn to_bytes( &self, tracker:&Tracker ) -> (Box<Vec<u8>>, BlockHeadSize, BlockDataSize, BlockTailSize) {
     // write tail marker
+    let t0 = Instant::now();
+    
     let mut tail = Box::new(Vec::<u8>::new());
     for i in 0..TAIL_MARKER.len() {
       tail.push(TAIL_MARKER.as_bytes()[i]);
@@ -460,22 +468,35 @@ impl Block {
     tail.push(0);tail.push(0);tail.push(0);tail.push(0);
 
     // write head
-    let mut bytes = write_block_head(self.head.clone(), self.data.len() as u32, tail.len() as u16);
+    let t1 = Instant::now();
+    
+    let mut bytes = 
+      tracker.track("to_bytes/write_block_head", || {
+        write_block_head(&self.head, self.data.len() as u32, tail.len() as u16, tracker)
+      });
+
     let block_head_size = BlockHeadSize(bytes.len() as u32);
     let block_data_size = BlockDataSize(self.data.len() as u32);
     let block_tail_size = BlockTailSize(tail.len() as u16);
 
     let off = bytes.len();
+    
     if self.data.len()>0 {      
-      bytes.resize(bytes.len() + self.data.len() + tail.len(), 0)
+      tracker.track("to_bytes/bytes.resize", || {
+        bytes.resize(bytes.len() + self.data.len() + tail.len(), 0)
+      })
     }
 
     // copy data
-    for i in 0..(self.data.len()) {
-      bytes[off + i] = self.data[i]
-    }
+    let t2 = Instant::now();
+    tracker.track("to_bytes/copy data", || {
+      for i in 0..(self.data.len()) {
+        bytes[off + i] = self.data[i]
+      }
+    });
 
     // update tail data
+    let t3 = Instant::now();
     let total_size = bytes.len() as u32;
     let total_size = total_size.to_le_bytes();
     tail[4] = total_size[0];
@@ -487,6 +508,12 @@ impl Block {
     for i in 0..tail.len() {
       bytes[ blen - tail.len() + i ] = tail[i];
     }
+
+    let t4 = Instant::now();
+    tracker.add("to_bytes/tail write",t4.duration_since(t3));
+    tracker.add("to_bytes/tail marker write",t1.duration_since(t0));
+    tracker.add("to_bytes/head write",t2.duration_since(t1));
+    tracker.add("to_bytes", t4.duration_since(t0));
 
     (bytes, block_head_size, block_data_size, block_tail_size)
   }
@@ -501,8 +528,8 @@ impl BlockHead {
 
   /// Формирование байтового представления
   #[allow(dead_code)]
-  pub fn to_bytes( &self, data_size:u32 ) -> Box<Vec<u8>> {
-    write_block_head( self.clone(), data_size, 8)
+  pub fn to_bytes( &self, data_size:u32, tracker: &Tracker ) -> Box<Vec<u8>> {
+    write_block_head( &self, data_size, 8, tracker)
   }
 
   /// Чтение заголовка из указанной позиции
@@ -639,7 +666,6 @@ const PREVIEW_SIZE:usize = 1024 * 64;
 
 impl Block {
   /// Чтение блока из массива байт
-  #[allow(dead_code)]
   pub fn read_from<Source>( position: u64, file: &Source ) -> Result<(Self,u64), BlockErr> 
   where Source : ReadBytesFrom
   {
@@ -675,12 +701,22 @@ impl Block {
   }
 
   /// Запись блока в массив байтов
-  #[allow(dead_code)]
-  pub fn write_to<Destination>( &self, position:u64, dest:&mut Destination ) -> Result<BlockHeadRead,BlockErr> 
+  pub fn write_to<Destination>( &self, position:u64, dest:&mut Destination, tracker: &Tracker ) -> Result<BlockHeadRead,BlockErr> 
   where Destination: WriteBytesTo
   {
-    let (bytes,head_size,data_size,tail_size) = self.to_bytes();
+    let sub_track = tracker.sub_tracker("to_bytes/");
+
+    let t0 = Instant::now();
+    let (bytes,head_size,data_size,tail_size) = self.to_bytes(&sub_track);
+
+    let t1 = Instant::now();    
     dest.write_to( position, &bytes[0 .. bytes.len()])?;
+
+    let t2 = Instant::now();
+    tracker.add("write_to", t2.duration_since(t0));
+    tracker.add("write_to/self.to_bytes", t1.duration_since(t0));
+    tracker.add("write_to/dest.write_to", t2.duration_since(t1));
+
     Ok(
       BlockHeadRead { 
         position: FileOffset::from(position), 
@@ -705,7 +741,9 @@ fn test_block_rw(){
     data: Box::new( vec![1,2,3] )
   };
 
-  block.write_to(0, &mut bb).unwrap();
+  let tracker = Tracker::new();
+
+  block.write_to(0, &mut bb, &tracker).unwrap();
   println!("{block_size}", block_size=bb.bytes_count().unwrap() );
 
   let (rblock,_) = Block::read_from(0, &bb).unwrap();
