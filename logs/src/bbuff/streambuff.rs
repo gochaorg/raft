@@ -7,7 +7,14 @@ pub trait ByteWriter<V:Sized> {
   fn write( &mut self, v:V );
 }
 
+#[derive(Clone, Debug)]
+struct ResizeScale {
+  pub target_size_min: usize,
+  pub extend_size: usize,
+}
+
 /// Буфер записи
+#[derive(Debug,Clone)]
 pub struct ByteBuff {
   /// Буфер
   pub buff: Box<Vec<u8>>,
@@ -16,8 +23,19 @@ pub struct ByteBuff {
   pub position: usize,
 
   /// Метрики
-  pub tracker: Tracker
+  pub tracker: Tracker,
 }
+
+const ONE_MB: usize = 1024*1024;
+const RESIZE_SCALES: [ResizeScale; 6] = 
+    [
+      ResizeScale { target_size_min:ONE_MB*16, extend_size: ONE_MB*16 },
+      ResizeScale { target_size_min:1024*256, extend_size:ONE_MB },
+      ResizeScale { target_size_min:1024*16, extend_size:1024*256 },
+      ResizeScale { target_size_min:1024, extend_size:1024*16 },
+      ResizeScale { target_size_min:128, extend_size:1024 },
+      ResizeScale { target_size_min:0, extend_size:128 },
+    ];
 
 #[allow(dead_code)]
 impl ByteBuff {
@@ -37,14 +55,33 @@ impl ByteBuff {
     // extends if need
     if data.len() > available {
       let add = data.len() - available;
-      self.tracker.track("bytebuff/write_byte_arr/resize", ||
-        self.buff.resize(self.buff.len() + add, 0) );
+      let target_size = self.buff.len() + add;
+
+      let trunc_available = self.buff.capacity();
+      if data.len() > trunc_available {
+        let extend_size = 
+          RESIZE_SCALES.iter().filter(|scale| scale.target_size_min <= target_size )
+            .map(|scale| scale.extend_size)
+            .next().unwrap_or_else(|| (1024* 64) as usize);
+
+        let len_target = target_size;
+        let resize_target = (target_size / extend_size) * extend_size +
+          if (target_size % extend_size) > 0 { extend_size } else { 0usize };
+
+        self.tracker.track("bytebuff/write_byte_arr/resize", ||
+          self.buff.resize(resize_target, 0) );
+
+        self.buff.truncate(len_target);
+      } else {
+        self.tracker.track("bytebuff/write_byte_arr/truncate", ||
+          self.buff.truncate(target_size) );
+      }
     }
 
     self.tracker.track("bytebuff/write_byte_arr/write data", || {
-      for i in 0..data.len() {
-        self.buff[i + self.position] = data[i];
-      }
+      let data_part = &mut self.buff[self.position .. (self.position + data.len())];
+      data_part.copy_from_slice(&data);
+
       self.position += data.len();
     })
   }

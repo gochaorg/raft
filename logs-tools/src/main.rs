@@ -18,7 +18,7 @@ use std::{
     io::prelude::*, sync::{RwLock, Arc}, time::Instant
 };
 use err::LogToolErr;
-use sha2::{Sha256, Sha512, Digest, digest};
+use sha2::{Sha256, Digest};
 
 fn main() {
     let args:Vec<String> = env::args().collect();
