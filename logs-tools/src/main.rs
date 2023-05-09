@@ -18,6 +18,7 @@ use std::{
     io::prelude::*, sync::{RwLock, Arc}, time::Instant
 };
 use err::LogToolErr;
+use sha2::{Sha256, Sha512, Digest, digest};
 
 fn main() {
     let args:Vec<String> = env::args().collect();
@@ -39,6 +40,7 @@ fn parse_args( args:&Vec<String> ) -> Box<Vec<Action>> {
 
     let mut state = "state";
     let mut append_log:Box<Option<String>> = Box::new(None);
+    let mut sha256 = false;
 
     loop {
         let arg = itr.next();
@@ -51,6 +53,10 @@ fn parse_args( args:&Vec<String> ) -> Box<Vec<Action>> {
                     state = "append"
                 } else if arg == "v" {
                     state = "view"
+                } else if arg == "+sha256" {
+                    sha256 = true
+                } else if arg == "-sha256" {
+                    sha256 = false
                 } else {
                     println!("undefined arg {arg}")
                 }
@@ -72,7 +78,8 @@ fn parse_args( args:&Vec<String> ) -> Box<Vec<Action>> {
                 state = "state";
                 actions.push(
                     Action::ViewHeads { 
-                        log_file: arg.clone()
+                        log_file: arg.clone(),
+                        sha256: sha256,
                     }
                 )
             }
@@ -90,7 +97,8 @@ enum Action {
         entry_file: String,
     },
     ViewHeads {
-        log_file: String
+        log_file: String,
+        sha256: bool,
     }
 }
 
@@ -121,11 +129,11 @@ impl Action {
 
                 Ok(())
             },
-            Action::ViewHeads { log_file } => {
+            Action::ViewHeads { log_file , sha256 } => {
                 let mut p0 = PathBuf::new();
                 p0.push(log_file);
 
-                view_logfile(p0)
+                view_logfile(p0, *sha256)
             }
         }
     }
@@ -194,7 +202,7 @@ fn append_file<P: AsRef<Path>, P2: AsRef<Path>>( log_file: P, entry_file: P2 ) -
     })
 }
 
-fn view_logfile<P: AsRef<Path>>( log_file: P ) -> Result<(), LogToolErr> {
+fn view_logfile<P: AsRef<Path>>( log_file: P, sha256:bool ) -> Result<(), LogToolErr> {
     let buff = FileBuff::open_read_only(log_file)?;
     let log = LogFile::new(buff)?;
     let log = Arc::new(RwLock::new(log));
@@ -202,11 +210,27 @@ fn view_logfile<P: AsRef<Path>>( log_file: P ) -> Result<(), LogToolErr> {
     let mut ptr = log.pointer_to_end()?;
     loop {
         let h = ptr.current_head();
-        println!(
+        print!(
             "{b_id:0>6} {d_size:0>10}", 
             b_id   = h.head.block_id.value(),
             d_size = h.data_size.value()
         );
+
+        if sha256 {
+            match ptr.current_data() {
+                Ok(data) => {
+                    let mut hasher = Sha256::new();
+                    hasher.update(*data);
+                    let hash = hasher.finalize();
+                    let hash = hex::encode(hash);
+                    print!(" {hash}");
+                },
+                Err(err) => {
+                    print!("can't read data {err:?}")
+                }
+            }
+        }
+        println!();
 
         match ptr.previous() {
             Ok(next_ptr) => {

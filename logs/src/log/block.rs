@@ -461,23 +461,24 @@ impl Block {
     // write tail marker
     let t0 = Instant::now();
     
-    let mut tail = Box::new(Vec::<u8>::new());
-    for i in 0..TAIL_MARKER.len() {
-      tail.push(TAIL_MARKER.as_bytes()[i]);
-    }
-    tail.push(0);tail.push(0);tail.push(0);tail.push(0);
+    let mut tail = tracker.track("to_bytes/tail marker", || { 
+      let mut tail = Box::new(Vec::<u8>::new());
+      for i in 0..TAIL_MARKER.len() {
+        tail.push(TAIL_MARKER.as_bytes()[i]);
+      }
+      tail.push(0);tail.push(0);tail.push(0);tail.push(0);
+      tail
+    });
 
     // write head
-    let t1 = Instant::now();
-    
     let mut bytes = 
       tracker.track("to_bytes/write_block_head", || {
         write_block_head(&self.head, self.data.len() as u32, tail.len() as u16, tracker)
       });
 
-    let block_head_size = BlockHeadSize(bytes.len() as u32);
-    let block_data_size = BlockDataSize(self.data.len() as u32);
-    let block_tail_size = BlockTailSize(tail.len() as u16);
+    let block_head_size = tracker.track("to_bytes/block_head_size",||BlockHeadSize(bytes.len() as u32));
+    let block_data_size = tracker.track("to_bytes/block_data_size",||BlockDataSize(self.data.len() as u32));
+    let block_tail_size = tracker.track("to_bytes/block_tail_size",||BlockTailSize(tail.len() as u16));
 
     let off = bytes.len();
     
@@ -488,31 +489,27 @@ impl Block {
     }
 
     // copy data
-    let t2 = Instant::now();
     tracker.track("to_bytes/copy data", || {
-      for i in 0..(self.data.len()) {
-        bytes[off + i] = self.data[i]
-      }
+      let data_part = &mut bytes[off .. (off + self.data.len())];
+      data_part.copy_from_slice(&self.data);
     });
 
     // update tail data
-    let t3 = Instant::now();
-    let total_size = bytes.len() as u32;
-    let total_size = total_size.to_le_bytes();
-    tail[4] = total_size[0];
-    tail[5] = total_size[1];
-    tail[6] = total_size[2];
-    tail[7] = total_size[3];
+    tracker.track("to_bytes/tail update", ||{
+      let total_size = bytes.len() as u32;
+      let total_size = total_size.to_le_bytes();
+      tail[4] = total_size[0];
+      tail[5] = total_size[1];
+      tail[6] = total_size[2];
+      tail[7] = total_size[3];
 
-    let blen = bytes.len();
-    for i in 0..tail.len() {
-      bytes[ blen - tail.len() + i ] = tail[i];
-    }
+      let blen = bytes.len();
+      for i in 0..tail.len() {
+        bytes[ blen - tail.len() + i ] = tail[i];
+      }
+    });
 
     let t4 = Instant::now();
-    tracker.add("to_bytes/tail write",t4.duration_since(t3));
-    tracker.add("to_bytes/tail marker write",t1.duration_since(t0));
-    tracker.add("to_bytes/head write",t2.duration_since(t1));
     tracker.add("to_bytes", t4.duration_since(t0));
 
     (bytes, block_head_size, block_data_size, block_tail_size)
@@ -704,7 +701,7 @@ impl Block {
   pub fn write_to<Destination>( &self, position:u64, dest:&mut Destination, tracker: &Tracker ) -> Result<BlockHeadRead,BlockErr> 
   where Destination: WriteBytesTo
   {
-    let sub_track = tracker.sub_tracker("to_bytes/");
+    let sub_track = tracker.sub_tracker("block.to_bytes/");
 
     let t0 = Instant::now();
     let (bytes,head_size,data_size,tail_size) = self.to_bytes(&sub_track);

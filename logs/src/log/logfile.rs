@@ -383,12 +383,16 @@ fn test_navigation() {
 impl<FlatBuff> LogFile<FlatBuff> 
 where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
 {
-  fn build_next_block(  &mut self, data_id: DataId, data: &[u8] ) -> Block {
+  fn build_next_block( &mut self, data_id: DataId, data: &[u8], tracker:&Tracker ) -> Block {
 
     // build BlockData
     let mut block_data = Vec::<u8>::new();
-    block_data.resize( data.len(), 0 );
-    for i in 0..data.len() { block_data[i] = data[i] }    
+    tracker.track("resize", || block_data.resize( data.len(), 0 ));    
+    tracker.track("copy data", || 
+      //for i in 0..data.len() { block_data[i] = data[i] } 
+      block_data.copy_from_slice(&data)
+    );
+
     let block_data = Box::new(block_data);
 
     // build BlockOptions
@@ -425,20 +429,24 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
       }
     };
 
-    for i in 1..32 {
-      let level = 32 - i;
-      let n = u32::pow(2, level);
-      let idx = level;
-      if block_id.value() % n == 0 { 
-        update_ref(idx as usize) 
+    tracker.track("update backrefs", ||
+      for i in 1..32 {
+        let level = 32 - i;
+        let n = u32::pow(2, level);
+        let idx = level;
+        if block_id.value() % n == 0 { 
+          update_ref(idx as usize) 
+        }
       }
-    }
+    );
 
-    let back_refs:Vec<(BlockId,FileOffset)> = self.last_blocks.iter()
+    let back_refs:Vec<(BlockId,FileOffset)> = 
+      tracker.track("build back_refs vector", ||
+      self.last_blocks.iter()
       .map( |bhr| 
         (bhr.head.block_id.clone(), bhr.position.clone()) )
       .collect()
-      ;
+      );
 
     let back_refs = Box::new(back_refs);
 
@@ -460,14 +468,20 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
       metric.inc("append_data"); 
     };
 
+    let t0 = Instant::now();
+
     let tracker = self.tracker.clone();
 
-    let block = tracker.track("append_data.build_next_block", || self.build_next_block(data_id, data) );
-    let res = tracker.track("append_data.append_block", || self.append_block( &block ) );
+    let block = tracker.track("append_data/build_next_block", || 
+      self.build_next_block(data_id, data, &tracker.sub_tracker("append_data/build_next_block/")) 
+    );
+    let res = tracker.track("append_data/append_block", || self.append_block( &block ) );
 
     let res = res?;
 
     { self.counters.write()?.inc("append_data.succ"); }
+
+    tracker.add("append_data", Instant::now().duration_since(t0));
 
     Ok(res)
   }

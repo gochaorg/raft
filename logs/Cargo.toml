@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 random-access-disk = "0.8.0"
 aquamarine = "0.3.1"
+sha2 = "0.10.6"
