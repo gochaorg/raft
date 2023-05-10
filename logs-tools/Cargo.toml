@@ -9,3 +9,6 @@ edition = "2021"
 logs = { path = "../logs" }
 sha2 = "0.10.6"
 hex = "0.4.3"
+regex = "1.8.1"
+#lazy_static = "1.4.0"
+lazy-regex = "2.5.0"

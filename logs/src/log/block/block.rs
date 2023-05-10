@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crate::{bbuff::{absbuff::{ReadBytesFrom, WriteBytesTo}, streambuff::{ByteBuff, ByteWriter}}, perf::Tracker};
+use crate::{bbuff::{absbuff::{ReadBytesFrom, WriteBytesTo}, streambuff::{ByteBuff, self}}, perf::Tracker};
 
 use super::{BlockHead, BlockErr, PREVIEW_SIZE, HEAD_MIN_SIZE, LIMIT_USIZE, BlockHeadSize, BlockDataSize, BlockTailSize, TAIL_MARKER, BlockHeadRead, FileOffset};
 
@@ -53,7 +53,7 @@ impl Block {
   }
 
   /// Формирование массива байтов представлющих блок
-  fn to_bytes( &self, tracker:&Tracker ) -> (Box<Vec<u8>>, BlockHeadSize, BlockDataSize, BlockTailSize) {
+  fn to_bytes( &self, bbuf:&mut ByteBuff, tracker:&Tracker ) -> (BlockHeadSize, BlockDataSize, BlockTailSize) {
     // write tail marker
     let t0 = Instant::now();
     
@@ -66,11 +66,11 @@ impl Block {
       tail
     });
 
-    let mut bbuf = ByteBuff::new();
+    // let mut bbuf = ByteBuff::new();
 
     // write head
     tracker.track("to_bytes/write_block_head", || {
-      self.head.write_block_head(&mut bbuf, self.data.len() as u32, tail.len() as u16, tracker)
+      self.head.write_block_head(bbuf, self.data.len() as u32, tail.len() as u16, tracker)
     });
 
     let block_head_size = tracker.track("to_bytes/block_head_size",||BlockHeadSize(bbuf.buff.len() as u32));
@@ -98,20 +98,23 @@ impl Block {
     let t4 = Instant::now();
     tracker.add("to_bytes", t4.duration_since(t0));
 
-    (bbuf.buff, block_head_size, block_data_size, block_tail_size)
+    (block_head_size, block_data_size, block_tail_size)
   }
 
   /// Запись блока в массив байтов
-  pub fn write_to<Destination>( &self, position:u64, dest:&mut Destination, tracker: &Tracker ) -> Result<BlockHeadRead,BlockErr> 
+  pub fn write_to<Destination>( &self, position:u64, dest:&mut Destination, block_buff:&mut ByteBuff, tracker: &Tracker ) -> Result<BlockHeadRead,BlockErr> 
   where Destination: WriteBytesTo
   {
     let sub_track = tracker.sub_tracker("block.to_bytes/");
+    let mut bbuf = block_buff;//ByteBuff::new();
+    bbuf.reset();
 
     let t0 = Instant::now();
-    let (bytes,head_size,data_size,tail_size) = self.to_bytes(&sub_track);
+    let (head_size,data_size,tail_size) = self.to_bytes(&mut bbuf, &sub_track);
 
-    let t1 = Instant::now();    
-    dest.write_to( position, &bytes[0 .. bytes.len()])?;
+    let t1 = Instant::now();
+    let bytes = &bbuf.buff;
+    dest.write_to( position, &bytes )?;
 
     let t2 = Instant::now();
     tracker.add("write_to", t2.duration_since(t0));
@@ -152,8 +155,9 @@ fn test_block_rw(){
   };
 
   let tracker = Tracker::new();
+  let mut block_buff = streambuff::ByteBuff::new();
 
-  block.write_to(0, &mut bb, &tracker).unwrap();
+  block.write_to(0, &mut bb, &mut block_buff, &tracker).unwrap();
   println!("{block_size}", block_size=bb.bytes_count().unwrap() );
 
   let (rblock,_) = Block::read_from(0, &bb).unwrap();

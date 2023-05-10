@@ -9,6 +9,8 @@
 //! - добавление файла в лог
 
 mod err;
+mod bytesize;
+use bytesize::ByteSize;
 
 use logs::{bbuff::absbuff::*, logfile::{LogFile, GetPointer}, block::DataId, perf::{Counters, Tracker}};
 use std::{
@@ -41,6 +43,7 @@ fn parse_args( args:&Vec<String> ) -> Box<Vec<Action>> {
     let mut state = "state";
     let mut append_log:Box<Option<String>> = Box::new(None);
     let mut sha256 = false;
+    let mut block_buff_size : Option<ByteSize> = None;
 
     loop {
         let arg = itr.next();
@@ -57,9 +60,15 @@ fn parse_args( args:&Vec<String> ) -> Box<Vec<Action>> {
                     sha256 = true
                 } else if arg == "-sha256" {
                     sha256 = false
+                } else if arg == "-bbsize" || arg == "-block_buffer_size" {
+                    state = "-bbsize";
                 } else {
                     println!("undefined arg {arg}")
                 }
+            },
+            "-bbsize" => {
+                state = "state";
+                block_buff_size = Some(ByteSize::parse(arg).unwrap())
             },
             "append" => {
                 append_log = Box::new(Some(arg.clone()));
@@ -70,7 +79,8 @@ fn parse_args( args:&Vec<String> ) -> Box<Vec<Action>> {
                 actions.push(
                     Action::Append { 
                         log_file: append_log.clone().unwrap().clone(), 
-                        entry_file: arg.clone()
+                        entry_file: arg.clone(),
+                        block_buff_size: block_buff_size
                     }
                 )
             },
@@ -95,6 +105,7 @@ enum Action {
     Append {
         log_file: String,
         entry_file: String,
+        block_buff_size: Option<ByteSize>
     },
     ViewHeads {
         log_file: String,
@@ -105,7 +116,11 @@ enum Action {
 impl Action {
     fn execute( &self ) -> Result<(), LogToolErr> {
         match self {
-            Action::Append { log_file, entry_file } => {
+            Action::Append { 
+                log_file, 
+                entry_file,
+                block_buff_size
+            } => {
                 let mut p0 = PathBuf::new();
                 p0.push(log_file);
                 
@@ -114,7 +129,8 @@ impl Action {
                 
                 let atiming = append_file(
                     p0, 
-                    p1 
+                    p1,
+                    block_buff_size.clone()
                 )?;
 
                 println!("duration:");
@@ -148,7 +164,11 @@ struct AppendFileTiming {
     pub log_tacker: Arc<Tracker>,
 }
 
-fn append_file<P: AsRef<Path>, P2: AsRef<Path>>( log_file: P, entry_file: P2 ) -> Result<AppendFileTiming, LogToolErr> {
+fn append_file<P: AsRef<Path>, P2: AsRef<Path>>( 
+    log_file: P, 
+    entry_file: P2,
+    block_buff_size: Option<ByteSize>
+) -> Result<AppendFileTiming, LogToolErr> {
     let mut timing : Box<Vec<Instant>> = Box::new(Vec::<Instant>::new());
 
     timing.push(Instant::now());
@@ -158,6 +178,9 @@ fn append_file<P: AsRef<Path>, P2: AsRef<Path>>( log_file: P, entry_file: P2 ) -
     timing.push(Instant::now());
 
     let mut log = LogFile::new(buff)?;
+    if block_buff_size.is_some() {
+        log.resize_block_buffer(block_buff_size.unwrap().0)
+    }
     timing.push(Instant::now());
 
     let mut entry_file = OpenOptions::new().read(true).create(false).write(false).open(entry_file)?;

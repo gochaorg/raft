@@ -45,6 +45,7 @@
 //! Получается такое хитрое дерево, по которому возможно быстрая навигация назад.
 //! см [BackRefs]
 
+use crate::bbuff::streambuff;
 use crate::perf::{Metrics, Tracker};
 
 use super::block::*;
@@ -60,6 +61,7 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
 {
   buff: FlatBuff,  
   last_blocks: Box<Vec<BlockHeadRead>>,
+  block_buff: streambuff::ByteBuff,
   pub counters: Arc<RwLock<Counters>>,
   pub tracker: Arc<Tracker>,
 }
@@ -139,7 +141,8 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
           buff: buff,
           last_blocks: Box::new(Vec::<BlockHeadRead>::new()),
           counters: Arc::new(RwLock::new(Counters::new())),
-          tracker: Arc::new(Tracker::new())
+          tracker: Arc::new(Tracker::new()),
+          block_buff: streambuff::ByteBuff::new(),
         }
       )
     }
@@ -155,9 +158,16 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
         buff: buff,
         last_blocks: last_blocks,
         counters: Arc::new(RwLock::new(Counters::new())),
-        tracker: Arc::new(Tracker::new())
+        tracker: Arc::new(Tracker::new()),
+        block_buff: streambuff::ByteBuff::new(),
       }
     )
+  }
+
+  /// Изменение размера блока буффера
+  pub fn resize_block_buffer( &mut self, new_size: usize ) {
+    self.block_buff.buff.resize(new_size, 0);
+    self.block_buff.reset();
   }
 
   /// Добавление блока в лог файл
@@ -190,7 +200,7 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
     let sub_track = self.tracker.sub_tracker("append_next_block/block.write_to/");
 
     let t0 = Instant::now();        
-    let writed_block = block.write_to(position, &mut self.buff, &sub_track)?;
+    let writed_block = block.write_to(position, &mut self.buff, &mut self.block_buff, &sub_track)?;
 
     let t1 = Instant::now();
 
@@ -389,7 +399,6 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
     let mut block_data = Vec::<u8>::new();
     tracker.track("resize", || block_data.resize( data.len(), 0 ));    
     tracker.track("copy data", || 
-      //for i in 0..data.len() { block_data[i] = data[i] } 
       block_data.copy_from_slice(&data)
     );
 

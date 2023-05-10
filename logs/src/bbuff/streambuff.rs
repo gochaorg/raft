@@ -49,6 +49,12 @@ impl ByteBuff {
     ByteBuff { buff: Box::clone(&buff), position: 0, tracker:Tracker::new() }
   }
 
+  /// Сбор: устанавливает pointer = 0, len = 0
+  pub fn reset( &mut self ) {
+    self.buff.truncate(0);
+    self.position = 0;
+  }
+
   /// Запись массива байт в текущую позицию и смещение позиции
   pub fn write_byte_arr( &mut self, data: &[u8] ) {
     let available = self.buff.len() - self.position;
