@@ -151,8 +151,8 @@ fn read_block_head( data: Box<Vec<u8>> ) -> Result<(BlockHead, BlockHeadSize, Bl
 }
 
 impl BlockHead {
-  pub fn write_block_head( &self, data_size:u32, tail_size:u16, tracker:&Tracker ) -> Box<Vec<u8>> {
-    let mut bbuf = ByteBuff::new();
+  pub fn write_block_head( &self, bbuf:&mut ByteBuff, data_size:u32, tail_size:u16, tracker:&Tracker ) {
+    //let mut bbuf = ByteBuff::new();
     bbuf.tracker = tracker.clone();
   
     let t0 = Instant::now();
@@ -176,8 +176,6 @@ impl BlockHead {
   
     let t99 = Instant::now();
     tracker.add("write_block_head", t99.duration_since(t0));
-  
-    bbuf.buff
   }
   
   /// Чтение заголовка

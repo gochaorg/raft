@@ -57,7 +57,7 @@ impl ByteBuff {
       let add = data.len() - available;
       let target_size = self.buff.len() + add;
 
-      let trunc_available = self.buff.capacity();
+      let trunc_available = self.buff.capacity() - self.position;
       if data.len() > trunc_available {
         let extend_size = 
           RESIZE_SCALES.iter().filter(|scale| scale.target_size_min <= target_size )
@@ -73,8 +73,9 @@ impl ByteBuff {
 
         self.buff.truncate(len_target);
       } else {
-        self.tracker.track("bytebuff/write_byte_arr/truncate", ||
-          self.buff.truncate(target_size) );
+        unsafe {
+          self.buff.set_len(target_size);
+        }
       }
     }
 

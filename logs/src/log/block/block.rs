@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crate::{bbuff::absbuff::{ReadBytesFrom, WriteBytesTo}, perf::Tracker};
+use crate::{bbuff::{absbuff::{ReadBytesFrom, WriteBytesTo}, streambuff::{ByteBuff, ByteWriter}}, perf::Tracker};
 
 use super::{BlockHead, BlockErr, PREVIEW_SIZE, HEAD_MIN_SIZE, LIMIT_USIZE, BlockHeadSize, BlockDataSize, BlockTailSize, TAIL_MARKER, BlockHeadRead, FileOffset};
 
@@ -66,17 +66,21 @@ impl Block {
       tail
     });
 
+    let mut bbuf = ByteBuff::new();
+
     // write head
-    let mut bytes = 
-      tracker.track("to_bytes/write_block_head", || {
-        self.head.write_block_head(self.data.len() as u32, tail.len() as u16, tracker)
-      });
+    tracker.track("to_bytes/write_block_head", || {
+      self.head.write_block_head(&mut bbuf, self.data.len() as u32, tail.len() as u16, tracker)
+    });
+
+    let mut bytes = bbuf.buff;
 
     let block_head_size = tracker.track("to_bytes/block_head_size",||BlockHeadSize(bytes.len() as u32));
     let block_data_size = tracker.track("to_bytes/block_data_size",||BlockDataSize(self.data.len() as u32));
     let block_tail_size = tracker.track("to_bytes/block_tail_size",||BlockTailSize(tail.len() as u16));
 
     let off = bytes.len();
+    // let off = bbuf.position;
     
     if self.data.len()>0 {      
       tracker.track("to_bytes/bytes.resize", || {
@@ -88,10 +92,13 @@ impl Block {
     tracker.track("to_bytes/copy data", || {
       let data_part = &mut bytes[off .. (off + self.data.len())];
       data_part.copy_from_slice(&self.data);
+      // bbuf.write_byte_arr(&self.data)
     });
 
     // update tail data
     tracker.track("to_bytes/tail update", ||{
+      // let total_size = bbuf.buff.len() as u32 + tail.len() as u32;
+
       let total_size = bytes.len() as u32;
       let total_size = total_size.to_le_bytes();
       tail[4] = total_size[0];
@@ -103,12 +110,15 @@ impl Block {
       for i in 0..tail.len() {
         bytes[ blen - tail.len() + i ] = tail[i];
       }
+
+      //bbuf.write_byte_arr(&tail);
     });
 
     let t4 = Instant::now();
     tracker.add("to_bytes", t4.duration_since(t0));
 
     (bytes, block_head_size, block_data_size, block_tail_size)
+    // (bbuf.buff, block_head_size, block_data_size, block_tail_size)
   }
 
   /// Запись блока в массив байтов
@@ -148,9 +158,17 @@ fn test_block_rw(){
 
   let mut bb = ByteBuff::new_empty_unlimited();
 
+  let mut data = Box::new(Vec::<u8>::new());
+  for i in 0..134 { data.push(i as u8) }
+
   let block = Block {
-    head: BlockHead { block_id: BlockId::new(0), data_type_id: DataId::new(1), back_refs: BackRefs::default(), block_options: BlockOptions::default() },
-    data: Box::new( vec![1,2,3] )
+    head: BlockHead { 
+      block_id: BlockId::new(0), 
+      data_type_id: DataId::new(1), 
+      back_refs: BackRefs::default(), 
+      block_options: BlockOptions::default() 
+    },
+    data: data
   };
 
   let tracker = Tracker::new();
@@ -161,4 +179,6 @@ fn test_block_rw(){
   let (rblock,_) = Block::read_from(0, &bb).unwrap();
   assert!( rblock.head.block_id == block.head.block_id );
   assert!( rblock.head.data_type_id == block.head.data_type_id );
+  assert!( rblock.data == block.data );
+  assert!( rblock.head.back_refs.refs == block.head.back_refs.refs );
 }
