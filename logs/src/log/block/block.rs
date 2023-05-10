@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crate::{bbuff::absbuff::{ReadBytesFrom, WriteBytesTo}, perf::Tracker, block::{BlockId, DataId, BackRefs, BlockOptions}};
+use crate::{bbuff::absbuff::{ReadBytesFrom, WriteBytesTo}, perf::Tracker};
 
 use super::{BlockHead, BlockErr, PREVIEW_SIZE, HEAD_MIN_SIZE, LIMIT_USIZE, BlockHeadSize, BlockDataSize, BlockTailSize, TAIL_MARKER, BlockHeadRead, FileOffset};
 
@@ -144,6 +144,7 @@ impl Block {
 fn test_block_rw(){
   use super::super::super::bbuff::absbuff::ByteBuff;
   use crate::bbuff::absbuff::BytesCount;
+  use crate::block::{BlockId, DataId, BackRefs, BlockOptions};
 
   let mut bb = ByteBuff::new_empty_unlimited();
 
