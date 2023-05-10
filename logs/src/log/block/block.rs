@@ -73,51 +73,32 @@ impl Block {
       self.head.write_block_head(&mut bbuf, self.data.len() as u32, tail.len() as u16, tracker)
     });
 
-    let mut bytes = bbuf.buff;
-
-    let block_head_size = tracker.track("to_bytes/block_head_size",||BlockHeadSize(bytes.len() as u32));
+    let block_head_size = tracker.track("to_bytes/block_head_size",||BlockHeadSize(bbuf.buff.len() as u32));
     let block_data_size = tracker.track("to_bytes/block_data_size",||BlockDataSize(self.data.len() as u32));
     let block_tail_size = tracker.track("to_bytes/block_tail_size",||BlockTailSize(tail.len() as u16));
 
-    let off = bytes.len();
-    
-    if self.data.len()>0 {      
-      tracker.track("to_bytes/bytes.resize", || {
-        bytes.resize(bytes.len() + self.data.len() + tail.len(), 0)
-      })
-    }
-
     // copy data
     tracker.track("to_bytes/copy data", || {
-      let data_part = &mut bytes[off .. (off + self.data.len())];
-      data_part.copy_from_slice(&self.data);
-      // bbuf.write_byte_arr(&self.data)
+      bbuf.write_byte_arr(&self.data)
     });
 
     // update tail data
     tracker.track("to_bytes/tail update", ||{
-      // let total_size = bbuf.buff.len() as u32 + tail.len() as u32;
-
-      let total_size = bytes.len() as u32;
+      let total_size = bbuf.buff.len() as u32 + tail.len() as u32;
       let total_size = total_size.to_le_bytes();
+
       tail[4] = total_size[0];
       tail[5] = total_size[1];
       tail[6] = total_size[2];
       tail[7] = total_size[3];
 
-      let blen = bytes.len();
-      for i in 0..tail.len() {
-        bytes[ blen - tail.len() + i ] = tail[i];
-      }
-
-      //bbuf.write_byte_arr(&tail);
+      bbuf.write_byte_arr(&tail);
     });
 
     let t4 = Instant::now();
     tracker.add("to_bytes", t4.duration_since(t0));
 
-    (bytes, block_head_size, block_data_size, block_tail_size)
-    // (bbuf.buff, block_head_size, block_data_size, block_tail_size)
+    (bbuf.buff, block_head_size, block_data_size, block_tail_size)
   }
 
   /// Запись блока в массив байтов
