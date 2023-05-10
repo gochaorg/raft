@@ -173,6 +173,8 @@ impl BlockHead {
     let size = bbuf.position;  
     bbuf.position = 0;
     bbuf.write(size as u32);
+
+    bbuf.position = size;
   
     let t99 = Instant::now();
     tracker.add("write_block_head", t99.duration_since(t0));

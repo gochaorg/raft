@@ -80,7 +80,6 @@ impl Block {
     let block_tail_size = tracker.track("to_bytes/block_tail_size",||BlockTailSize(tail.len() as u16));
 
     let off = bytes.len();
-    // let off = bbuf.position;
     
     if self.data.len()>0 {      
       tracker.track("to_bytes/bytes.resize", || {
