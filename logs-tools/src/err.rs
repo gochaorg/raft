@@ -1,6 +1,6 @@
 use std::sync::{PoisonError, RwLockReadGuard};
 
-use logs::{logfile::LogErr, bbuff::absbuff::ABuffError};
+use logs::{logfile::LogErr, bbuff::absbuff::ABuffError, block::BlockErr};
 
 #[derive(Debug,Clone)]
 pub enum LogToolErr {
@@ -9,6 +9,13 @@ pub enum LogToolErr {
     IOError { message:String, os_error:Option<i32> },
     FileSizeToBig,
     RwLockErr { message:String },
+    BlockError(BlockErr)
+}
+
+impl From<BlockErr> for LogToolErr {
+    fn from(value: BlockErr) -> Self {
+        Self::BlockError(value.clone())
+    }
 }
 
 impl From<ABuffError> for LogToolErr {

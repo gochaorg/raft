@@ -393,7 +393,7 @@ fn test_navigation() {
 impl<FlatBuff> LogFile<FlatBuff> 
 where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
 {
-  fn build_next_block( &mut self, data_id: DataId, data: &[u8], tracker:&Tracker ) -> Block {
+  fn build_next_block( &mut self, data_id: DataId, block_opt:&BlockOptions, data: &[u8], tracker:&Tracker ) -> Block {
 
     // build BlockData
     let mut block_data = Vec::<u8>::new();
@@ -405,7 +405,7 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
     let block_data = Box::new(block_data);
 
     // build BlockOptions
-    let block_opt = BlockOptions::default();
+    //let block_opt = BlockOptions::default();
     
     if self.last_blocks.is_empty() {
       let res = Block {
@@ -413,7 +413,7 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
           block_id: BlockId::new(0), 
           data_type_id: data_id, 
           back_refs: BackRefs::default(), 
-          block_options: block_opt 
+          block_options: block_opt.clone()
         },
         data: block_data
       };
@@ -464,14 +464,14 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
         block_id: block_id, 
         data_type_id: data_id, 
         back_refs: BackRefs { refs: back_refs }, 
-        block_options: block_opt 
+        block_options: block_opt.clone() 
       },
       data: block_data
     }
   }
 
   /// Добавление данных в лог
-  pub fn append_data( &mut self, data_id: DataId, data: &[u8] ) -> Result<(), LogErr> {
+  pub fn append_data( &mut self, block_opt: &BlockOptions, data: &[u8] ) -> Result<(), LogErr> {
     { 
       let mut metric = self.counters.write()?;
       metric.inc("append_data"); 
@@ -482,7 +482,7 @@ where FlatBuff: ReadBytesFrom+WriteBytesTo+BytesCount+ResizeBytes+Clone
     let tracker = self.tracker.clone();
 
     let block = tracker.track("append_data/build_next_block", || 
-      self.build_next_block(data_id, data, &tracker.sub_tracker("append_data/build_next_block/")) 
+      self.build_next_block(DataId::user_data(), block_opt, data, &tracker.sub_tracker("append_data/build_next_block/")) 
     );
     let res = tracker.track("append_data/append_block", || self.append_block( &block ) );
 
@@ -672,7 +672,7 @@ fn test_pointer() {
     let mut log = log.write().unwrap();
 
     for n in 0u8 .. 130 {
-      log.append_data(DataId::new(0), &[n,n+1,n+2]).unwrap();
+      log.append_data(&BlockOptions::default(), &[n,n+1,n+2]).unwrap();
     }
   }
 

@@ -51,3 +51,5 @@ pub use head::*;
 mod block;
 pub use block::*;
 
+mod string_n;
+pub use string_n::*;

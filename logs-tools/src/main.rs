@@ -12,12 +12,13 @@ mod err;
 mod bytesize;
 use bytesize::ByteSize;
 
-use logs::{bbuff::absbuff::*, logfile::{LogFile, GetPointer}, block::DataId, perf::{Counters, Tracker}};
+use chrono::{DateTime, Utc};
+use logs::{bbuff::absbuff::*, logfile::{LogFile, GetPointer}, block::{BlockOptions}, perf::{Counters, Tracker}};
 use std::{
     env, 
     path::{Path, PathBuf}, 
     fs::OpenOptions,
-    io::prelude::*, sync::{RwLock, Arc}, time::Instant
+    io::prelude::*, sync::{RwLock, Arc}, 
 };
 use err::LogToolErr;
 use sha2::{Sha256, Digest};
@@ -44,6 +45,7 @@ fn parse_args( args:&Vec<String> ) -> Box<Vec<Action>> {
     let mut append_log:Box<Option<String>> = Box::new(None);
     let mut sha256 = false;
     let mut block_buff_size : Option<ByteSize> = None;
+    let mut verbose : bool = false;
 
     loop {
         let arg = itr.next();
@@ -52,14 +54,18 @@ fn parse_args( args:&Vec<String> ) -> Box<Vec<Action>> {
         let arg = arg.unwrap();
         match state {
             "state" => {
-                if arg == "a" {
+                if arg == "a" || arg=="append" {
                     state = "append"
-                } else if arg == "v" {
+                } else if arg == "v" || arg == "view" {
                     state = "view"
                 } else if arg == "+sha256" {
                     sha256 = true
                 } else if arg == "-sha256" {
                     sha256 = false
+                } else if arg == "+v" {
+                    verbose = true
+                } else if arg == "-v" {
+                    verbose = false
                 } else if arg == "-bbsize" || arg == "-block_buffer_size" {
                     state = "-bbsize";
                 } else {
@@ -80,7 +86,8 @@ fn parse_args( args:&Vec<String> ) -> Box<Vec<Action>> {
                     Action::Append { 
                         log_file: append_log.clone().unwrap().clone(), 
                         entry_file: arg.clone(),
-                        block_buff_size: block_buff_size
+                        block_buff_size: block_buff_size,
+                        verbose: verbose
                     }
                 )
             },
@@ -105,7 +112,8 @@ enum Action {
     Append {
         log_file: String,
         entry_file: String,
-        block_buff_size: Option<ByteSize>
+        block_buff_size: Option<ByteSize>,
+        verbose: bool,
     },
     ViewHeads {
         log_file: String,
@@ -119,7 +127,8 @@ impl Action {
             Action::Append { 
                 log_file, 
                 entry_file,
-                block_buff_size
+                block_buff_size,
+                verbose
             } => {
                 let mut p0 = PathBuf::new();
                 p0.push(log_file);
@@ -127,21 +136,18 @@ impl Action {
                 let mut p1 = PathBuf::new();
                 p1.push(entry_file);
                 
-                let atiming = append_file(
+                let timing = append_file(
                     p0, 
                     p1,
                     block_buff_size.clone()
                 )?;
 
-                println!("duration:");
-                let timing = atiming.timing;
-                timing.iter().skip(1).zip( 
-                    timing.iter() ).map( |(a,b)| a.duration_since(*b) 
-                ).enumerate().for_each( |(idx,dur)| println!("{idx} {:?}",dur) );
-
-                println!("metrics:\n {}", atiming.log_counters );
-                println!("buff tracks:\n{}", atiming.buff_tracker);
-                println!("log tracks:\n{}", atiming.log_tacker);
+                if *verbose {
+                    println!("log counters:\n{}", timing.log_counters );
+                    println!("append file tracks:\n{}", timing.append_file);
+                    println!("buff tracks:\n{}", timing.buff_tracker);
+                    println!("log tracks:\n{}", timing.log_tacker);
+                }
 
                 Ok(())
             },
@@ -158,8 +164,8 @@ impl Action {
 const READ_BUFF_SZIE: usize = 1024*1024;
 
 struct AppendFileTiming {
-    pub timing : Box<Vec<Instant>>,
     pub log_counters: Box<Counters>,
+    pub append_file : Arc<Tracker>,
     pub buff_tracker: Arc<Tracker>,
     pub log_tacker: Arc<Tracker>,
 }
@@ -169,24 +175,43 @@ fn append_file<P: AsRef<Path>, P2: AsRef<Path>>(
     entry_file: P2,
     block_buff_size: Option<ByteSize>
 ) -> Result<AppendFileTiming, LogToolErr> {
-    let mut timing : Box<Vec<Instant>> = Box::new(Vec::<Instant>::new());
-
-    timing.push(Instant::now());
-
-    let buff = FileBuff::open_read_write(log_file)?;
-    let buff_track = buff.tracker.clone();
-    timing.push(Instant::now());
-
-    let mut log = LogFile::new(buff)?;
-    if block_buff_size.is_some() {
-        log.resize_block_buffer(block_buff_size.unwrap().0)
+    let mut block_opt = BlockOptions::default();
+    match entry_file.as_ref().to_str() {
+        Some(file_name) => {
+            block_opt.set("file", file_name)?
+        },
+        None => {}
     }
-    timing.push(Instant::now());
 
-    let mut entry_file = OpenOptions::new().read(true).create(false).write(false).open(entry_file)?;
-    timing.push(Instant::now());
+    let tracker : Tracker = Tracker::new();
 
-    let file_size = entry_file.metadata()?.len();
+    let buff = tracker.track("open log file", ||
+        FileBuff::open_read_write(log_file))?;
+
+    let buff_track = buff.tracker.clone();
+
+    let mut log = LogFile::new(buff)?;    
+    if block_buff_size.is_some() {
+        tracker.track("resize log block buffer", ||
+            log.resize_block_buffer(block_buff_size.unwrap().0))
+    }
+
+    let mut entry_file = 
+        tracker.track("open data file", ||
+        OpenOptions::new().read(true).create(false).write(false).open(entry_file))?;
+
+    let entry_file_meta = entry_file.metadata()?;
+
+    let last_mod_time = entry_file_meta.modified()?;
+    let last_mod_time: DateTime<Utc> = last_mod_time.into();
+    block_opt.set("modify_time_utc", last_mod_time.format("%Y-%m-%dT%H:%M:%S.%f").to_string())?;
+    block_opt.set("modify_time_iso8601", last_mod_time.format("%+").to_string())?;
+    block_opt.set("modify_time_unix", last_mod_time.format("%s").to_string())?;
+
+    ///////////////////
+    // read file
+
+    let file_size = entry_file_meta.len();
     if file_size > usize::MAX as u64 {
         return Err( LogToolErr::FileSizeToBig )
     }
@@ -198,27 +223,36 @@ fn append_file<P: AsRef<Path>, P2: AsRef<Path>>(
 
     entry_file.seek(std::io::SeekFrom::Start(0))?;
     let mut read_buff: [u8; READ_BUFF_SZIE] = [0; READ_BUFF_SZIE];    
-    timing.push(Instant::now());
 
-    while block_ptr < file_size {
-        let reads = entry_file.read(&mut read_buff)?;
-        if reads==0 {
-            break;
-        } else {
-            for i in 0 .. reads {
-                block_data[block_ptr] = read_buff[i];
-                block_ptr += 1;
+    tracker.track("read file", || {
+        while block_ptr < file_size {
+            match entry_file.read(&mut read_buff) {
+                Err(err) => {
+                    return Err(LogToolErr::from(err));
+                }
+                Ok(reads) => {
+                    if reads==0 {
+                        break;
+                    } else {
+                        for i in 0 .. reads {
+                            block_data[block_ptr] = read_buff[i];
+                            block_ptr += 1;
+                        }
+                    }
+                }
             }
         }
-    }
+        Ok(())
+    })?;
 
-    timing.push(Instant::now());
-    log.append_data(DataId::user_data(), &block_data[0..block_data.len()])?;
+    //////////////////
+    // append log
 
-    timing.push(Instant::now());
+    tracker.track("log append", ||
+        log.append_data(&BlockOptions::default(), &block_data[0..block_data.len()]))?;
 
     Ok(AppendFileTiming { 
-        timing: timing,
+        append_file: Arc::new(tracker),
         log_counters: Box::new(log.counters.clone().read()?.clone()),
         buff_tracker: buff_track,
         log_tacker: log.tracker.clone(),
@@ -253,6 +287,15 @@ fn view_logfile<P: AsRef<Path>>( log_file: P, sha256:bool ) -> Result<(), LogToo
                 }
             }
         }
+
+        //print!("{:?}", h);
+
+        if !h.head.block_options.values.is_empty() {
+            for (key,value) in h.head.block_options.clone().values.into_iter() {
+                print!(" {key:?}={value:?}")
+            }            
+        }
+
         println!();
 
         match ptr.previous() {

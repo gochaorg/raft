@@ -145,12 +145,15 @@ fn test_block_rw(){
   let mut data = Box::new(Vec::<u8>::new());
   for i in 0..134 { data.push(i as u8) }
 
+  let mut opts = BlockOptions::default();
+  opts.set("key", "value").unwrap();
+
   let block = Block {
     head: BlockHead { 
       block_id: BlockId::new(0), 
       data_type_id: DataId::new(1), 
       back_refs: BackRefs::default(), 
-      block_options: BlockOptions::default() 
+      block_options: opts 
     },
     data: data
   };
@@ -166,6 +169,8 @@ fn test_block_rw(){
   assert!( rblock.head.data_type_id == block.head.data_type_id );
   assert!( rblock.data == block.data );
   assert!( rblock.head.back_refs.refs == block.head.back_refs.refs );
+
+  println!("{:?}", rblock.head);
 }
 
 // /// Построение блока

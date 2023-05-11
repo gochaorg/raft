@@ -37,7 +37,6 @@ const RESIZE_SCALES: [ResizeScale; 6] =
       ResizeScale { target_size_min:0, extend_size:128 },
     ];
 
-#[allow(dead_code)]
 impl ByteBuff {
   /// Создание пустого буфера
   pub fn new() -> Self {
@@ -235,13 +234,12 @@ impl ByteReader<ByteArrayRead> for ByteBuff {
     if available < (target.expect_size as i64) {
       Err("no data".to_string())
     } else {
-      let mut bw = ByteBuff::from(Box::clone(&target.data));
-      for _ in 0..target.expect_size {
+      target.data.resize(target.expect_size as usize, 0);
+      for i in 0..target.expect_size {
         let mut b:u8 = 0;
         self.read(&mut b)?;
-        bw.write(b);
+        target.data[i as usize] = b;
       }
-      self.position += target.expect_size as usize;
       Ok(())
     }
   }
