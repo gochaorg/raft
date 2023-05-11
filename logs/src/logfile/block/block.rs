@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use crate::{bbuff::{absbuff::{ReadBytesFrom, WriteBytesTo}, streambuff::{ByteBuff}}, perf::Tracker};
 
-use super::{BlockHead, BlockErr, PREVIEW_SIZE, HEAD_MIN_SIZE, LIMIT_USIZE, BlockHeadSize, BlockDataSize, BlockTailSize, TAIL_MARKER, BlockHeadRead, FileOffset};
+use super::*;
 
 /// Блок лога
 pub struct Block {
@@ -167,3 +167,16 @@ fn test_block_rw(){
   assert!( rblock.data == block.data );
   assert!( rblock.head.back_refs.refs == block.head.back_refs.refs );
 }
+
+// /// Построение блока
+// pub struct BlockBuilder<'a> {
+//   /// Ссылка на данные
+//   pub data: &'a[u8],
+
+//   pub tail: &'a[u8],
+
+//   pub block_id:  &'a BlockId,
+//   pub data_id:   &'a DataId,
+//   pub back_refs: &'a Vec<(BlockId, FileOffset)>,
+//   pub options:   &'a BlockOptions
+// }

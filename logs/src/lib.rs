@@ -1,5 +1,6 @@
 pub mod perf;
 pub mod bbuff;
-mod log;
-pub use log::*;
+
+pub mod logfile;
+pub use logfile::*;
 

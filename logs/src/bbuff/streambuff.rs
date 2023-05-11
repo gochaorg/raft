@@ -133,6 +133,12 @@ impl ByteWriter<u64> for ByteBuff {
   }
 }
 
+impl ByteWriter<usize> for ByteBuff {
+  fn write( &mut self, v:usize ) {
+    self.write( v as u64 )
+  }
+}
+
 /// Чтение данных из байтового массива
 pub trait ByteReader<V> {
   fn read( &mut self, target:&mut V ) -> Result<(),String>;
@@ -210,8 +216,18 @@ impl ByteReader<u64> for ByteBuff {
   }
 }
 
+impl ByteReader<usize> for ByteBuff {
+  fn read( &mut self, target:&mut usize ) -> Result<(),String> {
+    let mut size:u64 = 0;
+    self.read(&mut size)?;
+
+    *target = size as usize;
+    Ok(())
+  }
+}
+
 /// Чтение массива из текущей позиции и смещение позиции
-pub struct ByteArrayRead{ data:Box<Vec<u8>>, expect_size:u32 }
+pub struct ByteArrayRead{ pub data:Box<Vec<u8>>, pub expect_size:u32 }
 
 impl ByteReader<ByteArrayRead> for ByteBuff {
   fn read( &mut self, target:&mut ByteArrayRead ) -> Result<(),String> {

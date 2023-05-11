@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use crate::{bbuff::{streambuff::*, absbuff::ReadBytesFrom}, perf::Tracker};
 
-use super::{BlockId, DataId, BlockOptions, FileOffset, BlockErr, LIMIT_USIZE};
+use super::*;
 
 /// Размер буфера при чтении заголовка, в теории заголовок не должен быть больше этого значения
 pub const PREVIEW_SIZE:usize = 1024 * 256;
@@ -24,7 +24,7 @@ pub struct BlockHead {
 }
 
 /// минимальный размер заголовка
-pub const HEAD_MIN_SIZE : u32 = 22;
+pub const HEAD_MIN_SIZE : u32 = 22 + BLOCK_OPTION_MIN_SIZE;
 
 #[derive(Clone, Debug)]
 #[cfg_attr(doc, aquamarine::aquamarine)]
@@ -54,7 +54,7 @@ pub const HEAD_MIN_SIZE : u32 = 22;
 ///  d -.-> |4| a
 ///  
 ///  h -.-> |расстояние 8| a
-///  ```  
+///  ``` 
 pub struct BackRefs {
   pub refs: Box<Vec<(BlockId, FileOffset)>>
 }
@@ -168,7 +168,7 @@ impl BlockHead {
       bbuf.write(*b_off);
     }
   
-    bbuf.write(self.block_options);
+    bbuf.write(&self.block_options);
   
     let size = bbuf.position;  
     bbuf.position = 0;
