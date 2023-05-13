@@ -55,12 +55,15 @@ use std::fmt;
 use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Instant;
 
+// type FlatBuff = ReadBytesFrom + WriteBytesTo + BytesCount + ResizeBytes + Clone;
+pub trait FlatBuff : ReadBytesFrom + WriteBytesTo + BytesCount + ResizeBytes + Clone {}
+
 #[derive(Clone)]
-pub struct LogFile<FlatBuff>
+pub struct LogFile<B>
 where
-    FlatBuff: ReadBytesFrom + WriteBytesTo + BytesCount + ResizeBytes + Clone,
+    B: FlatBuff,
 {
-    buff: FlatBuff,
+    buff: B,
     last_blocks: Box<Vec<BlockHeadRead>>,
     block_buff: streambuff::ByteBuff,
     pub counters: Arc<RwLock<Counters>>,
@@ -69,7 +72,7 @@ where
 
 impl<A> fmt::Display for LogFile<A>
 where
-    A: ReadBytesFrom + WriteBytesTo + BytesCount + ResizeBytes + Clone,
+    A: FlatBuff,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let log_size = self.buff.bytes_count();
@@ -136,11 +139,11 @@ impl<A> From<PoisonError<RwLockWriteGuard<'_, A>>> for LogErr {
 /// Реализация
 /// - создания лог файла
 /// - Добавление блока в лог файл
-impl<FlatBuff> LogFile<FlatBuff>
+impl<B> LogFile<B>
 where
-    FlatBuff: ReadBytesFrom + WriteBytesTo + BytesCount + ResizeBytes + Clone,
+    B: FlatBuff,
 {
-    pub fn new(buff: FlatBuff) -> Result<Self, LogErr> {
+    pub fn new(buff: B) -> Result<Self, LogErr> {
         let buff_size = buff.bytes_count()?;
         if buff_size == 0 {
             return Ok(LogFile {
@@ -282,9 +285,9 @@ fn test_raw_append_block() {
     println!("log {}", log);
 }
 
-impl<FlatBuff> LogFile<FlatBuff>
+impl<B> LogFile<B>
 where
-    FlatBuff: ReadBytesFrom + WriteBytesTo + BytesCount + ResizeBytes + Clone,
+    B: FlatBuff,
 {
     /// Чтение заголовка в указанной позиции
     fn read_head_at<P: Into<FileOffset>>(&self, position: P) -> Result<BlockHeadRead, LogErr> {
@@ -450,9 +453,9 @@ fn test_navigation() {
     assert!(rm0.is_none());
 }
 
-impl<FlatBuff> LogFile<FlatBuff>
+impl<B> LogFile<B>
 where
-    FlatBuff: ReadBytesFrom + WriteBytesTo + BytesCount + ResizeBytes + Clone,
+    B: FlatBuff,
 {
     fn build_next_block(
         &mut self,
@@ -564,19 +567,19 @@ where
     }
 }
 
-pub trait GetPointer<FlatBuff>
+pub trait GetPointer<B>
 where
-    FlatBuff: ReadBytesFrom + WriteBytesTo + BytesCount + ResizeBytes + Clone,
+    B: FlatBuff,
 {
     /// Создания указателя на последний добавленый блок
-    fn pointer_to_end(self) -> Result<LogPointer<FlatBuff>, LogErr>;
+    fn pointer_to_end(self) -> Result<LogPointer<B>, LogErr>;
 }
 
-impl<FlatBuff> GetPointer<FlatBuff> for Arc<RwLock<LogFile<FlatBuff>>>
+impl<B> GetPointer<B> for Arc<RwLock<LogFile<B>>>
 where
-    FlatBuff: ReadBytesFrom + WriteBytesTo + BytesCount + ResizeBytes + Clone,
+    B: FlatBuff,
 {
-    fn pointer_to_end(self) -> Result<LogPointer<FlatBuff>, LogErr> {
+    fn pointer_to_end(self) -> Result<LogPointer<B>, LogErr> {
         let lock = self.read()?;
         if lock.last_blocks.is_empty() {
             return Err(LogErr::LogIsEmpty);
@@ -592,17 +595,17 @@ where
 
 /// Указатель на блок
 #[derive(Clone)]
-pub struct LogPointer<FlatBuff>
+pub struct LogPointer<B>
 where
-    FlatBuff: ReadBytesFrom + WriteBytesTo + BytesCount + ResizeBytes + Clone,
+    B: FlatBuff,
 {
-    log_file: Arc<RwLock<LogFile<FlatBuff>>>,
+    log_file: Arc<RwLock<LogFile<B>>>,
     current_block: BlockHeadRead,
 }
 
-impl<FlatBuff> LogPointer<FlatBuff>
+impl<B> LogPointer<B>
 where
-    FlatBuff: ReadBytesFrom + WriteBytesTo + BytesCount + ResizeBytes + Clone,
+    B: FlatBuff,
 {
     /// Возвращает заголовок текущего блока
     pub fn current_head<'a>(&'a self) -> &'a BlockHeadRead {

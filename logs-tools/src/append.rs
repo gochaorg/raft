@@ -134,3 +134,8 @@ pub fn append_file<P: AsRef<Path>, P2: AsRef<Path> + Clone>(
         log_tacker: log.tracker.clone(),
     })
 }
+
+// fn append_from_stdin() {
+//     let mut data
+//     std::io::stdin().
+// }

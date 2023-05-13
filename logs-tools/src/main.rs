@@ -132,6 +132,10 @@ fn parse_args(args: &Vec<String>) -> Box<Vec<Action>> {
     Box::new(actions)
 }
 
+enum ExtractTo {
+    File { file_name: String }
+}
+
 /// Операции с лог файлом
 #[derive(Debug, Clone)]
 enum Action {
@@ -148,8 +152,15 @@ enum Action {
         /// Теги
         tags: Vec<TagAction>,
     },
+    
     /// Просмотр заголовков лог файла
     ViewHeads { log_file: String, sha256: bool },
+
+    /// Извлечение записи из лога
+    Extract {
+        log_file: String,
+
+    }
 }
 
 impl Action {
@@ -184,6 +195,9 @@ impl Action {
                 p0.push(log_file);
 
                 viewheaders::view_logfile(p0, *sha256)
+            }
+            Action::Extract { log_file } => {
+                todo!()
             }
         }
     }

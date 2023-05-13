@@ -7,7 +7,7 @@ use std::{
     sync::{Arc, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
-use crate::perf::Tracker;
+use crate::{perf::Tracker, FlatBuff};
 
 /// Ошибка чтения/записи
 #[derive(Debug, Clone)]
@@ -131,6 +131,10 @@ pub struct ByteBuff {
     pub max_size: Option<usize>,
 }
 
+impl FlatBuff for ByteBuff {
+    
+}
+
 impl ByteBuff {
     #[allow(dead_code)]
     pub fn new_empty_unlimited() -> Self {
@@ -224,6 +228,8 @@ pub struct FileBuff {
     pub file: Arc<RwLock<File>>,
     pub tracker: Arc<Tracker>,
 }
+
+impl FlatBuff for FileBuff {}
 
 impl FileBuff {
     pub fn change_tracker(&mut self, new_tracker: Arc<Tracker>) {
