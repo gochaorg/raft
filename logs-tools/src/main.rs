@@ -8,11 +8,10 @@ mod bytesize;
 mod err;
 use bytesize::ByteSize;
 
-use chrono::{DateTime, Utc};
 use err::LogToolErr;
 use logs::{
     bbuff::absbuff::*,
-    block::{BlockOptions},
+    block::{BlockOptions, String16},
     logfile::{GetPointer, LogFile},
     perf::{Counters, Tracker},
 };
@@ -56,6 +55,7 @@ fn parse_args(args: &Vec<String>) -> Box<Vec<Action>> {
     let mut sha256 = false;
     let mut block_buff_size: Option<ByteSize> = None;
     let mut verbose: bool = false;
+    let mut tags: Vec<TagAction> = vec![];
 
     loop {
         let arg = itr.next();
@@ -80,6 +80,8 @@ fn parse_args(args: &Vec<String>) -> Box<Vec<Action>> {
                     verbose = false
                 } else if arg == "-bbsize" || arg == "-block_buffer_size" {
                     state = "-bbsize";
+                } else if arg == "tag" {
+                    state = "tag"
                 } else {
                     println!("undefined arg {arg}")
                 }
@@ -99,14 +101,32 @@ fn parse_args(args: &Vec<String>) -> Box<Vec<Action>> {
                     entry_file: arg.clone(),
                     block_buff_size: block_buff_size,
                     verbose: verbose,
-                })
+                    tags: tags.clone(),
+                });
             }
             "view" => {
                 state = "state";
                 actions.push(Action::ViewHeads {
                     log_file: arg.clone(),
                     sha256: sha256,
-                })
+                });
+            },
+            "tag" => {
+                state = "state";
+                match &arg[..] {
+                    "clear" => {
+                        tags.push(TagAction::Clear)
+                    },
+                    "default" => {
+                        tags.push(TagAction::AddFileName { key: String16::try_from("file").unwrap() });
+                        tags.push(TagAction::AddFileModifyTime { key: String16::try_from("modify_time_utc").unwrap(), format:"%Y-%m-%dT%H:%M:%S.%f".to_string() });
+                        tags.push(TagAction::AddFileModifyTime { key: String16::try_from("modify_time_iso8601").unwrap(), format:"%+".to_string() });
+                        tags.push(TagAction::AddFileModifyTime { key: String16::try_from("modify_time_unix").unwrap(), format:"%s".to_string() });
+                    },
+                    _ => {                        
+                        println!("undefined tag arg: {}",arg)
+                    }
+                }
             }
             _ => {}
         }
@@ -124,6 +144,7 @@ enum Action {
         entry_file: String,
         block_buff_size: Option<ByteSize>,
         verbose: bool,
+        tags: Vec<TagAction>,
     },
     /// Просмотр заголовков лог файла
     ViewHeads { log_file: String, sha256: bool },
@@ -137,6 +158,7 @@ impl Action {
                 entry_file,
                 block_buff_size,
                 verbose,
+                tags,
             } => {
                 let mut p0 = PathBuf::new();
                 p0.push(log_file);
@@ -144,7 +166,7 @@ impl Action {
                 let mut p1 = PathBuf::new();
                 p1.push(entry_file);
 
-                let timing = append_file(p0, p1, block_buff_size.clone())?;
+                let timing = append_file(p0, p1, block_buff_size.clone(), tags)?;
 
                 if *verbose {
                     println!("log counters:\n{}", timing.log_counters);
@@ -185,23 +207,20 @@ struct AppendFileTiming {
 /// Добавляет в лог файл
 ///
 /// Параметры
-/// - `log_file` лог файл
-/// - `entry_file` добавляемый файл
+/// - `log_file_name` лог файл
+/// - `entry_file_name` добавляемый файл
 /// - `block_buff_size` размер буфера записи
-fn append_file<P: AsRef<Path>, P2: AsRef<Path>>(
-    log_file: P,
-    entry_file: P2,
+fn append_file<P: AsRef<Path>, P2: AsRef<Path> + Clone>(
+    log_file_name: P,
+    entry_file_name: P2,
     block_buff_size: Option<ByteSize>,
+    tags: &Vec<TagAction>,
 ) -> Result<AppendFileTiming, LogToolErr> {
     let mut block_opt = BlockOptions::default();
-    match entry_file.as_ref().to_str() {
-        Some(file_name) => block_opt.set("file", file_name)?,
-        None => {}
-    }
 
     let tracker: Tracker = Tracker::new();
 
-    let buff = tracker.track("open log file", || FileBuff::open_read_write(log_file))?;
+    let buff = tracker.track("open log file", || FileBuff::open_read_write(log_file_name))?;
 
     let buff_track = buff.tracker.clone();
 
@@ -217,25 +236,13 @@ fn append_file<P: AsRef<Path>, P2: AsRef<Path>>(
             .read(true)
             .create(false)
             .write(false)
-            .open(entry_file)
+            .open(entry_file_name.clone())
     })?;
-
-    let entry_file_meta = entry_file.metadata()?;
-
-    let last_mod_time = entry_file_meta.modified()?;
-    let last_mod_time: DateTime<Utc> = last_mod_time.into();
-    block_opt.set(
-        "modify_time_utc",
-        last_mod_time.format("%Y-%m-%dT%H:%M:%S.%f").to_string(),
-    )?;
-    block_opt.set(
-        "modify_time_iso8601",
-        last_mod_time.format("%+").to_string(),
-    )?;
-    block_opt.set("modify_time_unix", last_mod_time.format("%s").to_string())?;
 
     ///////////////////
     // read file
+
+    let entry_file_meta = entry_file.metadata()?;
 
     let file_size = entry_file_meta.len();
     if file_size > u32::MAX as u64 {
@@ -270,6 +277,29 @@ fn append_file<P: AsRef<Path>, P2: AsRef<Path>>(
         }
         Ok(())
     })?;
+
+    ////////////////
+    // tags
+
+    let cctx = CommonContext;
+    let fctx = FileContext {
+        file_name: entry_file_name.clone(),
+        file: &entry_file,
+        metadata: &entry_file_meta,
+        data: &block_data
+    };
+
+    for tag in tags {
+        match cctx.apply(&mut block_opt, tag)? {
+            TagApplyResult::Applied => {},
+            TagApplyResult::Skipped => {
+                match fctx.apply(&mut block_opt, tag)? {
+                    TagApplyResult::Applied => {},
+                    TagApplyResult::Skipped => {}
+                }
+            }
+        }
+    }
 
     //////////////////
     // append log

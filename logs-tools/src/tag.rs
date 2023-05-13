@@ -2,8 +2,9 @@
 //! 
 //! Для конкретной записи можно указать опции ([BlockOptions]) 
 
-use std::{path::Path, fs::File};
+use std::{path::Path, fs::{File, Metadata}};
 
+use chrono::{DateTime, Utc};
 use logs::block::{BlockOptions, String16, String32};
 
 use crate::err::LogToolErr;
@@ -33,6 +34,7 @@ pub trait ApplyTag {
 }
 
 /// Общий контекст
+#[derive(Debug,Clone)]
 pub struct CommonContext;
 
 impl ApplyTag for CommonContext {
@@ -64,11 +66,45 @@ impl ApplyTag for CommonContext {
     }
 }
 
+#[derive(Debug,Clone)]
 pub struct FileContext<'a, P> 
 where P: AsRef<Path>
 {
-    file_name: P,
-    file: &'a File,
-    data: &'a Vec<u8>,
+    pub file_name: P,
+
+    #[allow(dead_code)]
+    pub file: &'a File,
+    
+    pub metadata: &'a Metadata,
+
+    #[allow(dead_code)]
+    pub data: &'a Vec<u8>,    
 }
 
+impl<'a, P> ApplyTag for FileContext<'a,P>  
+where P: AsRef<Path>
+{
+    fn apply(&self, options: &mut BlockOptions, tag:&TagAction ) -> Result<TagApplyResult,LogToolErr> {
+        match &tag {
+            TagAction::AddFileModifyTime { key, format } => {
+                let mod_time = self.metadata.modified()?;
+                let mod_time: DateTime<Utc> = mod_time.into();
+                let mod_time = mod_time.format(format).to_string();
+                options.set(key, mod_time)?;
+                Ok(TagApplyResult::Applied)
+            },
+            TagAction::AddFileName { key } => {
+                match self.file_name.as_ref().to_str() {
+                    Some(file_name) => {
+                        options.set(key, file_name.to_string())?;
+                        Ok(TagApplyResult::Applied)
+                    },
+                    None => {
+                        Err(LogToolErr::ApplyTagFail { message: format!("can't read file name"), tag: tag.clone() })
+                    }
+                }
+            }
+            _ => Ok(TagApplyResult::Skipped)
+        }
+    }
+}
