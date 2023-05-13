@@ -7,6 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Трекер скорости выполнения тодельных участков
 #[derive(Debug, Clone)]
 pub struct Tracker {
     pub prefix: String,

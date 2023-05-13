@@ -1,5 +1,6 @@
 use crate::bbuff::streambuff::{ByteBuff, ByteReader, ByteWriter};
 
+/// Тип данных, скорей всего будет удален
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub struct DataId(u32);
 

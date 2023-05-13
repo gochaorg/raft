@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::bbuff::streambuff::{ByteBuff, ByteReader, ByteWriter};
 
+/// Смещение относительно начала файла в байтах
 #[derive(Copy, Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct FileOffset(u64);
 

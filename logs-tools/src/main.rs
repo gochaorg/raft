@@ -1,12 +1,8 @@
 //! Основные функции
 //!
 //! - просмотр лог файла
-//!     - кол-во элементов
-//!     - выгрузка указанных элементов
-//!         - в файлы по шаблону
-//!         - в stdout
-//!         - указание конкретных блоков через запятую
 //! - добавление файла в лог
+//! - выгрузка файла из лога
 
 mod bytesize;
 mod err;
@@ -16,7 +12,7 @@ use chrono::{DateTime, Utc};
 use err::LogToolErr;
 use logs::{
     bbuff::absbuff::*,
-    block::{BlockOptions, String16},
+    block::{BlockOptions},
     logfile::{GetPointer, LogFile},
     perf::{Counters, Tracker},
 };
@@ -48,6 +44,7 @@ fn main() {
     }
 }
 
+/// Парсинг аргументов коммандной строки
 fn parse_args(args: &Vec<String>) -> Box<Vec<Action>> {
     let mut actions = Vec::<Action>::new();
 
@@ -289,6 +286,7 @@ fn append_file<P: AsRef<Path>, P2: AsRef<Path>>(
     })
 }
 
+/// Просмотр заголовков
 fn view_logfile<P: AsRef<Path>>(log_file: P, sha256: bool) -> Result<(), LogToolErr> {
     let buff = FileBuff::open_read_only(log_file)?;
     let log = LogFile::new(buff)?;

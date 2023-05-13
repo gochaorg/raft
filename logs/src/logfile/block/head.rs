@@ -69,6 +69,7 @@ impl Default for BackRefs {
     }
 }
 
+/// Размер заголовка в байтах
 #[derive(Debug, Clone, Copy)]
 pub struct BlockHeadSize(pub u32);
 
@@ -78,6 +79,7 @@ impl BlockHeadSize {
     }
 }
 
+/// Размер данных в байтах
 #[derive(Debug, Clone, Copy)]
 pub struct BlockDataSize(pub u32);
 
@@ -87,6 +89,7 @@ impl BlockDataSize {
     }
 }
 
+/// Размер хвоста в байтах
 #[derive(Debug, Clone, Copy)]
 pub struct BlockTailSize(pub u16);
 
@@ -166,6 +169,13 @@ fn read_block_head(
 }
 
 impl BlockHead {
+    /// Запись блока в байтовый буффер
+    /// 
+    /// Параметры
+    /// - `bbuf` буфер
+    /// - `data_size` размер данных
+    /// - `tail_size` размер хвоста
+    /// - `tracker` трекер скорости выполнения
     pub fn write_block_head(
         &self,
         bbuf: &mut ByteBuff,

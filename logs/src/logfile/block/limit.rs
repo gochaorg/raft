@@ -2,6 +2,7 @@ use std::fmt;
 
 use super::BlockErr;
 
+/// Ограничение максимального кол-ва байт
 #[derive(Debug, Clone, Copy)]
 pub struct Limit(pub u64);
 
@@ -21,4 +22,5 @@ impl fmt::Display for Limit {
         write!(f, "{}", self.0)
     }
 }
+
 pub const LIMIT_USIZE: Limit = Limit(usize::MAX as u64);
