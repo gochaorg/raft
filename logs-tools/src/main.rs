@@ -23,6 +23,9 @@ pub use tag::*;
 mod append;
 mod viewheaders;
 mod extract;
+mod range;
+mod substr;
+mod parse;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
