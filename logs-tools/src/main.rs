@@ -6,6 +6,7 @@
 
 mod bytesize;
 mod err;
+use actions::tag::TagAction;
 use bytesize::ByteSize;
 
 use err::LogToolErr;
@@ -17,12 +18,8 @@ use std::{
     path::{PathBuf},
 };
 
-mod tag;
-pub use tag::*;
-
-mod append;
-mod viewheaders;
-mod extract;
+mod actions;
+use actions::*;
 mod range;
 mod substr;
 mod parse;
@@ -162,7 +159,6 @@ enum Action {
     /// Извлечение записи из лога
     Extract {
         log_file: String,
-
     }
 }
 
@@ -182,7 +178,7 @@ impl Action {
                 let mut p1 = PathBuf::new();
                 p1.push(entry_file);
 
-                let timing = append::append_file(p0, p1, block_buff_size.clone(), tags)?;
+                let timing = append_file(p0, p1, block_buff_size.clone(), tags)?;
 
                 if *verbose {
                     println!("log counters:\n{}", timing.log_counters);

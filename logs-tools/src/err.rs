@@ -2,7 +2,7 @@ use std::sync::{PoisonError, RwLockReadGuard};
 
 use logs::{bbuff::absbuff::ABuffError, block::BlockErr, logfile::LogErr};
 
-use crate::TagAction;
+use crate::actions::tag::TagAction;
 
 #[derive(Debug, Clone)]
 pub enum LogToolErr {
