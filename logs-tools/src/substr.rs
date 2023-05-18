@@ -20,12 +20,16 @@ impl std::ops::Add<CharsCount> for CharsCount {
 }
 
 
-pub trait SubString {
-    fn substring( &self, offset:CharsCount ) -> Option<&str>;
+pub trait SubString 
+where Self: Sized
+{
+    fn substring( self, offset:CharsCount ) -> Option<Self>;
 }
 
-impl SubString for &str {
-    fn substring( &self, offset:CharsCount ) -> Option<&str> {
+impl SubString for &str 
+where Self: Sized
+{
+    fn substring( self, offset:CharsCount ) -> Option<Self> {
         if offset.is_zero() {
             return Some(self);
         }
