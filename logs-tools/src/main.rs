@@ -132,6 +132,7 @@ fn parse_args(args: &Vec<String>) -> Box<Vec<Action>> {
     Box::new(actions)
 }
 
+#[allow(dead_code)]
 enum ExtractTo {
     File { file_name: String }
 }
@@ -157,12 +158,14 @@ enum Action {
     ViewHeads { log_file: String, sha256: bool },
 
     /// Извлечение записи из лога
+    #[allow(dead_code)]
     Extract {
         log_file: String,
     }
 }
 
 impl Action {
+    #[allow(unused_variables)]
     fn execute(&self) -> Result<(), LogToolErr> {
         match self {
             Action::Append {
