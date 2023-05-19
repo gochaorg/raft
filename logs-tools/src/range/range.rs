@@ -180,8 +180,11 @@ fn test_iter_on_vec() {
     println!( "{:?}", iter.next() );
 }
 
-impl Range<i32> {
-    pub fn iter( &self ) -> Box<dyn Iterator<Item = i32>> {
+impl<T> Range<T> 
+where
+    T: Clone+Sized+Next<T>+Ord+'static
+{
+    pub fn iter( &self ) -> Box<dyn Iterator<Item = T>> {
         match self {
             Self::Single(v) => {
                 Box::new( SingleIter::new(v) ) 
@@ -194,6 +197,14 @@ impl Range<i32> {
                     finished: false
                 }) 
             },
+            Self::FromToInc(from, to) => {
+                Box::new( FromToIter {
+                    to: to.clone(),
+                    cur: from.clone(),
+                    include_to: true,
+                    finished: false
+                }) 
+            },
             Self::Multiple(items) => {
                 let itm = items.to_vec();
                 Box::new( IterOnVecIter {
@@ -201,15 +212,17 @@ impl Range<i32> {
                     cur_item: 0,
                     cur_iter: None
                 })
-            },
-            _ => {todo!()}
+            }
         }
     }
 }
 
-impl IntoIterator for Range<i32> {
-    type Item = i32;
-    type IntoIter = Box<dyn Iterator<Item = i32>>;
+impl<T> IntoIterator for Range<T> 
+where
+    T: Clone+Sized+Next<T>+Ord+'static
+{
+    type Item = T;
+    type IntoIter = Box<dyn Iterator<Item = T>>;
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
@@ -236,12 +249,15 @@ fn range_iter_test() {
 
     println!("----");
     let range = Range::Multiple( vec![
-        Range::Single(1),
+        Range::Single(1u32),
         Range::FromToExc(7,10),
         Range::Multiple( vec![
-            Range::FromToExc(12,15)
+            Range::FromToInc(12,15)
         ])
     ]);
     let mut iter = range.into_iter();
-    for _ in 0..10 { println!("{:?}",iter.next()); }
+    for _ in 0..10 { 
+        let v = iter.next();
+        println!("{:?}",v);
+    }
 }
