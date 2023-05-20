@@ -130,8 +130,10 @@ fn test_number() {
 
     let (num,_) = res.unwrap();
     println!("{:?}", num.try_u128());
+    assert!( num.try_u32() == Some(123u32) );
 
     let res = parser.parse("0xFe");
     let (num,_) = res.unwrap();
     println!("{:?}", num.try_u128());
+    assert!( num.try_u32() == Some(254u32) );
 }

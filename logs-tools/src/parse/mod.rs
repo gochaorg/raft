@@ -6,3 +6,6 @@ pub use digit::*;
 
 mod number;
 pub use number::*;
+
+mod ws;
+pub use ws::*;
