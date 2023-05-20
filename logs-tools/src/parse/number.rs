@@ -1,25 +1,105 @@
 use crate::substr::*;
 
-use super::{DigitBase, DigitParser, Parser};
+use super::*;
 
 #[derive(Debug,Clone)]
 pub struct Number { pub digits: Vec<u8>, pub base: DigitBase }
 
-pub struct NumberParser { 
-//    base: DigitBase, 
-//    prefix:Option<String>
+impl Number {
+    pub fn try_u128( &self ) -> Option<u128> {
+        let res : Result<u128,String> = self.clone().try_into();
+        match res {
+            Ok(res) => Some(res),
+            Err(_) => None
+        }
+    }
+
+    pub fn try_u64( &self ) -> Option<u64> {
+        self.try_u128().and_then(|n| 
+            if n > u64::MAX as u128 {
+                None
+            } else {
+                Some(n as u64)
+            }
+        )
+    }
+
+    pub fn try_u32( &self ) -> Option<u32> {
+        self.try_u128().and_then(|n| 
+            if n > u32::MAX as u128 {
+                None
+            } else {
+                Some(n as u32)
+            }
+        )
+    }
 }
 
+impl TryFrom<Number> for u128 {
+    type Error = String;
+    fn try_from(value: Number) -> Result<Self, Self::Error> {
+        let mut digits = value.digits.clone();
+        digits.reverse();
+
+        let base = match value.base {
+            DigitBase::Bin => 2u128,
+            DigitBase::Oct => 8u128,
+            DigitBase::Dec => 10u128,
+            DigitBase::Hex => 16u128,
+        };
+
+        let mut kof = 1u128;
+        let mut sum = 0u128;
+
+        for digit in digits {
+            match (digit as u128).checked_mul(kof) {
+                Some(succ_mul) => {
+                    sum += succ_mul;
+                    match kof.checked_mul(base) {
+                        Some(succ_kof) => kof = succ_kof,
+                        None => return Err(format!("overflow parse number: {kof} * {base}"))
+                    }
+                },
+                None => return Err(format!("overflow parse number: {digit} * {kof}"))
+            }
+        }
+        
+        Ok(sum)
+    }
+}
+
+pub struct NumberParser;
+
+const BIN_DIGIT_PARSER : DigitParser = DigitParser { base: DigitBase::Bin };
+const OCT_DIGIT_PARSER : DigitParser = DigitParser { base: DigitBase::Oct };
 const DEC_DIGIT_PARSER : DigitParser = DigitParser { base: DigitBase::Dec };
+const HEX_DIGIT_PARSER : DigitParser = DigitParser { base: DigitBase::Hex };
 
 impl Parser<Number> for NumberParser {
     fn parse( &self, source: &str ) -> Option<(Number, CharsCount)> {
         let mut src = source.clone();
+        let (num_parser,prefix_cc) = LookupParser { max_chars_count: 2 }.parse(source)
+            .when_equals("0x", HEX_DIGIT_PARSER)
+            .when_equals("0o", OCT_DIGIT_PARSER)
+            .when_equals("0b", BIN_DIGIT_PARSER)
+            .fetch()
+            .unwrap_or((DEC_DIGIT_PARSER, CharsCount(0)))
+            ;
+
+        if prefix_cc.0 > 0 {
+            match src.substring(prefix_cc) {
+                Some(substr) => {
+                    src = substr;
+                },
+                None => {}
+            }
+        }
+
         let mut digits: Vec<u8> = vec![];
-        let mut chr_count = CharsCount(0);
+        let mut chr_count = prefix_cc;
 
         loop {
-            match DEC_DIGIT_PARSER.parse(src) {
+            match num_parser.parse(src) {
                 Some( (d,cc) ) => {
                     digits.push(d.0);
                     match src.substring(cc) {
@@ -35,7 +115,7 @@ impl Parser<Number> for NumberParser {
         };
         
         if chr_count.0 > 0 {
-            Some(( Number { base: DigitBase::Dec, digits: digits }, chr_count ))
+            Some(( Number { base: num_parser.base, digits: digits }, chr_count ))
         } else {
             None
         }
@@ -46,5 +126,12 @@ impl Parser<Number> for NumberParser {
 fn test_number() {
     let parser = NumberParser {};
     let res = parser.parse("123 as");
-    println!("{res:?}")
+    println!("{res:?}");
+
+    let (num,_) = res.unwrap();
+    println!("{:?}", num.try_u128());
+
+    let res = parser.parse("0xFe");
+    let (num,_) = res.unwrap();
+    println!("{:?}", num.try_u128());
 }

@@ -133,12 +133,12 @@ pub struct LookupContext<R:Sized+Clone> {
 }
 
 impl<R:Sized+Clone> LookupContext<R> {
-    fn when_equals( &mut self, str: &str, res:R ) -> &mut Self {
+    pub fn when_equals( &mut self, str: &str, res:R ) -> &mut Self {
         self.data.push((str.to_string(), res.clone()));
         self
     }
 
-    fn fetch( &self ) -> Option<(R,CharsCount)> {
+    pub fn fetch( &self ) -> Option<(R,CharsCount)> {
         match &self.lookup {
             Some((Lookup(str), _)) => {
                 match (&self.data).into_iter().filter(|(sample,_)| {
