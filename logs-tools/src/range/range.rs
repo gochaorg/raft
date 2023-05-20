@@ -1,5 +1,3 @@
-use std::borrow::BorrowMut;
-
 #[derive(Clone)]
 pub enum Range<T:Sized+Clone> {
     Single(T),
