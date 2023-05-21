@@ -522,6 +522,7 @@ name = "logs-tools"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "either",
  "hex",
  "lazy-regex",
  "logs",

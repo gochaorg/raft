@@ -1,21 +1,23 @@
-use std::{fmt::Debug, rc::Rc};
-
+use std::{fmt::Debug, rc::Rc, process::Output};
+use either::*;
 use crate::substr::*;
 
+/// Общий интерфейс парсера
 pub trait Parser<A:Sized> {
     fn parse( &self, source: &str ) -> Option<(A, CharsCount)>;
 }
-pub struct ParseFollow<'a,R1,R2> 
+
+pub struct FollowParser<'a,R1,R2> 
 where 
-    R1: Sized,
-    R2: Sized,
+    R1: Sized+Clone,
+    R2: Sized+Clone,
 {
     first: Rc<dyn Parser<R1> + 'a>,
     second: Rc<dyn Parser<R2> + 'a>,
 }
 
 #[allow(dead_code)]
-impl<'a,R1,R2> ParseFollow<'a,R1,R2>
+impl<'a,R1,R2> FollowParser<'a,R1,R2>
 where
     R1: Sized + Clone,
     R2: Sized + Clone,
@@ -30,7 +32,7 @@ where
     }
 }
 
-impl<'a,R1,R2> Parser<(R1,R2)> for ParseFollow<'a,R1,R2> 
+impl<'a,R1,R2> Parser<(R1,R2)> for FollowParser<'a,R1,R2> 
 where
     R1: Sized + Clone,
     R2: Sized + Clone,
@@ -64,7 +66,7 @@ fn test_follow_1() {
     
     let parser1 = DigitParser::parser();
     let parser2 = DigitParser::parser();
-    let parser = ParseFollow::new(parser1, parser2);
+    let parser = FollowParser::new(parser1, parser2);
 
     let res = parser.parse(str);
     assert!( res == Some(((Digit(1),Digit(2)),CharsCount(2))) )
@@ -72,7 +74,7 @@ fn test_follow_1() {
 
 #[allow(dead_code)]
 pub fn follow<'a,A:Sized+Clone+'a,B:Sized+Clone+'a>( left:Rc<dyn Parser<A> + 'a>, right:Rc<dyn Parser<B> + 'a> ) -> Rc<dyn Parser<(A,B)> + 'a> {
-    let parser = Rc::new(ParseFollow { first: left.clone(), second: right.clone() });
+    let parser = Rc::new(FollowParser { first: left.clone(), second: right.clone() });
     parser
 }
 
@@ -90,3 +92,98 @@ fn test_follow_2() {
     assert!( res == Some(((Digit(1),Digit(2)),CharsCount(2))) )
 }
 
+pub struct AlternativeParser<'a,A,B>
+where
+    A: Sized+Clone,
+    B: Sized+Clone
+{
+    first:  Rc<dyn Parser<A> + 'a>,
+    second: Rc<dyn Parser<B> + 'a>,
+}
+
+impl<'a,A,B> Parser<Either<A,B>> for AlternativeParser<'a,A,B> 
+where
+    A: Sized+Clone,
+    B: Sized+Clone
+{
+    fn parse( &self, source: &str ) -> Option<(Either<A,B>, CharsCount)> {
+        match self.first.parse(source) {
+            Some((res,cc)) => Some( (Left(res), cc) ),
+            None => {
+                match self.second.parse(source) {
+                    Some((res,cc)) => Some( (Right(res),cc) ),
+                    None => None
+                }
+            }
+        }
+    }
+}
+
+pub fn alternative<'a,A:Sized+Clone+'a,B:Sized+Clone+'a>( left:Rc<dyn Parser<A> + 'a>, right:Rc<dyn Parser<B> + 'a> ) -> Rc<dyn Parser<Either<A,B>> + 'a> {
+    Rc::new( AlternativeParser { first: left.clone(), second: right.clone() } )
+}
+
+
+#[derive(Clone)]
+pub struct ResultMapperParser<'a,A,B,F> 
+where
+    F: (Fn(&A) -> B) + 'a,
+    B: Clone+Sized,
+{
+    source: Rc<dyn Parser<A> + 'a>,
+    mapper: F
+}
+
+impl<'a,A,B,F> Parser<B> for ResultMapperParser<'a,A,B,F>
+where
+    F: (Fn(&A) -> B) + 'a,
+    B: Clone+Sized,
+{
+    fn parse( &self, source: &str ) -> Option<(B, CharsCount)> {
+        match self.source.parse(source) {
+            Some( (src,cc) ) => {
+                let dest = (self.mapper)(&src);
+                Some((dest,cc))
+            },
+            None => None
+        }
+    }    
+}
+
+pub fn map<'a,A,F,B>( source: Rc<dyn Parser<A> + 'a>, f:F ) -> Rc<dyn Parser<B> + 'a> 
+where
+    F: Fn(&A) -> B + 'a,
+    B: Clone+Sized + 'a,
+    A: 'a
+{
+    Rc::new( ResultMapperParser {
+        source: source.clone(),
+        mapper: f
+    })
+}
+
+// pub struct Repeat<'a,A>
+// where
+//     A: Sized+Clone
+// {
+//     parser: Rc<dyn Parser<A> + 'a>,
+//     min_match_count: Option<usize>,
+//     max_match_count: Option<usize>
+// }
+
+#[test]
+fn test_map_1() {
+    use super::digit::*;
+
+    let str = "123";
+    
+    let parser1 = DigitParser::parser();
+    let parser2 = DigitParser::parser();
+    let parser = FollowParser::new(parser1, parser2);
+    let parser = parser.parser();
+    let parser = map(parser, |(a,b)| a.0 + b.0 );
+
+
+    let res = parser.parse(str);
+    assert!( res == Some((3u8,CharsCount(2))) )
+}

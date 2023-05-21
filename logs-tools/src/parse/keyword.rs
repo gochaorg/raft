@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::substr::*;
 use super::{Parser, lookup::Lookup, lookup::LookupParser};
 
@@ -65,6 +67,14 @@ where
                 }
             }
         }
+    }
+}
+
+impl<'a,A> Keywords<A> 
+where A: Clone+Sized+'a
+{
+    pub fn parser( self ) -> Rc<dyn Parser<A> + 'a> {
+        Rc::new( self.clone() )
     }
 }
 

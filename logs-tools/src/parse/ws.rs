@@ -1,8 +1,17 @@
+use std::rc::Rc;
+
 use super::Parser;
 use crate::substr::*;
 
+#[derive(Debug,Clone)]
 pub struct WhiteSpace(pub String);
 pub struct WhiteSpaceParser;
+
+impl WhiteSpaceParser {
+    pub fn parser( self ) -> Rc<dyn Parser<WhiteSpace>> {
+        Rc::new( self )
+    }
+}
 
 impl Parser<WhiteSpace> for WhiteSpaceParser {
     fn parse( &self, source: &str ) -> Option<(WhiteSpace, CharsCount)> {

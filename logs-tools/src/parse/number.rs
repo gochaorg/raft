@@ -1,8 +1,10 @@
+use std::rc::Rc;
+
 use crate::substr::*;
 
 use super::*;
 
-#[derive(Debug,Clone)]
+#[derive(Debug,Clone,PartialEq)]
 pub struct Number { pub digits: Vec<u8>, pub base: DigitBase }
 
 impl Number {
@@ -69,6 +71,12 @@ impl TryFrom<Number> for u128 {
 }
 
 pub struct NumberParser;
+
+impl NumberParser {
+    pub fn parser( self ) -> Rc<dyn Parser<Number>> {
+        Rc::new( self )
+    }
+}
 
 const BIN_DIGIT_PARSER : DigitParser = DigitParser { base: DigitBase::Bin };
 const OCT_DIGIT_PARSER : DigitParser = DigitParser { base: DigitBase::Oct };
