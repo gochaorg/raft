@@ -1,3 +1,32 @@
+/// Хранит диапазоны значений
+/// 
+/// Например для `1,2,4,8-10` будет такая структура:
+/// 
+/// ```
+/// Multiple(
+///   Single(1),
+///   Single(2),
+///   Single(4),
+///   FromToInc(8,10),
+/// )
+/// ```
+/// 
+/// По данной структуре возможно итерироваться:
+/// 
+/// ```
+/// let range = Range::Multiple( vec![
+///     Range::Single(1u32),
+///     Range::FromToExc(7,10),
+///     Range::Multiple( vec![
+///         Range::FromToInc(12,15)
+///     ])
+/// ]);
+/// let mut iter = range.into_iter();
+/// for _ in 0..10 { 
+///     let v = iter.next();
+///     println!("{:?}",v);
+/// }
+/// ```
 #[derive(Clone)]
 pub enum Range<T:Sized+Clone> {
     Single(T),
