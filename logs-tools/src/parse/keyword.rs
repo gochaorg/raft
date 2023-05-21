@@ -1,5 +1,5 @@
 use crate::substr::*;
-use super::{Parser, LookupParser, Lookup};
+use super::{Parser, lookup::Lookup, lookup::LookupParser};
 
 #[derive(Clone,Debug)]
 pub struct Keywords<A> 
@@ -10,6 +10,7 @@ where
     max_keyword_len: usize
 }
 
+#[allow(dead_code)]
 #[derive(Clone,Debug)]
 pub struct KeywordsBuilder<A> 
 where
@@ -18,6 +19,7 @@ where
     keywords: Vec<(String,A)>
 }
 
+#[allow(dead_code)]
 impl<A> KeywordsBuilder<A> 
 where
     A: Clone+Sized

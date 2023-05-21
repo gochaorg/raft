@@ -28,6 +28,7 @@
 /// }
 /// ```
 #[derive(Clone)]
+#[allow(dead_code)]
 pub enum Range<T:Sized+Clone> {
     Single(T),
     FromToExc(T,T),

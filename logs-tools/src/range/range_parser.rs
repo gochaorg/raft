@@ -14,3 +14,15 @@
 //! 
 use super::range::*;
 use crate::substr::*;
+use super::super::parse::*;
+
+struct Single(Number);
+struct FromTo(Number,Number);
+
+// struct SingleParser;
+// impl Parser<FromTo> for SingleParser {
+//     fn parse( &self, source: &str ) -> Option<(FromTo, CharsCount)> {
+//         let mut src = source.clone();
+//         //NumberParser.parse(source)
+//     }
+// }

@@ -12,3 +12,6 @@ pub use ws::*;
 
 mod keyword;
 pub use keyword::*;
+
+mod lookup;
+pub use lookup::*;
