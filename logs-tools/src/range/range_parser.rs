@@ -138,7 +138,7 @@ pub enum RangeNum {
 }
 
 #[derive(Debug,Clone)]
-pub struct Multiple( Vec::<RangeNum> );
+pub struct Multiple(pub Vec::<RangeNum> );
 
 /// Множество значений
 /// 
@@ -242,3 +242,4 @@ fn multiple_parse_test() {
     let res = parser.parse("1,2,4-6");
     println!("{:?}", res);
 }
+

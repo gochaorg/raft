@@ -71,6 +71,42 @@ impl TryFrom<Number> for u128 {
     }
 }
 
+impl TryFrom<Number> for u64 {
+    type Error = String;
+    fn try_from(value: Number) -> Result<Self, Self::Error> {
+        let v:u128 = value.try_into()?;
+        if v > u64::MAX as u128 { return Err(format!("can't convert {v} to u64 from u128: overflow u64::MAX")); }
+        Ok(v as u64)
+    }
+}
+
+impl TryFrom<Number> for u32 {
+    type Error = String;
+    fn try_from(value: Number) -> Result<Self, Self::Error> {
+        let v:u128 = value.try_into()?;
+        if v > u32::MAX as u128 { return Err(format!("can't convert {v} to u32 from u128: overflow u32::MAX")); }
+        Ok(v as u32)
+    }
+}
+
+impl TryFrom<Number> for u16 {
+    type Error = String;
+    fn try_from(value: Number) -> Result<Self, Self::Error> {
+        let v:u128 = value.try_into()?;
+        if v > u16::MAX as u128 { return Err(format!("can't convert {v} to u16 from u128: overflow u16::MAX")); }
+        Ok(v as u16)
+    }
+}
+
+impl TryFrom<Number> for u8 {
+    type Error = String;
+    fn try_from(value: Number) -> Result<Self, Self::Error> {
+        let v:u128 = value.try_into()?;
+        if v > u8::MAX as u128 { return Err(format!("can't convert {v} to u8 from u128: overflow u8::MAX")); }
+        Ok(v as u8)
+    }
+}
+
 /// Парсер числа
 /// 
 /// Синтаксис
