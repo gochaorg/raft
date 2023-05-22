@@ -4,6 +4,7 @@ use crate::substr::*;
 
 use super::*;
 
+/// Целое число см [NumberParser]
 #[derive(Debug,Clone,PartialEq)]
 pub struct Number { pub digits: Vec<u8>, pub base: DigitBase }
 
@@ -70,6 +71,28 @@ impl TryFrom<Number> for u128 {
     }
 }
 
+/// Парсер числа
+/// 
+/// Синтаксис
+/// 
+///     Number ::= hex_number | oct_number | bin_number | dec_number
+///     hex_number ::= '0x' hex_digit { hex_digit }
+///     hex_digit  ::= '0' | '1' | '2' | '3' | '4'
+///                  | '5' | '6' | '7' | '8' | '9'
+///                  | 'a' | 'b' | 'c' | 'd' | 'e' | 'f'
+///                  | 'A' | 'B' | 'C' | 'D' | 'E' | 'F'
+/// 
+///     oct_number ::= '0o' oct_digit { oct_digit }
+///     oct_digit  ::= '0' | '1' | '2' | '3' | '4'
+///                  | '5' | '6' | '7'
+/// 
+///     bin_number ::= '0b' bin_digit { bin_digit }
+///     bin_digit  ::= '0' | '1'
+/// 
+///     dec_number ::= dec_digit dec_digit
+///     dec_digit  ::= '0' | '1' | '2' | '3' | '4'
+///                  | '5' | '6' | '7' | '8' | '9'
+/// 
 pub struct NumberParser;
 
 impl NumberParser {

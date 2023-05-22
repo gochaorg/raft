@@ -5,6 +5,10 @@ use crate::substr::*;
 
 #[derive(Debug,Clone)]
 pub struct WhiteSpace(pub String);
+
+/// Парсинг пробельных символов
+#[derive(Debug,Clone)]
+
 pub struct WhiteSpaceParser;
 
 impl WhiteSpaceParser {

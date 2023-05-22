@@ -1,22 +1,15 @@
-//! Парсинг диапазона значений
-//! 
-//! Синтаксис
-//! 
-//! range ::= [ ws ] multiple
-//! 
-//! multiple ::= singleOrFromTo [ ws ] [ ',' [ws] singleOrFromTo ]
-//! 
-//! singleOrFromTo ::=  fromTo | single
-//! 
-//! single ::= [ws] number
-//! 
-//! fromTo ::= single [ws] '-' single
-//! 
 use std::rc::Rc;
 
 use crate::substr::*;
 use super::super::parse::*;
 
+/// Единичное значение
+/// 
+/// Синтаксис
+/// 
+///     Single ::= [ WhiteSpace ] Number
+/// 
+/// см [NumberParser], [WhiteSpaceParser]
 #[derive(Clone,Debug,PartialEq)]
 pub struct Single(pub Number);
 
@@ -69,7 +62,14 @@ fn single_parse_test() {
 #[derive(Clone,Debug,PartialEq)]
 pub struct FromTo(pub Number,pub Number);
 
-// fromTo ::= single [ws] '-' single
+/// Пара значений - диапазон
+/// 
+/// Синтаксис
+/// 
+///     FromTo ::= Single [ WhiteSpace ] '-' Single
+/// 
+/// см [SingleParser], [WhiteSpaceParser]
+
 #[derive(Clone)]
 pub struct FromToParser {
     parser: Rc<dyn Parser<FromTo>>
@@ -140,6 +140,15 @@ pub enum RangeNum {
 #[derive(Debug,Clone)]
 pub struct Multiple( Vec::<RangeNum> );
 
+/// Множество значений
+/// 
+/// Синтаксис
+/// 
+///     MultipleParse ::= RangeNum { delim RangeNum }
+///     RangeNum ::= FromTo | Single
+///     delim ::= [ WhiteSpace ] ','
+/// 
+/// см [SingleParser], [FromToParser], [WhiteSpaceParser]
 pub struct MultipleParse {
     delim_parser: Rc<dyn Parser<()>>,
     range_num_parser: Rc<dyn Parser<RangeNum>>,
