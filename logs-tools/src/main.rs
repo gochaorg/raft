@@ -11,8 +11,10 @@ use bytesize::ByteSize;
 
 use err::LogToolErr;
 use logs::{
-    block::{String16},
+    block::{String16, String32, BlockId},
 };
+use parse::Parser;
+use range::{MultipleParse, Range};
 use std::{
     env,
     path::{PathBuf},
@@ -48,11 +50,12 @@ fn parse_args(args: &Vec<String>) -> Box<Vec<Action>> {
     itr.next(); // skip exe
 
     let mut state = "state";
-    let mut append_log: Box<Option<String>> = Box::new(None);
+    let mut log_file_name: Box<Option<String>> = Box::new(None);
     let mut sha256 = false;
     let mut block_buff_size: Option<ByteSize> = None;
     let mut verbose: bool = false;
     let mut tags: Vec<TagAction> = vec![];
+    let mut custom_tag_name: Option<String16> = None;
 
     loop {
         let arg = itr.next();
@@ -79,6 +82,8 @@ fn parse_args(args: &Vec<String>) -> Box<Vec<Action>> {
                     state = "-bbsize";
                 } else if arg == "tag" {
                     state = "tag"
+                } else if arg == "e" || arg == "extract" {
+                    state = "extract"
                 } else {
                     println!("undefined arg {arg}")
                 }
@@ -88,13 +93,13 @@ fn parse_args(args: &Vec<String>) -> Box<Vec<Action>> {
                 block_buff_size = Some(ByteSize::parse(arg).unwrap())
             }
             "append" => {
-                append_log = Box::new(Some(arg.clone()));
+                log_file_name = Box::new(Some(arg.clone()));
                 state = "append_2"
             }
             "append_2" => {
                 state = "state";
                 actions.push(Action::Append {
-                    log_file: append_log.clone().unwrap().clone(),
+                    log_file: log_file_name.clone().unwrap().clone(),
                     entry_file: arg.clone(),
                     block_buff_size: block_buff_size,
                     verbose: verbose,
@@ -120,10 +125,65 @@ fn parse_args(args: &Vec<String>) -> Box<Vec<Action>> {
                         tags.push(TagAction::AddFileModifyTime { key: String16::try_from("modify_time_iso8601").unwrap(), format:"%+".to_string() });
                         tags.push(TagAction::AddFileModifyTime { key: String16::try_from("modify_time_unix").unwrap(), format:"%s".to_string() });
                     },
+                    "add" | "+" => {
+                        state = "tag_key";
+                    },
                     _ => {                        
                         println!("undefined tag arg: {}",arg)
                     }
                 }
+            },
+            "tag_key" => {
+                custom_tag_name = Some( arg.try_into().unwrap() );
+                state = "tag_value"
+            },
+            "tag_value" => {
+                state = "state";
+                tags.push( TagAction::AddTag { 
+                    key: custom_tag_name.clone().unwrap(), 
+                    value: String32::try_from(arg).unwrap()
+                })
+            },
+            "extract" => {
+                state = "selection";
+                log_file_name = Box::new(Some(arg.to_string()));                
+            },
+            "selection" => {
+                match &arg[..] {
+                    "all" => {
+                        state = "state";
+                        actions.push(Action::Extract { 
+                            log_file: log_file_name.clone().unwrap(), 
+                            selection: ExtractSelection::All
+                        });
+                    },
+                    "range" => {
+                        state = "selection_range";
+                    }
+                    _ => {
+                        state = "state";
+                        println!("undefined selection {arg}")
+                    }
+                }
+            },
+            "selection_range" => {
+                let parser = MultipleParse::new();
+                match parser.parse(arg) {
+                    None => {
+                        state = "state";
+                        println!("range {arg} not parsed");
+                    },
+                    Some((range_ast,_)) => {
+                        state = "state";
+                        let range : Range<u32> = range_ast.try_into().unwrap();
+                        
+                        actions.push(Action::Extract { 
+                            log_file: log_file_name.clone().unwrap(), 
+                            selection: ExtractSelection::Range(range) 
+                        });
+                    }
+                }
+                
             }
             _ => {}
         }
@@ -132,9 +192,14 @@ fn parse_args(args: &Vec<String>) -> Box<Vec<Action>> {
     Box::new(actions)
 }
 
-#[allow(dead_code)]
-enum ExtractTo {
-    File { file_name: String }
+/// Какие блоки выгружать
+#[derive(Debug, Clone)]
+enum ExtractSelection {
+    /// Все
+    All,
+
+    /// Конкретные диапазоны блоков выгружать
+    Range( range::Range<u32> )
 }
 
 /// Операции с лог файлом
@@ -160,7 +225,11 @@ enum Action {
     /// Извлечение записи из лога
     #[allow(dead_code)]
     Extract {
+        /// Лог файл
         log_file: String,
+
+        /// Какие блоки выбрать
+        selection: ExtractSelection
     }
 }
 
@@ -198,8 +267,26 @@ impl Action {
 
                 viewheaders::view_logfile(p0, *sha256)
             }
-            Action::Extract { log_file } => {
-                todo!()
+            Action::Extract { 
+                log_file,
+                selection
+            } => {
+                let mut log_file_path = PathBuf::new();
+                log_file_path.push( log_file );
+
+                match selection {
+                    ExtractSelection::All => {
+                        Err(
+                            LogToolErr::NotImplemented(format!("extract all entries"))
+                        )
+                    },
+                    ExtractSelection::Range(range) => {
+                        extract::extract_to_stdout(
+                            log_file_path,
+                            range.clone().into_iter().map(|b_id| BlockId::new(b_id))
+                        )
+                    }
+                }
             }
         }
     }

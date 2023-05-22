@@ -21,6 +21,7 @@ pub enum LogToolErr {
         message: String,
         tag: TagAction,
     },
+    NotImplemented(String)
 }
 
 impl From<BlockErr> for LogToolErr {

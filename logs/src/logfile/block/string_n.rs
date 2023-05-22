@@ -43,6 +43,13 @@ impl TryFrom<String> for String32 {
     }
 }
 
+impl TryFrom<&String> for String32 {
+    type Error = BlockErr;
+    fn try_from(value: &String) -> Result<Self, Self::Error> {
+        String32::try_from(value.clone())
+    }
+}
+
 impl TryFrom<&str> for String32 {
     type Error = BlockErr;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
@@ -129,6 +136,13 @@ impl TryFrom<String> for String16 {
         } else {
             Ok(String16(value.clone()))
         }
+    }
+}
+
+impl TryFrom<&String> for String16 {
+    type Error = BlockErr;
+    fn try_from(value: &String) -> Result<Self, Self::Error> {
+        String16::try_from(value.clone())
     }
 }
 
