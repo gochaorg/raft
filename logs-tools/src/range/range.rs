@@ -27,7 +27,7 @@
 ///     println!("{:?}",v);
 /// }
 /// ```
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 #[allow(dead_code)]
 pub enum Range<T:Sized+Clone> {
     Single(T),
