@@ -3,15 +3,23 @@ use std::rc::Rc;
 use crate::substr::*;
 use super::{Parser, lookup::Lookup, lookup::LookupParser};
 
+/// Парсинг ключевых слов
+/// 
+/// При использовании [KeywordsBuilder]
+/// слова хранятся в порядке убывания длинны
 #[derive(Clone,Debug)]
 pub struct Keywords<A> 
 where
     A: Clone+Sized
 {
+    /// Ключевое слово и его представление
     keywords: Vec<(String,A)>,
+
+    /// Максимальная длинна слова
     max_keyword_len: usize
 }
 
+/// Создание парсера
 #[allow(dead_code)]
 #[derive(Clone,Debug)]
 pub struct KeywordsBuilder<A> 
