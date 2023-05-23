@@ -66,16 +66,18 @@ impl ApplyTag for CommonContext {
     }
 }
 
+/// Контекст файла
 #[derive(Debug,Clone)]
 pub struct FileContext<'a, P> 
 where P: AsRef<Path>
 {
+    /// Имя файла
     pub file_name: P,
 
-    pub file: &'a File,
-    
+    /// Мета данные
     pub metadata: &'a Metadata,
 
+    /// Данные
     pub data: &'a Vec<u8>,    
 }
 

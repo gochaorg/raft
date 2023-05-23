@@ -51,6 +51,7 @@ impl Parser<Digit> for DigitParser {
     }
 }
 impl DigitParser {
+    #[allow(dead_code)]
     pub fn parser() -> Rc<dyn Parser<Digit>> {
         Rc::new( DigitParser { base: DigitBase::Dec } )
     }    

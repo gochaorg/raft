@@ -100,7 +100,7 @@ fn parse_args(args: &Vec<String>) -> Box<Vec<Action>> {
                 state = "state";
                 actions.push(Action::Append {
                     log_file: log_file_name.clone().unwrap().clone(),
-                    entry_file: arg.clone(),
+                    entry: EntryDataSource::File(arg.clone()),
                     block_buff_size: block_buff_size,
                     verbose: verbose,
                     tags: tags.clone(),
@@ -202,6 +202,12 @@ enum ExtractSelection {
     Range( range::Range<u32> )
 }
 
+#[derive(Debug, Clone)]
+enum EntryDataSource {
+    Stdin,
+    File(String)
+}
+
 /// Операции с лог файлом
 #[derive(Debug, Clone)]
 enum Action {
@@ -209,12 +215,16 @@ enum Action {
     Append {
         /// Лог файл
         log_file: String,
-        /// Добавляемый файл
-        entry_file: String,
+
+        /// Добавляемый файл/данные
+        entry: EntryDataSource,
+
         /// Размер буфера записи
         block_buff_size: Option<ByteSize>,
+
         /// Вывести информацию о тайминге
         verbose: bool,
+
         /// Теги
         tags: Vec<TagAction>,
     },
@@ -238,18 +248,33 @@ impl Action {
         match self {
             Action::Append {
                 log_file,
-                entry_file,
+                entry,
                 block_buff_size,
                 verbose,
                 tags,
             } => {
-                let mut p0 = PathBuf::new();
-                p0.push(log_file);
+                let mut log_file_path = PathBuf::new();
+                log_file_path.push(log_file);
 
-                let mut p1 = PathBuf::new();
-                p1.push(entry_file);
+                let timing = match entry {
+                    EntryDataSource::File(file_name) => {
+                        let mut entry_file_path = PathBuf::new();
+                        entry_file_path.push(file_name);
 
-                let timing = append_file(p0, p1, block_buff_size.clone(), tags)?;
+                        append_entry(
+                            log_file_path, 
+                            |tr| EntryFile::read_file(entry_file_path, tr), 
+                            *block_buff_size, 
+                            tags)
+                    },
+                    EntryDataSource::Stdin => {
+                        append_entry(
+                            log_file_path, 
+                            |_| EntryStdin::read_stdin(), 
+                            *block_buff_size, 
+                            tags)
+                    }
+                }?;
 
                 if *verbose {
                     println!("log counters:\n{}", timing.log_counters);

@@ -1,5 +1,5 @@
 pub mod append;
-pub use append::append_file;
+pub use append::*;
 
 pub mod extract;
 pub mod viewheaders;
