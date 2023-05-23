@@ -159,10 +159,10 @@ impl MultipleParse {
         let kw_parser = KeywordsBuilder::new(",", &()).build().parser();
 
         let delim_parser = 
-            map(follow(WhiteSpaceParser.parser(), kw_parser.clone()), |(_,t)| ());
+            map(follow(WhiteSpaceParser.parser(), kw_parser.clone()), |(_,_)| ());
 
         let delim_parser =
-            map( alternative(delim_parser, kw_parser.clone()), |eth| 
+            map( alternative(delim_parser, kw_parser.clone()), |_| 
             ());
 
         let single_parser = map( SingleParser::new().parser(), |v| RangeNum::One(v.clone()) );
@@ -180,6 +180,7 @@ impl MultipleParse {
         }
     }
 
+    #[allow(dead_code)]
     pub fn parser( self ) -> Rc<dyn Parser<Multiple>> {
         Rc::new( self )
     }

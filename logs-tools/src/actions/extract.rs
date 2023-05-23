@@ -4,7 +4,6 @@ use logs::{block::BlockId, bbuff::absbuff::FileBuff, LogFile, GetPointer, FlatBu
 
 use crate::err::LogToolErr;
 
-#[allow(dead_code)]
 pub fn extract_to_stdout<P,R>( log_file_name: P, blocks: R ) -> Result<(), LogToolErr> 
 where
     P: AsRef<Path>,
@@ -22,7 +21,6 @@ where
     Ok(())
 }
 
-#[allow(dead_code)]
 fn extract_block<B: FlatBuff>( log_ptr: &LogPointer<B> ) -> Result<(), LogToolErr> {
     let data = log_ptr.current_data()?;
     std::io::stdout().write_all(&data)?;

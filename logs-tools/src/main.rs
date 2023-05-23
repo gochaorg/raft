@@ -223,7 +223,6 @@ enum Action {
     ViewHeads { log_file: String, sha256: bool },
 
     /// Извлечение записи из лога
-    #[allow(dead_code)]
     Extract {
         /// Лог файл
         log_file: String,

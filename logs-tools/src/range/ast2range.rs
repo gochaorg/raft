@@ -1,5 +1,4 @@
-use crate::parse::{Number, Parser};
-use crate::range::MultipleParse;
+use crate::parse::{Number};
 use super::{Multiple, RangeNum};
 use super::range::Range;
 
@@ -46,6 +45,9 @@ where A: TryFrom<Number,Error=String> + Clone
 
 #[test]
 fn multiple_parse_test() {
+    use crate::range::MultipleParse;
+    use super::super::parse::*;
+
     let parser = MultipleParse::new();
     let res = parser.parse("1,2,4-6");
     println!("{:?}", res);

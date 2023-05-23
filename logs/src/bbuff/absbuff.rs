@@ -136,7 +136,6 @@ impl FlatBuff for ByteBuff {
 }
 
 impl ByteBuff {
-    #[allow(dead_code)]
     pub fn new_empty_unlimited() -> Self {
         Self {
             data: Arc::new(RwLock::new(Vec::<u8>::new())),

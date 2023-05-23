@@ -58,7 +58,6 @@ pub struct DnsLookupBuilder {
     pub dns_name: DnsName,
 }
 
-#[allow(dead_code)]
 impl DnsLookup {
     /// Создание клиента
     ///

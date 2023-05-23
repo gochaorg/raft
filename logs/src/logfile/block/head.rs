@@ -212,7 +212,6 @@ impl BlockHead {
     }
 
     /// Чтение заголовка
-    #[allow(dead_code)]
     pub fn from_bytes(
         bytes: Box<Vec<u8>>,
     ) -> Result<(BlockHead, BlockHeadSize, BlockDataSize, BlockTailSize), String> {

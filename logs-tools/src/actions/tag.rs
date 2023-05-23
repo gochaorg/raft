@@ -13,7 +13,6 @@ use crate::err::LogToolErr;
 /// 
 /// Применяются к тому или иному контексту ( [ApplyTag], [CommonContext], [FileContext] )
 #[derive(Debug,Clone)]
-#[allow(dead_code)]
 pub enum TagAction {
     Clear,
     AddTag{ key: String16, value:String32 },
@@ -73,12 +72,10 @@ where P: AsRef<Path>
 {
     pub file_name: P,
 
-    #[allow(dead_code)]
     pub file: &'a File,
     
     pub metadata: &'a Metadata,
 
-    #[allow(dead_code)]
     pub data: &'a Vec<u8>,    
 }
 

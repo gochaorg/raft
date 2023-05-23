@@ -45,7 +45,6 @@ pub struct LookupContext<R:Sized+Clone> {
     pub data: Vec<(String,R)>
 }
 
-#[allow(dead_code)]
 impl<R:Sized+Clone> LookupContext<R> {
     pub fn when_equals( &mut self, str: &str, res:R ) -> &mut Self {
         self.data.push((str.to_string(), res.clone()));
