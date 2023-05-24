@@ -10,6 +10,16 @@ static MB: &Lazy<Regex> = regex!(r##"^(?i)(?<num>\d+)\s*mb?$"##);
 static GB: &Lazy<Regex> = regex!(r##"^(?i)(?<num>\d+)\s*gb?$"##);
 
 impl ByteSize {
+    /// Парсинг текстового представления
+    /// 
+    /// Синтаксис
+    /// 
+    ///     ByteSize ::= dec_number {white_space} [size_suffix]
+    ///     size_suffix ::= kb | mb | gb
+    ///     kb ::= ( 'K' | 'k' ) b
+    ///     mb ::= ( 'M' | 'm' ) b
+    ///     gb ::= ( 'G' | 'g' ) b
+    ///     b = 'B' | 'b'
     pub fn parse(text: &str) -> Result<ByteSize, String> {
         let plain = PLAIN
             .captures(text)
