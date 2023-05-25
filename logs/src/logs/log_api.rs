@@ -49,6 +49,7 @@ pub trait Log {
     fn get_previous_record( &self, record_id: Self::RecordId ) -> Result<Option<Self::RecordId>,Self::Err>;    
 }
 
+/// Выполняет добавление записи
 pub trait LogRecordAppender {
     /// Ошибки
     type Err;
@@ -60,6 +61,7 @@ pub trait LogRecordAppender {
     fn run() -> Result<Self::RecordId, Self::Err>;
 }
 
+/// Запись лог файла
 pub trait LogRecord {
     /// Ошибки
     type Err;
