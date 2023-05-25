@@ -2,8 +2,10 @@ use crate::bbuff::absbuff::ReadBytesFrom;
 
 use super::{Block, BlockErr, BlockHead, BlockHeadRead};
 
+/// Размер хвоста в байтах
 pub const TAIL_SIZE: u16 = 8;
 
+/// Маркер хвоста
 pub const TAIL_MARKER: &str = "TAIL";
 
 /// Хвост блока

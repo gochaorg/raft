@@ -23,4 +23,5 @@ impl fmt::Display for Limit {
     }
 }
 
+/// Ограничение соответствующее usize::MAX
 pub const LIMIT_USIZE: Limit = Limit(usize::MAX as u64);

@@ -55,9 +55,9 @@ use std::fmt;
 use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Instant;
 
-// type FlatBuff = ReadBytesFrom + WriteBytesTo + BytesCount + ResizeBytes + Clone;
 pub trait FlatBuff : ReadBytesFrom + WriteBytesTo + BytesCount + ResizeBytes + Clone {}
 
+/// Лог файл
 #[derive(Clone)]
 pub struct LogFile<B>
 where
@@ -103,6 +103,7 @@ where
     }
 }
 
+/// Возможные ошибки
 #[derive(Clone, Debug)]
 pub enum LogErr {
     Generic(String),
