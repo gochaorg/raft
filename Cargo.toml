@@ -2,7 +2,8 @@
 members = [
     "logs",
     "lookup",
-    "logs-tools"
+    "logs-tools",
+    "parse"
 ]
 
 # [package]

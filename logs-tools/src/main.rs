@@ -13,7 +13,7 @@ use err::LogToolErr;
 use logs::{
     block::{String16, String32, BlockId},
 };
-use parse::Parser;
+use parse::*;
 use range::{MultipleParse, Range};
 use std::{
     env,
@@ -23,8 +23,6 @@ use std::{
 mod actions;
 use actions::*;
 mod range;
-mod substr;
-mod parse;
 mod buildinfo;
 
 fn main() {

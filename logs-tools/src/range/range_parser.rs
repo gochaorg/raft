@@ -1,7 +1,6 @@
 use std::rc::Rc;
 
-use crate::substr::*;
-use super::super::parse::*;
+use parse::*;
 
 /// Единичное значение
 /// 

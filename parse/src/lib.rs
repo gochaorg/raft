@@ -1,14 +1,17 @@
+mod substr;
+pub use substr::*;
+
 mod parse;
 pub use parse::*;
 
-mod digit;
-pub use digit::*;
+mod ws;
+pub use ws::*;
 
 mod number;
 pub use number::*;
 
-mod ws;
-pub use ws::*;
+mod digit;
+pub use digit::*;
 
 mod keyword;
 pub use keyword::*;
