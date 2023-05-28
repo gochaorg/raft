@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use super::Parser;
-use crate::substr::*;
+use crate::*;
 
 #[derive(Debug,Clone)]
 pub struct WhiteSpace(pub String);
@@ -41,6 +41,6 @@ impl Parser<WhiteSpace> for WhiteSpaceParser {
 
 #[test]
 fn test_ws(){
-    let (_,cc) = WhiteSpaceParser.parse("  123").unwrap();
-    assert!(cc == CharsCount(2))
+    let res: (WhiteSpace,CharsCount) = WhiteSpaceParser.parse("  123").unwrap();
+    assert!(res.1 == CharsCount(2))
 }
