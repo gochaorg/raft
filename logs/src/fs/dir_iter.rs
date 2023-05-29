@@ -1,7 +1,18 @@
-use std::path::{Path, PathBuf};
-use std::fs::{self, DirEntry, read_dir};
+use std::path::{PathBuf};
+use std::fs::{read_dir};
 
-/// Описывает где искать логи
+/// Описывает корень для обхода файлов/каталогов
+/// 
+/// Пример
+/// 
+///     let di = DirTraverse {
+///         root: ".".to_string(),
+///         recursive: true,
+///     };
+///     
+///     for path in di {
+///         println!("{path:?}")
+///     }
 #[derive(Debug,Clone)]
 pub struct DirTraverse {
     /// Корень поиска
