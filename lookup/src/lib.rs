@@ -63,8 +63,7 @@ impl DnsLookup {
     ///
     /// # Аргументы
     /// name - имя искомого сервиса
-    #[allow(dead_code)]
-    fn name<N>(name: N) -> Result<DnsLookupBuilder, String>
+    pub fn name<N>(name: N) -> Result<DnsLookupBuilder, String>
     where
         N: Into<DnsNameParse>,
     {

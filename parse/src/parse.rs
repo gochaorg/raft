@@ -16,17 +16,16 @@ where
     second: Rc<dyn Parser<R2> + 'a>,
 }
 
-#[allow(dead_code)]
 impl<'a,R1,R2> FollowParser<'a,R1,R2>
 where
     R1: Sized + Clone,
     R2: Sized + Clone,
 {
-    fn new( p1:Rc<dyn Parser<R1> + 'a>, p2:Rc<dyn Parser<R2> + 'a> ) -> Self {
+    pub fn new( p1:Rc<dyn Parser<R1> + 'a>, p2:Rc<dyn Parser<R2> + 'a> ) -> Self {
         Self { first: p1, second: p2 }
     }
 
-    fn parser( &'a self ) -> Rc<dyn Parser<(R1,R2)> + 'a> {
+    pub fn parser( &'a self ) -> Rc<dyn Parser<(R1,R2)> + 'a> {
         let r = Self { first: self.first.clone(), second: self.second.clone() };
         Rc::new( r )
     }
@@ -72,7 +71,6 @@ fn test_follow_1() {
     assert!( res == Some(((Digit(1),Digit(2)),CharsCount(2))) )
 }
 
-#[allow(dead_code)]
 pub fn follow<'a,A:Sized+Clone+'a,B:Sized+Clone+'a>( left:Rc<dyn Parser<A> + 'a>, right:Rc<dyn Parser<B> + 'a> ) -> Rc<dyn Parser<(A,B)> + 'a> {
     let parser = Rc::new(FollowParser { first: left.clone(), second: right.clone() });
     parser

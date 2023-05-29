@@ -5,7 +5,7 @@
 use std::{path::Path, fs::{Metadata}};
 
 use chrono::{DateTime, Utc};
-use logs::block::{BlockOptions, String16, String32};
+use logs::logfile::block::*;
 
 use crate::err::LogToolErr;
 

@@ -38,7 +38,6 @@ where
         Self { keywords: kw }
     }
 
-    #[allow(dead_code)]
     pub fn add( self, word:&str, value:&A ) -> Self {
         let mut kw = self.keywords.clone();
         kw.push( (word.to_string(), value.clone()) );

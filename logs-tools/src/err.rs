@@ -1,6 +1,7 @@
 use std::sync::{PoisonError, RwLockReadGuard};
 
-use logs::{bbuff::absbuff::ABuffError, block::BlockErr, logfile::LogErr};
+use logs::{bbuff::absbuff::ABuffError, logfile::LogErr};
+use logs::logfile::block::*;
 
 use crate::actions::tag::TagAction;
 

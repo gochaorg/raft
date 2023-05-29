@@ -172,7 +172,8 @@ impl Block {
 fn test_block_rw() {
     use super::super::super::bbuff::absbuff::ByteBuff;
     use crate::bbuff::absbuff::BytesCount;
-    use crate::block::{BackRefs, BlockId, BlockOptions, DataId};
+    use crate::logfile::block::*;
+
     use crate::{
         bbuff::streambuff::{self},
         perf::Tracker,

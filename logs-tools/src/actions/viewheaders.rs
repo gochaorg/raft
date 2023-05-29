@@ -1,8 +1,8 @@
 use std::{path::Path, sync::{Arc, RwLock}};
 
-use logs::{bbuff::absbuff::FileBuff, LogFile, logfile::*};
+use logs::{bbuff::absbuff::FileBuff};
+use logs::logfile::*;
 use sha2::{Digest, Sha256};
-
 use crate::err::LogToolErr;
 
 /// Просмотр заголовков

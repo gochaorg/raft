@@ -1,6 +1,8 @@
 use std::{path::Path, sync::{RwLock, Arc}, io::Write};
 
-use logs::{block::BlockId, bbuff::absbuff::FileBuff, LogFile, GetPointer, FlatBuff, LogPointer};
+use logs::{bbuff::absbuff::FileBuff};
+use logs::logfile::*;
+use logs::logfile::block::*;
 
 use crate::err::LogToolErr;
 

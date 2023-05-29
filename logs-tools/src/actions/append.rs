@@ -1,7 +1,9 @@
 use std::{sync::Arc, path::Path, fs::OpenOptions};
 use std::io;
 use std::io::prelude::*;
-use logs::{perf::{Counters, Tracker}, block::BlockOptions, bbuff::absbuff::FileBuff, LogFile};
+use logs::{perf::{Counters, Tracker}, bbuff::absbuff::FileBuff};
+use logs::logfile::*;
+use logs::logfile::block::*;
 
 use crate::{bytesize::ByteSize, err::LogToolErr};
 use crate::actions::tag::*;

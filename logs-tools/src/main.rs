@@ -10,9 +10,8 @@ use actions::tag::TagAction;
 use bytesize::ByteSize;
 
 use err::LogToolErr;
-use logs::{
-    block::{String16, String32, BlockId},
-};
+use logs::logfile::block::*;
+
 use parse::*;
 use range::{MultipleParse, Range};
 use std::{

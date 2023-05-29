@@ -7,7 +7,8 @@ use std::{
     sync::{Arc, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
-use crate::{perf::Tracker, FlatBuff};
+use crate::{perf::Tracker};
+use crate::logfile::FlatBuff;
 
 /// Ошибка чтения/записи
 #[derive(Debug, Clone)]
