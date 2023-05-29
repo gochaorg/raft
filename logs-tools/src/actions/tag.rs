@@ -2,7 +2,7 @@
 //! 
 //! Для конкретной записи можно указать опции ([BlockOptions]) 
 
-use std::{path::Path, fs::{File, Metadata}};
+use std::{path::Path, fs::{Metadata}};
 
 use chrono::{DateTime, Utc};
 use logs::block::{BlockOptions, String16, String32};
@@ -12,6 +12,7 @@ use crate::err::LogToolErr;
 /// Указывает какие пары ключ/значение указать в логе
 /// 
 /// Применяются к тому или иному контексту ( [ApplyTag], [CommonContext], [FileContext] )
+#[allow(dead_code)]
 #[derive(Debug,Clone)]
 pub enum TagAction {
     Clear,

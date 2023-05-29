@@ -1,7 +1,6 @@
 use std::env;
 use std::fs::File;
 use std::io::Write;
-use std::io::prelude::*;
 use std::path::Path;
 
 fn main() {

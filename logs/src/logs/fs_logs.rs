@@ -1,4 +1,5 @@
 /// Описывает где искать логи
+#[allow(dead_code)]
 struct FsLogFind {
     /// Шаблон искомого файла
     wildcard: String,
