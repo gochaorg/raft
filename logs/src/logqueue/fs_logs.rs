@@ -61,7 +61,7 @@ impl FsLogFind {
 
 #[test]
 fn log_find_test() {
-    let fs_log = FsLogFind::new(".", "*log*rs", true).unwrap();
+    let fs_log = FsLogFind::new(".", "*log*.rs", true).unwrap();
 
     for path in fs_log {
         println!("{path:?}")

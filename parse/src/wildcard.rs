@@ -203,6 +203,8 @@ fn parse_wildcard_test() {
     ]})
 }
 
+const WILDCARD_DEBUG : bool = false;
+
 impl Wildcard {
     /// Проверка текста на совпадение
     pub fn test( &self, text:&str ) -> bool {
@@ -310,27 +312,27 @@ impl Wildcard {
         if cmax >  1 { todo!("bug!"); } // bug
 
         let captures2 = &captures;
-        // println!("{:?}", captures2.clone());
+        if WILDCARD_DEBUG { println!("\n{:?}", captures2.clone()) }
 
-        let mut c_to = 
+        let (mut c_from, mut c_to) = 
         match captures2.into_iter().next() {
             Some( Capture::Plain { from, to }) => {
                 if *from>0 { 
                     // если начинается не с начало строки, то уже не совпадение
                     return false; 
                 }
-                *to
+                (0usize, *to)
             },
             Some( Capture::Several { chars_counts:_, upper_unlimited:_ } ) => {
                 if captures.len()>1 {
                     match &captures[1] {
-                        Capture::Plain { from:_, to } => *to,
+                        Capture::Plain { from, to } => (0usize, *from),
                         Capture::Several { chars_counts:_, upper_unlimited:_ } => {
                             todo!()
                         }
                     }
                 }else{
-                    text.len()
+                    (0usize, text.len())
                 }
             }
             _ => todo!()
@@ -339,7 +341,6 @@ impl Wildcard {
         // Последний сapture должен совпадать с концом текста
         match captures2.last() {
             Some( Capture::Plain { from:_, to } ) => {
-                // println!("{to} {len}", to=*to, len=text.len());
                 if *to < text.len() {
                     return false;
                 }
@@ -364,36 +365,106 @@ impl Wildcard {
 
         let mut cap_pos = Vec::<CapPos>::new();
 
-        let mut c_from = 0usize;
-        for idx in 0..captures.len() {
-            let it = &captures[idx];
-            match it {
-                Capture::Plain { from, to } => {
-                    c_from = *from;
-                    c_to = *to;
-                    cap_pos.push( CapPos::Plain );
-                },
-                Capture::Several { chars_counts, upper_unlimited: upper_limited } => {
-                    let start_pos = c_to;
-                    let end_pos = 
-                        if idx >= (captures.len()-1) {
-                            text.len()
-                        } else {
-                            match &captures[idx+1] {
-                                Capture::Plain { from, to:_ } => { *from },
-                                Capture::Several { chars_counts:_, upper_unlimited:_ } => { todo!() }
+        // for idx in 0..captures.len() {
+        //     let it = &captures[idx];
+        //     match it {
+        //         Capture::Plain { from, to } => {
+        //             c_from = *from;
+        //             c_to = *to;
+        //             cap_pos.push( CapPos::Plain );
+        //         },
+        //         Capture::Several { chars_counts, upper_unlimited: upper_limited } => {
+        //             let start_pos = c_to;
+        //             let end_pos = 
+        //                 if idx >= (captures.len()-1) {
+        //                     text.len()
+        //                 } else {
+        //                     match &captures[idx+1] {
+        //                         Capture::Plain { from, to:_ } => { *from },
+        //                         Capture::Several { chars_counts:_, upper_unlimited:_ } => { todo!() }
+        //                     }
+        //                 };
+        //             c_from = start_pos;
+        //             c_to = end_pos;
+        //             cap_pos.push( CapPos::Several { from: start_pos, to: end_pos, chars_counts: *chars_counts, upper_unlimited: *upper_limited } );
+        //         }
+        //     }
+        // }
+
+        if captures.len()>1 {
+            for idx in 0..captures.len() {
+                if idx == captures.len()-1 {
+                    // last
+                    let prev = &captures[idx-1];
+                    let cur = &captures[idx];
+                    match cur {
+                        Capture::Several { chars_counts, upper_unlimited } => {
+                            match prev {
+                                Capture::Plain { from, to } => {
+                                    let (_prev_from, prev_to) = (*from, *to);
+                                    cap_pos.push( CapPos::Several { from: prev_to, to: text.len(), chars_counts: *chars_counts, upper_unlimited: *upper_unlimited } )
+                                },
+                                _ => { todo!("bug") }
                             }
-                        };
-                    c_from = start_pos;
-                    c_to = end_pos;
-                    cap_pos.push( CapPos::Several { from: start_pos, to: end_pos, chars_counts: *chars_counts, upper_unlimited: *upper_limited } );
+                        },
+                        _ => { cap_pos.push( CapPos::Plain ) }
+                    }
+                } else if idx == 0 {
+                    // first
+                    let cur = &captures[idx];
+                    let next = &captures[idx+1];
+                    match cur {
+                        Capture::Several { chars_counts, upper_unlimited } => {
+                            match next {
+                                Capture::Plain { from, to } => {
+                                    let (next_from, _next_to) = (*from, *to);
+                                    cap_pos.push( CapPos::Several { from: 0usize, to: next_from, chars_counts: *chars_counts, upper_unlimited: *upper_unlimited } )
+                                },
+                                _ => { todo!("bug") }
+                            }
+                        },
+                        _ => { cap_pos.push( CapPos::Plain ) }
+                    }
+                } else {
+                    // middle
+                    let prev = &captures[idx-1];
+                    let cur = &captures[idx];
+                    let next = &captures[idx+1];
+                    match cur {
+                        Capture::Several { chars_counts, upper_unlimited } => {
+                            match next {
+                                Capture::Plain { from, to } => {
+                                    let (next_from, _next_to) = (*from, *to);
+                                    match prev {
+                                        Capture::Plain { from, to } => {
+                                            let (_prev_from, prev_to) = (*from, *to);
+                                            cap_pos.push( CapPos::Several { from: prev_to, to: next_from, chars_counts: *chars_counts, upper_unlimited: *upper_unlimited } )
+                                        },
+                                        _ => { todo!("bug") }
+                                    }
+                                },
+                                _ => { todo!("bug") }
+                            }
+                        },
+                        _ => { cap_pos.push( CapPos::Plain ) }
+                    }
+                }
+            }
+        } else if captures.len() == 1 {
+            let first = &captures[0];
+            match first {
+                Capture::Plain { from:_, to:_ } => {
+                    cap_pos.push( CapPos::Plain )
+                },
+                Capture::Several { chars_counts, upper_unlimited } => {
+                    cap_pos.push( CapPos::Several { from: 0usize, to: text.len(), chars_counts: *chars_counts, upper_unlimited: *upper_unlimited } )
                 }
             }
         }
 
         // Все CapPos::Several должны совпадать с требованием chars_counts и upper_unlimited
         let cap_pos1 = &cap_pos;
-        // println!("{cap_pos1:?}");
+        if WILDCARD_DEBUG { println!("{cap_pos1:?}") }
 
         let succ = {
             let succ = cap_pos1.into_iter().filter_map(|it| match &it {
@@ -435,6 +506,12 @@ fn wildcard_test() {
     }    
 
     let samples = vec![
+        Sample { pattern: "*",       sample: "abXXrd",  expect:true  },
+        Sample { 
+            pattern: "*log*rs",   
+            sample: "./target/doc/logs_tools/actions/viewheaders", 
+            expect: true
+        },
         Sample { pattern: "ab???cd", sample: "abXXXcd", expect:true },
         Sample { 
             pattern: "*log*rs",   
@@ -444,7 +521,6 @@ fn wildcard_test() {
         Sample { pattern: "ab*cd",   sample: "abXXXcd", expect:true },
         Sample { pattern: "ab*??cd", sample: "abXXXcd", expect:true },
         Sample { pattern: "ab*cd",   sample: "abXXrd",  expect:false },
-        Sample { pattern: "*",       sample: "abXXrd",  expect:true  },
         Sample { pattern: "",        sample: "abXXrd",  expect:false  },
         Sample { pattern: "",        sample: "",        expect:true  },
     ];
