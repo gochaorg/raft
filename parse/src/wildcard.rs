@@ -310,30 +310,42 @@ impl Wildcard {
         if cmax >  1 { todo!("bug!"); } // bug
 
         let captures2 = &captures;
+        // println!("{:?}", captures2.clone());
 
-        let (mut _c_from,mut c_to) = 
+        let mut c_to = 
         match captures2.into_iter().next() {
             Some( Capture::Plain { from, to }) => {
                 if *from>0 { 
                     // если начинается не с начало строки, то уже не совпадение
                     return false; 
                 }
-                (*from, *to)
+                *to
             },
             Some( Capture::Several { chars_counts:_, upper_unlimited:_ } ) => {
                 if captures.len()>1 {
                     match &captures[1] {
-                        Capture::Plain { from, to } => (*from, *to),
+                        Capture::Plain { from:_, to } => *to,
                         Capture::Several { chars_counts:_, upper_unlimited:_ } => {
                             todo!()
                         }
                     }
                 }else{
-                    (0usize, text.len())
+                    text.len()
                 }
             }
             _ => todo!()
         };
+
+        // Последний сapture должен совпадать с концом текста
+        match captures2.last() {
+            Some( Capture::Plain { from:_, to } ) => {
+                // println!("{to} {len}", to=*to, len=text.len());
+                if *to < text.len() {
+                    return false;
+                }
+            },
+            _ => {}
+        }
 
         // Все Capture::Plain - проверели
         // теперь проверяем Capture::Several
@@ -352,11 +364,12 @@ impl Wildcard {
 
         let mut cap_pos = Vec::<CapPos>::new();
 
+        let mut c_from = 0usize;
         for idx in 0..captures.len() {
             let it = &captures[idx];
             match it {
                 Capture::Plain { from, to } => {
-                    _c_from = *from;
+                    c_from = *from;
                     c_to = *to;
                     cap_pos.push( CapPos::Plain );
                 },
@@ -371,7 +384,7 @@ impl Wildcard {
                                 Capture::Several { chars_counts:_, upper_unlimited:_ } => { todo!() }
                             }
                         };
-                    _c_from = start_pos;
+                    c_from = start_pos;
                     c_to = end_pos;
                     cap_pos.push( CapPos::Several { from: start_pos, to: end_pos, chars_counts: *chars_counts, upper_unlimited: *upper_limited } );
                 }
@@ -379,20 +392,35 @@ impl Wildcard {
         }
 
         // Все CapPos::Several должны совпадать с требованием chars_counts и upper_unlimited
+        let cap_pos1 = &cap_pos;
+        // println!("{cap_pos1:?}");
 
-        let succ = &cap_pos.into_iter().filter_map(|it| match &it {
-            CapPos::Plain => None,
-            CapPos::Several { from, to, chars_counts, upper_unlimited: upper_limited } => Some((*from, *to, *chars_counts, *upper_limited))
-        }).map( |(from,to,chars_counts,upper_unlimited)| {
-            let cnt = text[from..to].chars().count();
-            if upper_unlimited {
-                cnt >= chars_counts
-            } else {
-                cnt == chars_counts
-            }
-        }).fold( true, |acc,it| acc && it );
-        
-        *succ
+        let succ = {
+            let succ = cap_pos1.into_iter().filter_map(|it| match &it {
+                CapPos::Plain => None,
+                CapPos::Several { from, to, chars_counts, upper_unlimited: upper_limited } => Some((*from, *to, *chars_counts, *upper_limited))
+            }).map( |(from,to,chars_counts,upper_unlimited)| {
+                let cnt = text[from..to].chars().count();
+                if upper_unlimited {
+                    cnt >= chars_counts
+                } else {
+                    cnt == chars_counts
+                }
+            }).fold( true, |acc,it| acc && it );
+            succ
+        };
+
+        // Последний сapture должен совпадать с концом текста
+        match cap_pos1.last() {
+            Some(CapPos::Several { from:_, to, chars_counts:_, upper_unlimited:_ }) => {
+                if *to < text.len() {
+                    return false;
+                }
+            },
+            _ => {}
+        }
+
+        succ
     }
 }
 
@@ -407,9 +435,14 @@ fn wildcard_test() {
     }    
 
     let samples = vec![
+        Sample { pattern: "ab???cd", sample: "abXXXcd", expect:true },
+        Sample { 
+            pattern: "*log*rs",   
+            sample: "./target/debug/incremental/logs-172hjs3xscjc0/s-glbyyu88xb-1rdcwv3-1q7l0skrhptjq/2e8lrs8qt1qb18xz.o", 
+            expect: false
+        },
         Sample { pattern: "ab*cd",   sample: "abXXXcd", expect:true },
         Sample { pattern: "ab*??cd", sample: "abXXXcd", expect:true },
-        Sample { pattern: "ab???cd", sample: "abXXXcd", expect:true },
         Sample { pattern: "ab*cd",   sample: "abXXrd",  expect:false },
         Sample { pattern: "*",       sample: "abXXrd",  expect:true  },
         Sample { pattern: "",        sample: "abXXrd",  expect:false  },
