@@ -7,16 +7,85 @@ pub enum WildcardToken {
     MultipleAnyChar
 }
 
+/// Шаблон для сопостовления текст
+/// 
+/// Пример
+/// 
+///     // создание шаблона
+///     let sample = "шаблон";
+///     let (wc, _) = WildcardParser::new().parse(sample).unwrap();
+/// 
+///     // проверка совпадения текста
+///     if wc.test("текст") {
+///     }
+/// 
+/// Исходный шаблон может содержать специальные символы и обычный текст
+/// 
+/// - `?` - любой символ, одна штука
+/// - `*` - либой символ, 0 или более штук
+/// 
+/// Примеры
+/// 
+/// | Шаблон     | Проверяемая строка | Результат |
+/// |------------|--------------------|-----------|
+/// | "ab*cd"    | "abXXXcd"          | true      |
+/// | "ab*??cd"  | "abXXXcd"          | true      |
+/// | "ab???cd"  | "abXXXcd"          | true      |
+/// | "ab*cd"    | "abXXrd"           | false     |
+/// | "*"        | "abXXrd"           | true      |
+/// | ""         | "abXXrd"           | false     |
+/// | ""         | ""                 | true      |
 #[derive(Debug,Clone,PartialEq)]
 pub struct Wildcard { 
     pub seq: Vec<WildcardToken> 
 }
 
+/// Парсер шаблона
 #[derive(Debug,Clone)]
-struct WildcardParser;
+pub struct WildcardParser {
+    /// Допускается пустой шаблон
+    pub allow_empty: bool
+}
 
+impl WildcardParser {
+    /// Создает парсер, по умолчанию допускается пустой шаблон
+    pub fn new() -> Self {
+        Self { allow_empty: true }
+    }
+
+    /// Создание шаблона
+    pub fn create() -> WildcardParserBuilder {
+        WildcardParserBuilder { allow_empty: true }
+    }
+}
+
+/// Builder для [WildcardParser]
+pub struct WildcardParserBuilder {
+    pub allow_empty: bool
+}
+
+impl WildcardParserBuilder {
+    /// Допускать или нет пустой шаблон
+    pub fn allow_empty( self, allow: bool ) -> Self {
+        Self { allow_empty: allow }
+    }
+
+    /// Создание [WildcardParser]
+    pub fn build( self ) -> WildcardParser {
+        WildcardParser { allow_empty: self.allow_empty }
+    }
+}
+
+/// Парсер шаблона
 impl Parser<Wildcard> for WildcardParser {
     fn parse( &self, source: &str ) -> Option<(Wildcard, CharsCount)> {
+        if self.allow_empty && source.is_empty() {
+            return Some((
+                Wildcard { seq: vec![] },
+                CharsCount(0)
+            ))
+        }
+
         let mut cc = CharsCount(0);
         let mut res = Vec::<WildcardToken>::new();
         let mut str_buff = String::new();
@@ -120,7 +189,7 @@ impl Wildcard {
 
 #[test]
 fn parse_wildcard_test() {
-    let (wc,_) = WildcardParser.parse("12*a?c**d").unwrap();
+    let (wc,_) = WildcardParser::new().parse("12*a?c**d").unwrap();
     println!("aaa");
     println!("{wc:?}");
     assert!( wc == Wildcard { seq: vec![
@@ -151,11 +220,18 @@ impl Wildcard {
                 to: usize,
             },
             Several {
+                // Минимальное кол-во любых символов (?)
                 chars_counts: usize,
+
+                // Ограниченна ли верхнаяя граница или нет (*)
                 upper_unlimited: bool,
             }
         }        
 
+        // Обновление/добавление последнего значение Capture::Several
+        // 
+        // - inc_several - какое значение добавить chars_counts
+        // - unlimited - установить ли upper_unlimited
         let update_several = | captures: &mut Vec<Capture>, inc_several: usize, unlimited: bool | {
             match captures.pop() {
                 Some( Capture::Several { chars_counts, upper_unlimited: upper_limited } ) => {
@@ -171,6 +247,8 @@ impl Wildcard {
             }
         };
 
+        // Поиск совпадения plain text
+        // все записи WildcardToken::PlainText должны быть найдены в строке, в той же последованности что заданы в шаблоне
         let (cap_succ, _, captures) = work_set.into_iter().fold( 
             (true, 0usize, Vec::<Capture>::new() ) , 
             |(succ, from, mut captures),it| {
@@ -204,9 +282,12 @@ impl Wildcard {
         );
 
         if ! cap_succ || captures.is_empty() {
-            return false; // not matched
+            // не найдены WildcardToken::PlainText
+            // или расположены в не той последовательности
+            return false;
         }
 
+        // элементы captures должны чередоваться 
         let captures1 = &captures;
 
         let (_,cmin,cmax) = captures1.into_iter().fold(
@@ -224,6 +305,7 @@ impl Wildcard {
             }
         });
 
+        // если чередования нет, то будет превышение
         if cmin < -1 { todo!("bug!"); } // bug
         if cmax >  1 { todo!("bug!"); } // bug
 
@@ -233,7 +315,8 @@ impl Wildcard {
         match captures2.into_iter().next() {
             Some( Capture::Plain { from, to }) => {
                 if *from>0 { 
-                    return false; // not matched
+                    // если начинается не с начало строки, то уже не совпадение
+                    return false; 
                 }
                 (*from, *to)
             },
@@ -251,6 +334,10 @@ impl Wildcard {
             }
             _ => todo!()
         };
+
+        // Все Capture::Plain - проверели
+        // теперь проверяем Capture::Several
+        // сначала полчим для каждого Capture::Several вычислим расположение в строке
 
         #[derive(Debug,Clone)]
         enum CapPos {
@@ -291,12 +378,13 @@ impl Wildcard {
             }
         }
 
+        // Все CapPos::Several должны совпадать с требованием chars_counts и upper_unlimited
+
         let succ = &cap_pos.into_iter().filter_map(|it| match &it {
             CapPos::Plain => None,
             CapPos::Several { from, to, chars_counts, upper_unlimited: upper_limited } => Some((*from, *to, *chars_counts, *upper_limited))
         }).map( |(from,to,chars_counts,upper_unlimited)| {
             let cnt = text[from..to].chars().count();
-            //println!("  {}");
             if upper_unlimited {
                 cnt >= chars_counts
             } else {
@@ -324,16 +412,19 @@ fn wildcard_test() {
         Sample { pattern: "ab???cd", sample: "abXXXcd", expect:true },
         Sample { pattern: "ab*cd",   sample: "abXXrd",  expect:false },
         Sample { pattern: "*",       sample: "abXXrd",  expect:true  },
+        Sample { pattern: "",        sample: "abXXrd",  expect:false  },
+        Sample { pattern: "",        sample: "",        expect:true  },
     ];
 
     for sample in samples {        
-        let (wc, _) = WildcardParser.parse(sample.pattern).unwrap();
-        let actual = wc.test(sample.sample);
-        println!( "pattern \"{ptrn}\" sample \"{sample}\" expect {expect} actual {actual}", 
+        let (wc, _) = WildcardParser::new().parse(sample.pattern).unwrap();
+        print!( "pattern \"{ptrn}\" sample \"{sample}\" expect {expect}", 
             ptrn = sample.pattern,
             sample = sample.sample,
-            expect = sample.expect
+            expect = sample.expect,
         );
+        let actual = wc.test(sample.sample);
+        println!(" actual {actual}");
         assert!( actual == sample.expect )
     }
 }
