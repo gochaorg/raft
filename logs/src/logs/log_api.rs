@@ -1,5 +1,5 @@
 /// Лог - хранит в себе сумму лог файлов [crate::logfile]
-pub trait Log {
+pub trait LogQueue {
     /// Ошибки
     type Err;
 
