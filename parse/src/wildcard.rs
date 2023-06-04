@@ -314,7 +314,7 @@ impl Wildcard {
         let captures2 = &captures;
         if WILDCARD_DEBUG { println!("\n{:?}", captures2.clone()) }
 
-        let (mut c_from, mut c_to) = 
+        let (mut _c_from, mut _c_to) = 
         match captures2.into_iter().next() {
             Some( Capture::Plain { from, to }) => {
                 if *from>0 { 
@@ -326,7 +326,7 @@ impl Wildcard {
             Some( Capture::Several { chars_counts:_, upper_unlimited:_ } ) => {
                 if captures.len()>1 {
                     match &captures[1] {
-                        Capture::Plain { from, to } => (0usize, *from),
+                        Capture::Plain { from, to:_ } => (0usize, *from),
                         Capture::Several { chars_counts:_, upper_unlimited:_ } => {
                             todo!()
                         }

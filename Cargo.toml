@@ -3,7 +3,8 @@ members = [
     "logs",
     "lookup",
     "logs-tools",
-    "parse"
+    "parse",
+    "date-format"
 ]
 
 # [package]

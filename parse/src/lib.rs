@@ -21,3 +21,6 @@ pub use lookup::*;
 
 mod wildcard;
 pub use wildcard::*;
+
+mod template;
+pub use template::*;

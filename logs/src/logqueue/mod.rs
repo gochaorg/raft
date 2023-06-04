@@ -1,5 +1,8 @@
 mod log_api;
 pub use log_api::*;
 
-mod fs_logs;
-pub use fs_logs::*;
+/// Поиск лог файлов
+pub mod find_logs;
+
+/// Создание очередного файла
+mod new_file;

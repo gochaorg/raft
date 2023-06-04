@@ -1,7 +1,5 @@
 use std::path::PathBuf;
-
 use parse::{WildcardParser, Parser, Wildcard};
-
 use crate::fs::DirTraverse;
 
 /// Описывает где искать логи
@@ -48,7 +46,8 @@ impl IntoIterator for FsLogFind {
     }
 }
 
-impl FsLogFind {
+impl FsLogFind {    
+    #[allow(dead_code)]
     pub fn new( root:&str, wildcard:&str, recursive:bool ) -> Result<Self, String> {
         match WildcardParser::new().parse(wildcard) {
             Some((wc,_)) => {
@@ -67,4 +66,3 @@ fn log_find_test() {
         println!("{path:?}")
     }
 }
-
