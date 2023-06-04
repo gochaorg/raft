@@ -5,38 +5,67 @@ use crate::{DateTimeItem, DateValue, DateTimeZone};
 
 /// Парсинг формата времени
 /// 
-/// | Переменная | Значение       | DateTimeItem | Пример |
-/// |------------|----------------|--------------|----|
-/// | yyyy       | год - 4 цифры                                | Year           | 1998 | 
-/// | yy         | год - 2 цифры                                | Year2digit     | 98 |
-/// | mm         | месяц 01..12                                 | Month          |
-/// | mmm        | месяц 3 буквы                                | MonthNameShort |
-/// | mmmm       | месяц полное название                        | MonthNameFull  |
-/// | dd         | дата 01..31                                  | Date           |
-/// | wd         | день недели 3 буквы                          | WeekDayShort   |
-/// | wd0        | день недели Воскресенье=0 ... Суббота=6      | WeekDayZero    |
-/// | wd1        | день недели Понедельник=1 ... Воскресенье=7  | WeekDayOne     |
-/// | ww         | неделя 00..53                                | Week
-/// | wwd        | день недели - полное имя                     | WeekDayFull
-/// | w1         | неделя 00..53 - неделя начинается с ПН       | WeekMondayFirst
-/// | hh         | час 0-23                                     | Hour
-/// | hp         | час 0-12                                     | Hour12
-/// | ha         | час 0-12                                     | Hour12
-/// | am         | am или pm                                    | AMPMLoCase
-/// | AM         | AM или PM                                    | AMPMHiCase
-/// | pm         | am или pm                                    | AMPMLoCase
-/// | PM         | AM или PM                                    | AMPMHiCase
-/// | mi         | минуты                                       | Minute |
-/// | ss         | секунды                                      | Second |
-/// | s3         | миллисек                                     | Millisec | 026 |
-/// | s6         | микросек                                     | Microsec | 026490 |
-/// | s9         | наносек                                      | Nanosec | 026490000 |
-/// | ms         | миллисек                                     | Millisec | 026490 |
-/// | ns         | наносек                                      | Nanosec | 026490000 |
-/// | z4         | смещение UTC                                 | Zone4 | +0930 |
-/// | zh         | смещение UTC                                 | ZoneHour | +09 |
-/// | zhm        | смещение UTC                                 | ZoneHourMin | +09:30 |
-/// | zhms       | смещение UTC                                 | ZoneHourMinSec | +09:30:00 |
+/// Общий синтаксис таков
+/// 
+///     [ time_zone ] { qouted | non-quoted | variable }
+/// 
+/// time_zone - указывает временную зону, возможно три формата
+/// - `utc:` - зона UTC
+/// - `local:` - локальная зона
+/// - `offset+hhmi` либо `offset-hhmi` - смещение относительно UTC, hh - час, mi - минута
+/// 
+/// qouted - строка символов в одиночных ковычках
+/// non-quoted - строка символов, которые не совпадают с variable
+/// variable - переменная
+/// 
+/// По поводу строк
+/// 
+/// - строка начинается с одинарной кавыички
+/// - две подряд кавычки заменяются на одну
+/// 
+/// Примеры:
+/// - например шаблон `yyyy'yyyy'` - будет выведено значение 2023yyyy
+/// - шаблон `mm''dd'hello''mi'mi` - будет `03'25hello'mi34`
+/// 
+/// По поводу переменных
+/// 
+/// - выбирается наиболее длинное совпадение,
+/// 
+/// например между `yyyy` или `yy` - будет выбрано `yyyy`
+/// 
+/// 
+/// | Переменная | Значение                                     | DateTimeItem    | Пример |
+/// |------------|----------------------------------------------|-----------------|--------|
+/// | yyyy       | год - 4 цифры                                | Year            | 1998   | 
+/// | yy         | год - 2 цифры                                | Year2digit      | 98     |
+/// | mm         | месяц 01..12                                 | Month           |
+/// | mmm        | месяц 3 буквы                                | MonthNameShort  |
+/// | mmmm       | месяц полное название                        | MonthNameFull   |
+/// | dd         | дата 01..31                                  | Date            |
+/// | wd         | день недели 3 буквы                          | WeekDayShort    |
+/// | wd0        | день недели Воскресенье=0 ... Суббота=6      | WeekDayZero     |
+/// | wd1        | день недели Понедельник=1 ... Воскресенье=7  | WeekDayOne      |
+/// | ww         | неделя 00..53                                | Week            |
+/// | wwd        | день недели - полное имя                     | WeekDayFull     |
+/// | w1         | неделя 00..53 - неделя начинается с ПН       | WeekMondayFirst |
+/// | hh         | час 0-23                                     | Hour            |
+/// | hp         | час 0-12                                     | Hour12          |
+/// | ha         | час 0-12                                     | Hour12          |
+/// | am         | am или pm                                    | AMPMLoCase      |
+/// | AM         | AM или PM                                    | AMPMHiCase      |
+/// | pm         | am или pm                                    | AMPMLoCase      |
+/// | PM         | AM или PM                                    | AMPMHiCase      |
+/// | mi         | минуты                                       | Minute          |
+/// | ss         | секунды                                      | Second          |
+/// | s3         | миллисек                                     | Millisec        | 026 |
+/// | s6         | микросек                                     | Microsec        | 026490 |
+/// | s9         | наносек                                      | Nanosec         | 026490000 |
+/// | ms         | миллисек                                     | Millisec        | 026490 |
+/// | ns         | наносек                                      | Nanosec         | 026490000 |
+/// | z4         | смещение UTC                                 | Zone4           | +0930 |
+/// | zh         | смещение UTC                                 | ZoneHour        | +09 |
+/// | zhm        | смещение UTC                                 | ZoneHourMin     | +09:30 |
+/// | zhms       | смещение UTC                                 | ZoneHourMinSec  | +09:30:00 |
 pub struct DateFormatParser {
     pub(crate) default_time_zone : DateTimeZone
 }
