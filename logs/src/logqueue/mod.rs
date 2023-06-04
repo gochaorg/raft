@@ -5,4 +5,4 @@ pub use log_api::*;
 pub mod find_logs;
 
 /// Создание очередного файла
-mod new_file;
+mod path_tmpl;
