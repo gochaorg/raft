@@ -1,5 +1,4 @@
-use chrono::{Utc, Local, TimeZone, DateTime, format::Fixed, FixedOffset, Offset, Duration};
-use std::{rc::Rc, cell::{Cell, RefCell}, time::Instant};
+use std::{ cell::{Cell, RefCell} };
 use parse::Parser;
 
 use crate::{DateTimeItem, DateValue, DateTimeZone};
@@ -1248,6 +1247,7 @@ impl Parser<DateFormat> for DateFormatParser {
 #[test]
 fn parse_test() {
     use crate::*;
+    use chrono::{Local};
     
     let (df,_) = DateFormatParser::default().parse("utc:yyyy:mm").unwrap();
     println!("{df:?}");
@@ -1338,6 +1338,7 @@ impl DateFormat {
         }).next()
     }
 
+    /// Парсинг даты времени см [DateFormatParser]
     pub fn parse(str: &str) -> DateFormat {
         DateFormatParser::default().parse(str).map(|(df,_)| df).unwrap_or(default_date_format())
     }
@@ -1345,6 +1346,7 @@ impl DateFormat {
 
 #[test]
 fn test_conv() {
+    use chrono::{Utc, Local, TimeZone, DateTime, FixedOffset};
     use crate::*;
 
     let df = default_date_format();

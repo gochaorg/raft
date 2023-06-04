@@ -1,3 +1,4 @@
+/// Элемент значения даты-времени
 #[derive(Debug,Clone, Copy,PartialEq)]
 pub(crate) enum DateTimeItem {
     Year,
