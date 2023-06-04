@@ -530,6 +530,7 @@ dependencies = [
  "chrono",
  "date-format",
  "parse",
+ "rand",
  "random-access-disk",
  "sha2",
 ]

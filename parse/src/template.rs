@@ -1,3 +1,5 @@
+use either::Either;
+
 use crate::{Parser, CharsCount};
 
 #[derive(Debug,Clone)]
@@ -161,7 +163,7 @@ fn parse_test() {
 }
 
 impl Template {
-    fn to_string<F>( &self, mut f:F ) -> String 
+    pub fn to_string<F>( &self, mut f:F ) -> String 
     where F: FnMut(&str) -> String
     {
         let mut buff: String = String::new();
@@ -193,4 +195,57 @@ fn to_string_test() {
         }
     );
     println!("{str}");
+}
+
+// pub struct TemplateMapper<'a, F, A> 
+// where
+//     F: FnMut(&str) -> A,
+//     A: Sized + Clone
+// {
+//     template: &'a Template,
+//     code_mapper: F
+// }
+// pub struct Te
+
+impl Template {
+    pub fn map<F1, A, F2, B>( &self, mut code_map:F1, mut text_map:F2 ) -> Vec<Either<A,B>> 
+    where
+        F1: FnMut(&str) -> A,
+        A: Sized + Clone,
+        F2: FnMut(&str) -> B,
+        B: Sized + Clone,
+    {
+        let mut result : Vec<Either<A,B>> = vec![];
+        for itm in &self.values {
+            match itm {
+                TemplateItem::Code(str) => {
+                    result.push( Either::Left(code_map(str)) )
+                },
+                TemplateItem::PlainText(str) => {
+                    result.push( Either::Right(text_map(str)) )
+                }
+            }
+        }
+        result
+    }
+
+    pub fn fold<A, F1, F2>( &self, initial:&A,  mut code_map:F1, mut text_map:F2 ) -> A
+    where
+        A: Sized + Clone,
+        F1: FnMut(&A, &str) -> A,
+        F2: FnMut(&A, &str) -> A,
+    {
+        let mut result = initial.clone();
+        for itm in &self.values {
+            match itm {
+                TemplateItem::Code(str) => {
+                    result = code_map(&result,str);
+                },
+                TemplateItem::PlainText(str) => {
+                    result = text_map(&result, str);
+                }
+            }
+        }
+        result
+    }
 }
