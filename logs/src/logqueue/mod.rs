@@ -4,5 +4,8 @@ pub use log_api::*;
 /// Поиск лог файлов
 pub mod find_logs;
 
-/// Создание очередного файла
+/// Шаблон пути
 mod path_tmpl;
+
+/// Генерация нового файла
+mod new_file;

@@ -1,10 +1,11 @@
-use std::{rc::Rc, cell::RefCell, sync::Mutex, collections::HashMap};
+use std::{rc::Rc, cell::RefCell, sync::Mutex, collections::HashMap, fmt::Debug};
 
 use chrono::Utc;
 use date_format::{DateFormat, Format};
 use parse::{TemplateParser, Parser, NumberParser};
 use rand::{rngs::ThreadRng, RngCore};
 
+/// Шаблон генерируемого файла
 #[allow(dead_code)]
 #[derive(Clone)]
 pub struct PathTemplate<'a> {
@@ -29,10 +30,12 @@ impl<'a> PathTemplate<'a> {
     }
 }
 
+/// Элемент имени файла
 pub trait PathValue {
     fn generate( &mut self ) -> String;
 }
 
+/// Обычный текст в имени файла
 pub struct PlainValue( pub String );
 impl PathValue for PlainValue {
     fn generate( &mut self ) -> String {
@@ -40,6 +43,7 @@ impl PathValue for PlainValue {
     }
 }
 
+/// Время в имени файла
 pub struct CurrentDateTimeValue( pub DateFormat );
 impl PathValue for CurrentDateTimeValue {
     fn generate( &mut self ) -> String {
@@ -48,6 +52,7 @@ impl PathValue for CurrentDateTimeValue {
     }
 }
 
+/// Случайное значение в имени файла
 pub struct RandomValue {
     dic: String,
     dic_char_count: usize,
@@ -86,6 +91,7 @@ impl Default for RandomValue {
     }
 }
 
+/// Парсер шаблона имени файла
 #[derive(Clone)]
 pub struct PathTemplateParser {
     pub variables: HashMap<String, Rc<Mutex<dyn PathValue>> >
@@ -96,6 +102,21 @@ impl Default for PathTemplateParser {
         PathTemplateParser { 
             variables: HashMap::new()
         }
+    }
+}
+
+impl Debug for PathTemplateParser {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut str = String::new();
+        str.push_str("PathTemplateParser { variables: ");
+
+        for (idx,key) in self.variables.keys().into_iter().enumerate() {
+            if idx > 0 { str.push_str(", ") }
+            str.push_str(key)
+        }
+        str.push_str("}");
+
+        write!(f,"{str}")
     }
 }
 
