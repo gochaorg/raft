@@ -2,6 +2,8 @@ use std::path::PathBuf;
 use parse::{WildcardParser, Parser, Wildcard};
 use crate::fs::DirTraverse;
 
+use super::new_file::NewFileGenerator;
+
 /// Описывает где искать логи
 #[allow(dead_code)]
 #[derive(Debug,Clone)]
@@ -66,3 +68,5 @@ fn log_find_test() {
         println!("{path:?}")
     }
 }
+
+

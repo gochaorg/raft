@@ -121,7 +121,7 @@ impl Debug for PathTemplateParser {
 }
 
 impl PathTemplateParser {
-    pub fn parse<'a>(&self, source: &'a str) -> Result<Box<PathTemplate>, String> {
+    pub fn parse<'a>(&self, source: &'a str) -> Result<PathTemplate, String> {
         let mut p_tmpl = RefCell::new(Vec::<Rc<Mutex<dyn PathValue>>>::new());
 
         let mut eval_code_err : Option<String> = None;
@@ -202,7 +202,7 @@ impl PathTemplateParser {
         };
 
         let p_tmpl = p_tmpl.borrow().clone();
-        Ok(Box::new( PathTemplate { generators: p_tmpl } ))
+        Ok( PathTemplate { generators: p_tmpl } )
     }
 }
 

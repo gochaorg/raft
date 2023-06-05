@@ -1,5 +1,7 @@
 use std::{time::{Duration, Instant}, path::{PathBuf}, fs::File, rc::Rc, sync::Mutex};
 
+use crate::logqueue::path_tmpl::PathTemplateParser;
+
 use super::path_tmpl::{PathTemplate};
 
 /// Генерация файла с уникальным именем
@@ -8,6 +10,9 @@ pub struct NewFileGenerator<'a,F>
 where
     F: Fn(PathBuf) -> Result<File,std::io::Error>
 {
+    /// Функция открытия файла
+    pub open: F,
+
     /// Шаблон для генерации пути файла
     pub path_template: PathTemplate<'a>,
 
@@ -16,9 +21,6 @@ where
 
     /// Максимальное кол-во попыток открыть файл
     pub max_attemps: Option<u32>,
-
-    /// Функция открытия файла
-    pub open: F,
 
     /// Задержка перед новой попыткой открытия файла
     pub throttling: Option<Duration>,
@@ -51,7 +53,7 @@ impl<'a,F> NewFileGenerator<'a,F>
 where
     F: Fn(PathBuf) -> Result<File,std::io::Error>
 {
-    pub fn generate( &'a mut self ) -> Result<NewFile, NewFileGeneratorErr> {
+    pub fn generate( &mut self ) -> Result<NewFile, NewFileGeneratorErr> {
         let mut attempt = 0u32;
         let started = Instant::now();
         let mut io_errors = Vec::<String>::new();
@@ -95,4 +97,52 @@ where
     }
 }
 
+#[test]
+fn new_file_test() {
+    use std::io::prelude::*;
+    use std::path::*;
+    use std::fs::*;
 
+    let test_dir = Path::new("./target/test/new_file");
+    if ! test_dir.is_dir() {
+        create_dir_all(test_dir).unwrap();
+    } else {
+        remove_dir_all(test_dir).unwrap();
+        create_dir_all(test_dir).unwrap();
+    }
+
+    let path_tmpl_parser = PathTemplateParser::default();
+    let mut path_tmpl = path_tmpl_parser.parse("./target/test/new_file/new_${time:local:yyyy-mm-ddThh-mi-ss}-${rnd:5}.log").unwrap();
+    println!("{}", path_tmpl.generate());
+
+    let mut new_file = NewFileGenerator {
+        open: |path| { OpenOptions::new().create(true).read(true).write(true).open(path) },
+        path_template: path_tmpl,
+        max_duration: Some(Duration::from_secs(15)),
+        max_attemps: Some(5),
+        throttling: Some(Duration::from_millis(250))
+    };
+    //let mut new_file.
+
+    let show_dir = || {
+        println!("dir content");
+        for rd in test_dir.read_dir().unwrap() {
+            let rd = rd.unwrap();
+            rd.file_name().to_str().map(|f|
+                println!("{}", f)
+            );
+        }
+    };
+
+    show_dir();
+
+    for _x in 0..5 {
+        let file1 = new_file.generate();
+        match file1 {
+            Ok(_) => println!(""),
+            Err(e) => println!("{e:?}")
+        }
+    }
+
+    show_dir();
+}
