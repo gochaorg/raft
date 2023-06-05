@@ -12,7 +12,9 @@ pub struct PathTemplate<'a> {
     generators: Vec<Rc<Mutex<dyn PathValue + 'a>>>
 }
 
+#[allow(dead_code)]
 impl<'a> PathTemplate<'a> {
+    /// Генерация имени файла
     pub fn generate( &mut self ) -> String {
         let mut str = String::new();
         for generator in &mut self.generators {
@@ -65,7 +67,7 @@ impl PathValue for RandomValue {
         let mut str = String::new();
         if self.dic.len()>0 {
             for _x in 0..self.count {
-                let rndi = (self.rnd.next_u64() as usize);
+                let rndi = self.rnd.next_u64() as usize;
                 let rndi = rndi % self.dic_char_count;
                 match &self.dic.chars().skip(rndi).next() {
                     Some(c) => { 
@@ -120,15 +122,15 @@ impl Debug for PathTemplateParser {
     }
 }
 
+#[allow(dead_code)]
 impl PathTemplateParser {
     pub fn parse<'a>(&self, source: &'a str) -> Result<PathTemplate, String> {
-        let mut p_tmpl = RefCell::new(Vec::<Rc<Mutex<dyn PathValue>>>::new());
+        let p_tmpl = RefCell::new(Vec::<Rc<Mutex<dyn PathValue>>>::new());
 
-        let mut eval_code_err : Option<String> = None;
         let tmpl = TemplateParser::default();
         match tmpl.parse(source) {
             Some((tmpl,_)) => {
-                let fold_res = tmpl.fold(&Ok(()), 
+                let _fold_res = tmpl.fold(&Ok(()), // TODO check result
                 |res,code| { 
                     if res.is_err() {
                         return res.clone();
@@ -210,7 +212,7 @@ impl PathTemplateParser {
 fn parse_template_test() {
     let mut parser = PathTemplateParser::default();
 
-    let mut log_num = Rc::new(Mutex::new(PlainValue(format!("LOG-a"))));
+    let log_num = Rc::new(Mutex::new(PlainValue(format!("LOG-a"))));
     parser.variables.insert(format!("logn"), log_num.clone());
 
     let tmpl = parser.parse("/home/${env:USER}/${logn}/${time:yyyy-mm-dd}/${time:hh-mi-ss}-rnd${rnd:5}.log");

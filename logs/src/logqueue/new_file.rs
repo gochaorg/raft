@@ -1,7 +1,5 @@
 use std::{time::{Duration, Instant}, path::{PathBuf}, fs::File, rc::Rc, sync::Mutex};
 
-use crate::logqueue::path_tmpl::PathTemplateParser;
-
 use super::path_tmpl::{PathTemplate};
 
 /// Генерация файла с уникальным именем
@@ -36,6 +34,7 @@ pub struct NewFile {
     pub file: Rc<Mutex<File>>
 }
 
+#[allow(dead_code)]
 #[derive(Clone,Debug)]
 pub enum NewFileGeneratorErr {
     /// Превышено максимальное кол-во попыток
@@ -49,6 +48,7 @@ pub enum NewFileGeneratorErr {
     }
 }
 
+#[allow(dead_code)]
 impl<'a,F> NewFileGenerator<'a,F>
 where
     F: Fn(PathBuf) -> Result<File,std::io::Error>
@@ -99,7 +99,7 @@ where
 
 #[test]
 fn new_file_test() {
-    use std::io::prelude::*;
+    use crate::logqueue::path_tmpl::PathTemplateParser;
     use std::path::*;
     use std::fs::*;
 
