@@ -20,6 +20,7 @@ where
     tracker: Option<Arc<Tracker>>,
 }
 
+#[allow(dead_code)]
 impl<'a,FNewFile> FsLogQueueConf<'a,FNewFile> 
 where
     FNewFile: Fn(PathBuf) -> Result<File,std::io::Error>
@@ -37,7 +38,7 @@ where
     }
 
     /// Открытие ранее существовавшего лог файла
-    fn open_log( &self, file: &PathBuf ) -> Result<LogFile<FileBuff>, FsLogOpenError> {
+    fn open_log( &self, _file: &PathBuf ) -> Result<LogFile<FileBuff>, FsLogOpenError> {
         todo!()
     }
 
@@ -146,6 +147,7 @@ impl From<LogErr> for FsLogOpenError {
 }
 
 /// Описывает очередь открытых лог файлов
+#[allow(dead_code)]
 pub struct FsLogQueueOpenned<'a,FNewFile>
 where
     FNewFile: Fn(PathBuf) -> Result<File,std::io::Error>
@@ -156,6 +158,7 @@ where
 }
 
 /// Описывает лог файл в очереди
+#[allow(dead_code)]
 pub struct LogQueueFile {
     /// лог файл
     pub log_file: LogFile<FileBuff>,
