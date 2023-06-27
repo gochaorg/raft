@@ -5,7 +5,7 @@ use crate::fs::DirTraverse;
 /// Описывает где искать логи
 #[allow(dead_code)]
 #[derive(Debug,Clone)]
-struct FsLogFind {
+pub struct FsLogFind {
     /// Шаблон искомого файла
     wildcard: Wildcard,
 
