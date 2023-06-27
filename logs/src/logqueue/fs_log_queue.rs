@@ -24,6 +24,7 @@ impl<'a,FNewFile> FsLogQueueConf<'a,FNewFile>
 where
     FNewFile: Fn(PathBuf) -> Result<File,std::io::Error>
 {
+    /// Первичная инициализация
     fn open_first_log( &self, file: Rc<Mutex<File>> ) -> Result<LogFile<FileBuff>, FsLogOpenError> {
         let f = file.lock()?;
         let f_clone = f.try_clone()?;
@@ -35,6 +36,7 @@ where
         Ok(lf)
     }
 
+    /// Открытие ранее существовавшего лог файла
     fn open_log( &self, file: &PathBuf ) -> Result<LogFile<FileBuff>, FsLogOpenError> {
         todo!()
     }
