@@ -9,3 +9,5 @@ mod path_tmpl;
 
 /// Генерация нового файла
 mod new_file;
+
+mod fs_log_queue;
