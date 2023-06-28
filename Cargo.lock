@@ -529,10 +529,12 @@ dependencies = [
  "aquamarine",
  "chrono",
  "date-format",
+ "once_cell",
  "parse",
  "rand",
  "random-access-disk",
  "sha2",
+ "uuid",
 ]
 
 [[package]]
@@ -635,9 +637,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.17.1"
+version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7e5500299e16ebb147ae15a00a942af264cf3688f47923b8fc2cd5858f23ad3"
+checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
 name = "parse"
@@ -1105,6 +1107,16 @@ dependencies = [
  "form_urlencoded",
  "idna 0.3.0",
  "percent-encoding",
+]
+
+[[package]]
+name = "uuid"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d023da39d1fde5a8a3fe1f3e01ca9632ada0a63e9797de55a879d6e2236277be"
+dependencies = [
+ "getrandom",
+ "rand",
 ]
 
 [[package]]
