@@ -16,10 +16,15 @@ trait LogQueueConf {
     fn open( &self ) -> Result<Self::Open, Self::OpenError>;
 }
 
+/// Открытые и проверенные лог файлы
 trait LogQueueOpenned {    
     type LogFile;
     type LogFiles;
+
+    /// Возвращает список лог файлов
     fn files( &self ) -> Self::LogFiles;
+
+    /// Возвращает актуальный лог файл для записи
     fn tail( &self ) -> Self::LogFile;
 }
 
