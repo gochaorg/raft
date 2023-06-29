@@ -456,7 +456,7 @@ fn test_navigation() {
 impl<B> LogFile<B>
 where
     B: FlatBuff,
-{
+{    
     fn build_next_block(
         &mut self,
         data_id: DataId,
@@ -532,6 +532,28 @@ where
             },
             data: block_data,
         }
+    }
+
+    /// Подсчет кол-ва элементов
+    pub fn count(&self) -> Result<u32,LogErr> {
+        let mut ptr = Arc::new(RwLock::new(self.clone())).pointer_to_end();
+        match ptr {
+            Ok(ptr) => {
+                Ok(ptr.current_block.head.block_id.value()+1)
+            },
+            Err(LogErr::LogIsEmpty) => Ok(0u32),
+            Err(err) => Err(err)
+        }
+    }
+
+    /// Получение блока по id
+    pub fn get_block(&self, block_id: BlockId) -> Result<Block,LogErr> {
+        let mut ptr = Arc::new(RwLock::new(self.clone())).pointer_to_end()?;
+        ptr = ptr.jump(block_id)?;
+        
+        let head = ptr.current_head().clone();
+        let data = ptr.current_data()?;
+        Ok(Block { head: head.head, data: data })
     }
 
     /// Добавление данных в лог

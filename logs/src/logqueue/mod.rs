@@ -56,3 +56,6 @@ mod logs_open;
 
 /// Идентификатор лога
 mod log_id;
+
+// Валидация логов
+mod log_seq_verifier;

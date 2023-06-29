@@ -21,7 +21,7 @@ where
 
 /// Идентификатор лог файла
 pub trait LogQueueFileId : PartialEq + std::fmt::Display + Clone + Debug + BlockReader + BlockWriter {
-    type ID;
+    type ID: PartialEq;
     fn id( &self ) -> Self::ID;
     fn previous( &self ) -> Option<Self::ID>;
     fn new() -> Self;
