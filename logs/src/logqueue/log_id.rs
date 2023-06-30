@@ -3,6 +3,7 @@ use std::str::FromStr;
 use uuid::Uuid;
 use crate::logfile::block::{String32, BlockErr};
 use crate::logfile::block::Block;
+use std::hash::Hash;
 
 /// Запись идентификатора в блок
 pub trait BlockWriter {
@@ -20,15 +21,15 @@ where
 }
 
 /// Идентификатор лог файла
-pub trait LogQueueFileId : PartialEq + std::fmt::Display + Clone + Debug + BlockReader + BlockWriter {
+pub trait LogQueueFileId : PartialEq + std::fmt::Display + Clone + Debug + BlockReader + BlockWriter + Hash {
     type ID: PartialEq;
     fn id( &self ) -> Self::ID;
     fn previous( &self ) -> Option<Self::ID>;
-    fn new() -> Self;
+    fn new( prev:Option<Self::ID> ) -> Self;
 }
 
 /// Идентификатор лог файла - UUID
-#[derive(Debug,Clone,PartialEq)]
+#[derive(Debug,Clone,PartialEq,Hash)]
 pub struct LogQueueFileUUID {
     pub uuid: Uuid,
     pub previous: Option<Uuid>,
@@ -48,10 +49,10 @@ impl LogQueueFileId for LogQueueFileUUID {
     fn id( &self ) -> Self::ID {
         self.uuid.clone()
     }
-    fn new() -> Self {
+    fn new( prev:Option<Self::ID> ) -> Self {
         Self {
             uuid: Uuid::new_v4(),
-            previous: None
+            previous: prev
         }
     }
     fn previous( &self ) -> Option<Self::ID> {
