@@ -153,12 +153,12 @@ where
     Ok(OrderedLogs{files: ordered_files, tail:last})
 }
 
-mod test {
+pub mod test {
     use uuid::Uuid;
     use super::*;
 
     #[derive(Debug,Clone,PartialEq,Hash)]
-    struct IdTest {
+    pub struct IdTest {
         id: Uuid,
         prev: Option<Uuid>
     }

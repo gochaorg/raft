@@ -1,11 +1,5 @@
 use std::marker::PhantomData;
-
-use crate::{
-    logfile::{
-        FlatBuff,
-        LogFile
-    }
-};
+use super::log_seq_verifier::OrderedLogs;
 
 /// Конфигурация лог файлов, которую можно открыть
 trait LogQueueConf {
@@ -29,13 +23,14 @@ trait LogQueueOpenned {
 }
 
 /// Минимальная конфигурация для открытия логов
-struct LogFileQueueConf<BUFF,FILE,ERR,FOpen,FFind,FValidate,FInit>
+struct LogFileQueueConf<LOG,FILE,ERR,FOpen,FFind,FValidate,FInit>
 where 
-    BUFF:FlatBuff,
-    FOpen: Fn(FILE) -> Result<LogFile<BUFF>, ERR>,
+    LOG:Clone,
+    FILE:Clone,
+    FOpen: Fn(FILE) -> Result<LOG, ERR>,
     FFind: Fn() -> Result<Vec<FILE>, ERR>,
-    FValidate: Fn(&Vec<(FILE,LogFile<BUFF>)>) -> Result<(FILE,LogFile<BUFF>),ERR>,
-    FInit: Fn() -> Result<(FILE,LogFile<BUFF>), ERR>,
+    FValidate: Fn(&Vec<(FILE,LOG)>) -> Result<OrderedLogs<(FILE,LOG)>,ERR>,
+    FInit: Fn() -> Result<(FILE,LOG), ERR>,
 {
     /// Поиск лог файлов
     find_files: FFind,
@@ -49,32 +44,32 @@ where
     /// Первичная инициализация
     init: FInit,
 
-    _p: PhantomData<(BUFF,FILE,ERR)>
+    _p: PhantomData<(LOG,FILE,ERR)>
 }
 
 /// Открытые лог файлы
-struct LogFilesOpenned<BUFF,FILE>
+struct LogFilesOpenned<LOG,FILE>
 where
-    BUFF:FlatBuff,
+    LOG:Clone,
 {
     /// Список открытых лог файлов
-    files: Vec<(FILE,LogFile<BUFF>)>,
+    files: Vec<(FILE,LOG)>,
 
     /// Последний актуальный лог файл - имя файла
     tail_file: FILE,
 
     /// Последний актуальный лог файл
-    tail_log: LogFile<BUFF>,
+    tail_log: LOG,
 
-    _p: PhantomData<(BUFF,FILE)>
+    _p: PhantomData<(LOG,FILE)>
 }
 
-impl<BUFF,FILE> LogQueueOpenned for LogFilesOpenned<BUFF,FILE>
+impl<LOG,FILE> LogQueueOpenned for LogFilesOpenned<LOG,FILE>
 where
-    BUFF:FlatBuff,
+    LOG:Clone,
     FILE:Clone,
 {
-    type LogFile = (FILE,LogFile<BUFF>);
+    type LogFile = (FILE,LOG);
     type LogFiles = Vec<Self::LogFile>;
 
     fn files( &self ) -> Self::LogFiles {
@@ -86,24 +81,24 @@ where
     }
 }
 
-impl<BUFF,FILE,ERR,FOpen,FFind,FValidate,FInit> LogQueueConf 
-for LogFileQueueConf<BUFF,FILE,ERR,FOpen,FFind,FValidate,FInit> 
+impl<LOG,FILE,ERR,FOpen,FFind,FValidate,FInit> LogQueueConf 
+for LogFileQueueConf<LOG,FILE,ERR,FOpen,FFind,FValidate,FInit> 
 where
-    BUFF:FlatBuff,
-    FOpen: Fn(FILE) -> Result<LogFile<BUFF>, ERR>,
+    LOG:Clone,
+    FOpen: Fn(FILE) -> Result<LOG, ERR>,
     FFind: Fn() -> Result<Vec<FILE>, ERR>,
-    FValidate: Fn(&Vec<(FILE,LogFile<BUFF>)>) -> Result<(FILE,LogFile<BUFF>),ERR>,
-    FInit: Fn() -> Result<(FILE,LogFile<BUFF>), ERR>,
+    FValidate: Fn(&Vec<(FILE,LOG)>) -> Result<OrderedLogs<(FILE,LOG)>,ERR>,
+    FInit: Fn() -> Result<(FILE,LOG), ERR>,
     FILE: Clone
 {
     type OpenError = ERR;
-    type Open = LogFilesOpenned<BUFF,FILE>;
+    type Open = LogFilesOpenned<LOG,FILE>;
 
     fn open( &self ) -> Result<Self::Open, Self::OpenError> {
         let found_files = (self.find_files)()?;
         if !found_files.is_empty() {
             let not_validated_open_files = found_files.iter().fold( 
-                Ok::<Vec::<(FILE,LogFile<BUFF>)>,ERR>(Vec::<(FILE,LogFile<BUFF>)>::new()), 
+                Ok::<Vec::<(FILE,LOG)>,ERR>(Vec::<(FILE,LOG)>::new()), 
                 |res,file| {
                 res.and_then(|mut res| {
                     let log_file = (self.open_log_file)(file.clone())?;
@@ -112,12 +107,13 @@ where
                 })
             })?;
 
-            let (tail_file, tail_log) = (self.validate)(&not_validated_open_files)?;
+            //let (tail_file, tail_log) = (self.validate)(&not_validated_open_files)?;
+            let validated_order = (self.validate)(&not_validated_open_files)?;
 
             Ok(LogFilesOpenned{ 
                 files: not_validated_open_files, 
-                tail_file: tail_file, 
-                tail_log: tail_log,
+                tail_file: validated_order.tail.0, 
+                tail_log: validated_order.tail.1,
                 _p: PhantomData.clone(),
             })
         }else{
@@ -132,4 +128,48 @@ where
     }
 }
 
+mod test {
+    use std::marker::PhantomData;
 
+    use super::super::log_id::*;
+    use super::super::log_seq_verifier::*;
+    use super::super::log_seq_verifier::test::*;
+
+    use super::*;
+
+    #[test]
+    fn open_logs() {
+        let id0 = IdTest::new(None);
+        let id1 = IdTest::new(Some(id0.id()));
+        let id2 = IdTest::new(Some(id1.id()));
+        let id3 = IdTest::new(Some(id2.id()));
+
+        let queue_conf: LogFileQueueConf<IdTest,IdTest,String,_,_,_,_> = 
+        LogFileQueueConf {
+            find_files: || {
+                Ok(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()])
+            },
+            open_log_file: |f| Ok::<IdTest,String>( f.clone() ),
+            validate: |_files:&Vec<(IdTest,IdTest)>| Ok( 
+                OrderedLogs {
+                    files: vec![
+                    (id1.clone(),id1.clone()), 
+                    (id2.clone(),id2.clone()), 
+                    (id3.clone(),id3.clone()),
+                    (id0.clone(),id0.clone()), 
+                    ],
+                    tail: (id3.clone(),id3.clone())
+                }                
+            ),
+            init: || Ok( (id0.clone(),id0.clone()) ),
+            _p: PhantomData.clone()
+        };
+
+        let open_files:LogFilesOpenned<IdTest,IdTest> = queue_conf.open().unwrap();
+        println!("tail {}", open_files.tail().0);
+        for (f,_) in &open_files.files() {
+            println!("log {}", f);
+        }
+
+    }
+}
