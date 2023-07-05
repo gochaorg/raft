@@ -143,7 +143,7 @@ where
         }
     }
 
-    let ordered_files: Vec<ITEM> = ordered_files.iter().map(|(a)|a.clone()).collect();
+    let ordered_files: Vec<ITEM> = ordered_files.iter().map(|a|a.clone()).collect();
     if !files_with_id.is_empty() {
         return Err(ERRBuild::not_found_next_log(&head_id, files_with_id));
     }
@@ -181,13 +181,13 @@ mod test {
     }
     impl BlockWriter for IdTest {
         type ERR = String;
-        fn block_write( &self, block: &mut crate::logfile::block::Block ) -> Result<(),Self::ERR> {
+        fn block_write( &self, _block: &mut crate::logfile::block::Block ) -> Result<(),Self::ERR> {
             Ok(())
         }
     }
     impl BlockReader for IdTest {
         type ERR = String;
-        fn block_read( block: &crate::logfile::block::Block ) -> Result<Self, Self::ERR> {
+        fn block_read( _block: &crate::logfile::block::Block ) -> Result<Self, Self::ERR> {
             todo!()
         }
     }
@@ -196,13 +196,13 @@ mod test {
         fn id_of(a:&IdTest) -> Result<IdTest,String> {            
             Ok(a.clone())
         }
-        fn items_count(a:&IdTest) -> Result<u32,String> {
+        fn items_count(_a:&IdTest) -> Result<u32,String> {
             Ok(1u32)
         }
     }
 
     impl ErrThrow<IdTest,String,IdTest> for IdTest {
-        fn two_heads(heads:Vec<(IdTest,IdTest)>) -> String {
+        fn two_heads(_heads:Vec<(IdTest,IdTest)>) -> String {
             "two_heads".to_string()
         }
 
@@ -210,7 +210,7 @@ mod test {
             "no_heads".to_string()
         }
 
-        fn not_found_next_log( id: &IdTest, logs:Vec<&(IdTest,IdTest)> ) -> String {
+        fn not_found_next_log( id: &IdTest, _logs:Vec<&(IdTest,IdTest)> ) -> String {
             format!("not_found_next_log id={id}")
         }
     }

@@ -536,7 +536,7 @@ where
 
     /// Подсчет кол-ва элементов
     pub fn count(&self) -> Result<u32,LogErr> {
-        let mut ptr = Arc::new(RwLock::new(self.clone())).pointer_to_end();
+        let ptr = Arc::new(RwLock::new(self.clone())).pointer_to_end();
         match ptr {
             Ok(ptr) => {
                 Ok(ptr.current_block.head.block_id.value()+1)
