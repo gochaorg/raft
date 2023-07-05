@@ -60,6 +60,7 @@ where
 /// Результат
 /// ============
 /// Список логов упорядоченных по времени создания
+#[allow(dead_code)]
 pub fn validate_sequence<ITEM,ERR,ERRBuild,ID>( files: &Vec<ITEM> ) -> 
     Result<OrderedLogs<ITEM>,ERR>
 where
