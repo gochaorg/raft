@@ -129,12 +129,15 @@ where
 }
 
 mod test {
+    #[allow(unused_imports)]
     use std::marker::PhantomData;
-
+    #[allow(unused_imports)]
     use super::super::log_id::*;
+    #[allow(unused_imports)]
     use super::super::log_seq_verifier::*;
+    #[allow(unused_imports)]
     use super::super::log_seq_verifier::test::*;
-
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]
