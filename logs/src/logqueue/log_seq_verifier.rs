@@ -1,22 +1,23 @@
 use super::log_id::*;
-use crate::{
-    logfile::{
-        FlatBuff,
-        LogFile, LogErr, block::BlockId
-    }
-};
 
-trait ErrThrow<ITEM,ERR,ID> 
+/// Генерация ошибки
+pub trait ErrThrow<ITEM,ERR,ID> 
 where
     ID:LogQueueFileId,
 {
+    /// Найдено 2 или более файла, которые могут быть началом (головой) очереди логов
+    /// Должен быть один
     fn two_heads(heads:Vec<(ITEM,ID)>) -> ERR;
+
+    /// Не найдено начала очереди
     fn no_heads() -> ERR;
+
+    /// Битая ссылка, голова лог файла ссылается на не существующий лог файл
     fn not_found_next_log( id: &ID, logs:Vec<&(ITEM,ID)> ) -> ERR;
 }
 
 /// Операции с лог файлов
-trait SeqValidateOp<A,ERR,ID> 
+pub trait SeqValidateOp<A,ERR,ID> 
 where
     ID:LogQueueFileId
 {
@@ -27,13 +28,17 @@ where
     fn id_of(a:&A) -> Result<ID,ERR>;
 }
 
+/// Упорядоченный лог файлы
 #[derive(Debug,Clone)]
-struct OrderedLogs<ITEM> 
+pub struct OrderedLogs<ITEM> 
 where 
     ITEM:Clone,    
 {
-    tail: ITEM,
-    files: Vec<ITEM>
+    /// Последний лог файл в очереди
+    pub tail: ITEM,
+
+    /// Упорядоченная очередь лог файлов
+    pub files: Vec<ITEM>
 }
 
 /// Валидация очереди логов
@@ -43,7 +48,19 @@ where
 /// - Должна быть одна голова - т.е. один id лога, который не ссылается на другие логи
 /// - Остальный логи, из id должны ссылаться на логи
 /// - ссылки должны образовывать линейную последовательность
-fn validate_sequence<ITEM,ERR,ERRBuild,ID>( files: &Vec<ITEM> ) -> 
+/// 
+/// Аргрументы
+/// ============
+/// - files - список лог файлов
+/// - ITEM - тип лог файла
+/// - ERR - тип ошибки
+/// - ERRBuild - trait для постраения ошибок
+/// - ID - тип идентификатора лог файла
+/// 
+/// Результат
+/// ============
+/// Список логов упорядоченных по времени создания
+pub fn validate_sequence<ITEM,ERR,ERRBuild,ID>( files: &Vec<ITEM> ) -> 
     Result<OrderedLogs<ITEM>,ERR>
 where
     ITEM: Clone + SeqValidateOp<ITEM,ERR,ID>,
