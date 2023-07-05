@@ -21,8 +21,8 @@ where
 }
 
 /// Идентификатор лог файла
-pub trait LogQueueFileId : PartialEq + std::fmt::Display + Clone + Debug + BlockReader + BlockWriter + Hash {
-    type ID: PartialEq;
+pub trait LogQueueFileId : Eq + std::fmt::Display + Clone + Debug + BlockReader + BlockWriter + Hash {
+    type ID: Eq + Clone;
     fn id( &self ) -> Self::ID;
     fn previous( &self ) -> Option<Self::ID>;
     fn new( prev:Option<Self::ID> ) -> Self;
@@ -43,6 +43,8 @@ impl std::fmt::Display for LogQueueFileUUID {
         })
     }
 }
+
+impl Eq for LogQueueFileUUID {}
 
 impl LogQueueFileId for LogQueueFileUUID {
     type ID = Uuid;

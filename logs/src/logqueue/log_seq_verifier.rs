@@ -27,8 +27,11 @@ where
     fn id_of(a:&A) -> Result<ID,ERR>;
 }
 
-#[derive(Debug)]
-struct OrderedLogs<ITEM> {
+#[derive(Debug,Clone)]
+struct OrderedLogs<ITEM> 
+where 
+    ITEM:Clone,    
+{
     tail: ITEM,
     files: Vec<ITEM>
 }
@@ -47,6 +50,7 @@ where
     ID: LogQueueFileId,
     ERRBuild: ErrThrow<ITEM,ERR,ID>
 {
+    // Выделение id файлов
     let files_with_id = files.iter().fold( 
         Ok::<Vec<(ITEM,ID)>,ERR>(vec![]), |res,itm| {
             res.and_then(|mut res| {
@@ -62,7 +66,7 @@ where
         }
     )?;
 
-    let head_files: Vec<(ITEM,ID)> = 
+    let mut head_files: Vec<(ITEM,ID)> = 
         files_with_id.iter().filter(|(_,id)| id.previous().is_none())
         .map(|(a,b)| (a.clone(), b.clone()))
         .collect();
@@ -71,12 +75,37 @@ where
         return Err(ERRBuild::two_heads(head_files));
     } else if head_files.is_empty() {
         // Найти те что ссылается на не существующую id
-        // let mut ids = std::collections::HashSet::<ID>::new();
-        // for (_,id) in head_files {
-        //     ids
-        // }
+        let mut ids = std::collections::HashSet::<ID>::new();
+        for (_,id) in &files_with_id {
+            ids.insert(id.clone());
+        }
 
-        return Err(ERRBuild::no_heads());
+        // обходим список
+        // ищем потенциальную голову
+        let mut files_set = files_with_id.clone();        
+        let mut heads = Vec::<(ITEM,ID)>::new();
+        while files_set.len() >= 1 {
+            let (f,id) = files_set[0].clone();
+            match ids.iter().find(|i| id.previous().map(|a| a == i.id()).unwrap_or(false) ) {
+                Some(_) => {
+                    files_set.remove(0);
+                },
+                None => {
+                    heads.push((f.clone(), id.clone()));
+                    files_set.remove(0);
+                }
+            }
+        }
+
+        if heads.is_empty() {
+            return Err(ERRBuild::no_heads());
+        } else if heads.len()>1 {
+            return Err(ERRBuild::two_heads(heads));
+        }
+
+        for (f,i) in heads {
+            head_files.push((f.clone(), i.clone()));
+        }
     }
 
     let (head,mut head_id) = head_files.iter().map(|(a,b)|(a.clone(),b.clone())).next().unwrap();
@@ -120,6 +149,7 @@ mod test {
             write!(f,"IdTest({}, {:?})",self.id, self.prev)
         }
     }
+    impl Eq for IdTest {}
     impl LogQueueFileId for IdTest {
         type ID = Uuid;
         fn id( &self ) -> Self::ID {            
@@ -243,12 +273,11 @@ mod test {
         }
     }
 
-
     #[test]
-    fn no_head() {
+    fn partial_queue() {
         let id0 = IdTest::new(None);
         let id1 = IdTest::new(Some(id0.id()));
-        let id2 = IdTest::new(Some(id0.id()));
+        let id2 = IdTest::new(Some(id1.id()));
         let id3 = IdTest::new(Some(id2.id()));
 
         let logs = vec![id1.clone(), id2.clone(), id3.clone()];
@@ -256,9 +285,13 @@ mod test {
             Ok(seq) => {
                 println!("ok");
                 println!("tail = {}",seq.tail);
-                for itm in seq.files {
+                for itm in &seq.files {
                     println!(" {itm}")
                 }
+                assert!( seq.files.len()==3 );
+                assert!( seq.files[0].id == id1.id() );
+                assert!( seq.files[1].id == id2.id() );
+                assert!( seq.files[2].id == id3.id() );
             }
             Err(err) => {
                 println!("err {err}");
