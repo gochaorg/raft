@@ -11,24 +11,35 @@ use super::logs_open::{
 };
 
 /// Очередь логов
-struct LogFileQueue<FILE,LOG,ERR,ID,LOGSwitch> 
+struct LogFileQueue<FILE,LOG,ERR,LOGSwitch> 
 where
     LOG: Clone,
-    LOGSwitch: LogSwitching<(FILE,LOG),ERR,ID>,
-    ID: LogQueueFileId,
+    LOGSwitch: LogSwitching<(FILE,LOG),ERR>,
 {
     files: Vec<(FILE,LOG)>,
     tail: (FILE,LOG),
     switching: LOGSwitch,
-    _p: PhantomData<(ERR,ID)>
+    _p: PhantomData<ERR>
 }
 
-impl<FILE,LOG,ERR,LOGSwitch,ID> LogOpened for LogFileQueue<FILE,LOG,ERR,ID,LOGSwitch>
+impl<FILE,LOG,ERR,LOGSwitch> LogFileQueue<FILE,LOG,ERR,LOGSwitch> 
 where
     LOG:Clone,
     FILE:Clone,
-    LOGSwitch: LogSwitching<(FILE,LOG),ERR,ID>,
-    ID: LogQueueFileId,
+    LOGSwitch: LogSwitching<(FILE,LOG),ERR> + Clone,
+{
+    fn switch( &mut self ) -> Result<(),ERR> {
+        let mut s = self.switching.clone();
+        let _ = s.switch(self)?;
+        Ok(())
+    }
+}
+
+impl<FILE,LOG,ERR,LOGSwitch> LogOpened for LogFileQueue<FILE,LOG,ERR,LOGSwitch>
+where
+    LOG:Clone,
+    FILE:Clone,
+    LOGSwitch: LogSwitching<(FILE,LOG),ERR>,
 {
     type LogFile = (FILE,LOG);
     type LogFiles = Vec<(FILE,LOG)>;
@@ -44,12 +55,11 @@ where
     }
 }
 
-impl<FILE,LOG,ERR,LOGSwitch,ID> LogQueueState<(FILE,LOG)> for LogFileQueue<FILE,LOG,ERR,ID,LOGSwitch> 
+impl<FILE,LOG,ERR,LOGSwitch> LogQueueState<(FILE,LOG)> for LogFileQueue<FILE,LOG,ERR,LOGSwitch> 
 where
     FILE: Clone,
     LOG: Clone,
-    LOGSwitch: LogSwitching<(FILE,LOG),ERR,ID>,
-    ID: LogQueueFileId,
+    LOGSwitch: LogSwitching<(FILE,LOG),ERR>,
 {
     type ERR = ERR;
     fn get_current_file( &self ) -> Result<(FILE,LOG),Self::ERR> {
@@ -63,32 +73,30 @@ where
 }
 
 /// Конфигурация логов
-struct LogQueueConf<FILE,LOG,ERR,ID,LOGOpenCfg,LOGOpenRes,LOGSwitch>
+struct LogQueueConf<FILE,LOG,ERR,LOGOpenCfg,LOGOpenRes,LOGSwitch>
 where
     FILE: Clone,
     LOGOpenRes: LogOpened<LogFile = (FILE,LOG), LogFiles = Vec<(FILE,LOG)>>,
     LOGOpenCfg: LogOpenConf<Open = LOGOpenRes, OpenError = ERR>,
-    LOGSwitch: LogSwitching<(FILE,LOG),ERR,ID> + Clone,
-    ID: LogQueueFileId,
+    LOGSwitch: LogSwitching<(FILE,LOG),ERR> + Clone,
 {
     log_open: LOGOpenCfg,
     log_switch: LOGSwitch,
 
-    _p: PhantomData<(ERR,ID)>
+    _p: PhantomData<ERR>
 }
 
-impl<FILE,LOG,ERR,ID,LOGOpenCfg,LOGOpenRes,LOGSwitch> 
-    LogQueueConf<FILE,LOG,ERR,ID,LOGOpenCfg,LOGOpenRes,LOGSwitch> 
+impl<FILE,LOG,ERR,LOGOpenCfg,LOGOpenRes,LOGSwitch> 
+    LogQueueConf<FILE,LOG,ERR,LOGOpenCfg,LOGOpenRes,LOGSwitch> 
 where
     FILE: Clone,
     LOG: Clone,
     LOGOpenRes: LogOpened<LogFile = (FILE,LOG), LogFiles = Vec<(FILE,LOG)>>,
     LOGOpenCfg: LogOpenConf<Open = LOGOpenRes, OpenError = ERR>,
-    LOGSwitch: LogSwitching<(FILE,LOG),ERR,ID> + Clone,
-    ID: LogQueueFileId,
+    LOGSwitch: LogSwitching<(FILE,LOG),ERR> + Clone,
 {
     /// Открытие логов
-    pub fn open( &self ) -> Result<LogFileQueue<FILE,LOG,ERR,ID,LOGSwitch>,ERR> {
+    pub fn open( &self ) -> Result<LogFileQueue<FILE,LOG,ERR,LOGSwitch>,ERR> {
         let opened = self.log_open.open()?;
         Ok(LogFileQueue {
             files: opened.files(),
@@ -138,7 +146,7 @@ fn log_queue_conf_test() {
         _p: PhantomData.clone(),
     };
 
-    let log_queue_conf : LogQueueConf<IdTest,IdTest,String,_,_,_,_> = LogQueueConf { 
+    let log_queue_conf : LogQueueConf<IdTest,IdTest,String,_,_,_> = LogQueueConf { 
         log_open: open_conf, 
         log_switch: log_switch, 
         _p: PhantomData.clone(),

@@ -18,23 +18,9 @@ pub struct OleNewId<'a, ID> {
     pub new_id: &'a ID,
 }
 
-pub trait LogSwitching<FILE,ERR,ID> : LogQueueState<FILE,ERR = ERR>
-where
-    ID: LogQueueFileId,
+pub trait LogSwitching<FILE,ERR> 
 {
-    fn switch( &mut self ) -> Result<(),ERR> {
-        let old_file = self.get_current_file()?;
-        let old_id = (self.read_id_of)(&old_file)?;
-
-        let new_id = ID::new(Some(old_id.id()));
-        let ids = OleNewId { old_id:&old_id, new_id:&new_id };
-
-        let mut new_file = (self.new_file)()?;
-        (self.write_id_to)(&mut new_file, ids)?;
-        
-        self.switch_current_file(new_file.clone())?;
-        Ok(())
-    }
+    fn switch<S:LogQueueState<FILE,ERR = ERR>>( &mut self, log_state: &mut S ) -> Result<(),ERR>;
 }
 
 /// Переключение лог файла
@@ -59,15 +45,26 @@ where
     pub _p : PhantomData<(FILE,ID,ERR)>
 }
 
-impl<FILE,ID,ERR,FReadId,FWriteId,FNewFile> LogSwitching<FILE,ERR,ID> 
-for LogSwitcher<FILE,ID,ERR,FReadId,FWriteId,FNewFile> 
+impl<FILE,ERR,ID,FReadId,FWriteId,FNewFile> LogSwitching<FILE,ERR> 
+for LogSwitcher<FILE,ID,ERR,FReadId,FWriteId,FNewFile>
 where
-    Self: LogQueueState<FILE,ERR = ERR>,
     FILE: Clone,
     ID: LogQueueFileId,
     FReadId: Fn(&FILE) -> Result<ID,ERR>,
     FWriteId: for <'a> Fn(&mut FILE, OleNewId<'a,ID>) -> Result<(),ERR>,
     FNewFile: FnMut() -> Result<FILE,ERR>,
 {
+    /// Переключение текущего лога
+    fn switch<S:LogQueueState<FILE,ERR = ERR>>( &mut self, log_state: &mut S ) -> Result<(),ERR> {
+        let old_file = log_state.get_current_file()?;
+        let old_id = (self.read_id_of)(&old_file)?;
+        let new_id = ID::new(Some(old_id.id()));
+        let ids = OleNewId { old_id:&old_id, new_id:&new_id };
 
+        let mut new_file = (self.new_file)()?;
+        (self.write_id_to)(&mut new_file, ids)?;
+        
+        log_state.switch_current_file(new_file.clone())?;
+        Ok(())
+    }
 }
