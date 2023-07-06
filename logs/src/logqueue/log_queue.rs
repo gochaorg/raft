@@ -1,4 +1,6 @@
 use std::marker::PhantomData;
+use std::sync::{RwLock, Arc};
+use std::sync::atomic::AtomicBool;
 
 use super::log_switch::{
     LogSwitching,
@@ -119,6 +121,9 @@ fn log_queue_conf_test() {
     let id2 = IdTest::new(Some(id1.id()));
     let id3 = IdTest::new(Some(id2.id()));
 
+    let oldnew_id_matched = Arc::new(AtomicBool::new(false));
+    let oldnew_id_matched1 = oldnew_id_matched.clone();
+
     let open_conf: LogFileQueueConf<IdTest,IdTest,String,_,_,_,_> = LogFileQueueConf {
         find_files: || Ok(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()]),
         open_log_file: |f| Ok::<IdTest,String>( f.clone() ),
@@ -137,7 +142,12 @@ fn log_queue_conf_test() {
 
     let log_switch : LogSwitcher<(IdTest,IdTest),IdTest,String,_,_,_> = LogSwitcher { 
         read_id_of: |f_id:&(IdTest,IdTest)| Ok( f_id.0.clone() ), 
-        write_id_to: |f,ids| Ok(()), 
+        write_id_to: |f,ids:OleNewId<'_,IdTest>| {
+            println!("old id={} new id={}", ids.old_id, ids.new_id);
+            oldnew_id_matched1.store(true, std::sync::atomic::Ordering::SeqCst);
+            ids.new_id.previous().map(|i| ids.old_id.id() == i );
+            Ok(())
+        }, 
         new_file: || {
             let id = IdTest::new(None);
             Ok( (id.clone(), id.clone()) )
@@ -151,5 +161,23 @@ fn log_queue_conf_test() {
         _p: PhantomData.clone(),
     };
 
-    let log_queue : LogFileQueue<IdTest,IdTest,String,_> = log_queue_conf.open().unwrap();
+    let mut log_queue : LogFileQueue<IdTest,IdTest,String,_> = log_queue_conf.open().unwrap();
+
+    println!("before");
+
+    let count0 = log_queue.files().len();
+    for (a,_) in log_queue.files() {
+        println!("log {a}");
+    }
+
+    println!("after");
+
+    log_queue.switch().unwrap();
+    let count1 = log_queue.files().len();
+    for (a,_) in log_queue.files() {
+        println!("log {a}");
+    }
+
+    assert!(count1 > count0);
+    assert!(oldnew_id_matched.load(std::sync::atomic::Ordering::SeqCst));
 }
