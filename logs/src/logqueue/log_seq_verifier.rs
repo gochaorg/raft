@@ -16,16 +16,21 @@ where
     fn not_found_next_log( id: &ID, logs:Vec<&(ITEM,ID)> ) -> ERR;
 }
 
+pub trait IdOf<A,ID,ERR> {
+    /// получить идентификатор-ссылку
+    fn id_of(a:&A) -> Result<ID,ERR>;
+}
+
 /// Операции с лог файлов
-pub trait SeqValidateOp<A,ERR,ID> 
+pub trait SeqValidateOp<A,ERR,ID>: IdOf<A,ID,ERR>
 where
     ID:LogQueueFileId
 {
     /// кол-во элементов в логе
     fn items_count(a:&A) -> Result<u32,ERR>;
 
-    /// получить идентификатор-ссылку
-    fn id_of(a:&A) -> Result<ID,ERR>;
+    // получить идентификатор-ссылку
+    //fn id_of(a:&A) -> Result<ID,ERR>;
 }
 
 /// Упорядоченный лог файлы
@@ -194,11 +199,14 @@ pub mod test {
     }
 
     impl SeqValidateOp<IdTest,String,IdTest> for IdTest {
-        fn id_of(a:&IdTest) -> Result<IdTest,String> {            
-            Ok(a.clone())
-        }
         fn items_count(_a:&IdTest) -> Result<u32,String> {
             Ok(1u32)
+        }
+    }
+
+    impl IdOf<IdTest,IdTest,String> for IdTest {
+        fn id_of(a:&IdTest) -> Result<IdTest,String> {
+            Ok(a.clone())
         }
     }
 

@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use super::log_seq_verifier::OrderedLogs;
 
 /// Конфигурация лог файлов, которую можно открыть
-trait LogQueueConf {
+pub trait LogQueueConf {
     type Open;
     type OpenError;
 
@@ -11,7 +11,7 @@ trait LogQueueConf {
 }
 
 /// Открытые и проверенные лог файлы
-trait LogQueueOpenned {    
+pub trait LogQueueOpenned {    
     type LogFile;
     type LogFiles;
 
@@ -23,7 +23,7 @@ trait LogQueueOpenned {
 }
 
 /// Минимальная конфигурация для открытия логов
-struct LogFileQueueConf<LOG,FILE,ERR,FOpen,FFind,FValidate,FInit>
+pub struct LogFileQueueConf<LOG,FILE,ERR,FOpen,FFind,FValidate,FInit>
 where 
     LOG:Clone,
     FILE:Clone,
@@ -33,22 +33,22 @@ where
     FInit: Fn() -> Result<(FILE,LOG), ERR>,
 {
     /// Поиск лог файлов
-    find_files: FFind,
+    pub find_files: FFind,
 
     /// Открытие лог файла
-    open_log_file: FOpen,
+    pub open_log_file: FOpen,
 
     /// Валидация открытых лог файлов
-    validate: FValidate,
+    pub validate: FValidate,
 
     /// Первичная инициализация
-    init: FInit,
+    pub init: FInit,
 
-    _p: PhantomData<(LOG,FILE,ERR)>
+    pub _p: PhantomData<(LOG,FILE,ERR)>
 }
 
 /// Открытые лог файлы
-struct LogFilesOpenned<LOG,FILE>
+pub struct LogFilesOpenned<LOG,FILE>
 where
     LOG:Clone,
 {
