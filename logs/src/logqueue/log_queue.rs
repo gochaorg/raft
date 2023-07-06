@@ -1,6 +1,5 @@
 use std::marker::PhantomData;
 
-use super::log_id::LogQueueFileId;
 use super::log_switch::{
     LogSwitching,
     LogQueueState
