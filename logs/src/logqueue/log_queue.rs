@@ -1,6 +1,6 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::sync::{RwLock, Arc};
-use std::sync::atomic::AtomicBool;
 
 use super::log_switch::{
     LogSwitching,
@@ -12,14 +12,23 @@ use super::logs_open::{
 };
 
 /// Очередь логов
-struct LogFileQueue<FILE,LOG,ERR,LOGSwitch> 
+pub struct LogFileQueue<FILE,LOG,ERR,LOGSwitch> 
 where
     LOG: Clone,
     LOGSwitch: LogSwitching<(FILE,LOG),ERR>,
 {
+    /// Список файлов
     files: Vec<(FILE,LOG)>,
+
+    /// Актуальный лог
     tail: (FILE,LOG),
+
+    /// Переключение лог файла
+    #[allow(dead_code)]
     switching: LOGSwitch,
+
+    //log_id_to_log: RefCell<HashMap<ID,(FILE,LOG)>>,
+
     _p: PhantomData<ERR>
 }
 
@@ -29,7 +38,16 @@ where
     FILE:Clone,
     LOGSwitch: LogSwitching<(FILE,LOG),ERR> + Clone,
 {
-    fn switch( &mut self ) -> Result<(),ERR> {
+    pub fn new(
+        files: Vec<(FILE,LOG)>,
+        tail: (FILE,LOG),
+        switching: LOGSwitch,
+    ) -> Self {
+        Self { files: files, tail: tail, switching: switching, _p: PhantomData.clone() }
+    }
+
+    /// Переключение лога
+    pub fn switch( &mut self ) -> Result<(),ERR> {
         let mut s = self.switching.clone();
         let _ = s.switch(self)?;
         Ok(())
@@ -110,6 +128,9 @@ where
 
 #[test]
 fn log_queue_conf_test() {
+    use std::sync::Arc;
+    use std::sync::atomic::AtomicBool;
+
     use super::log_seq_verifier::test::IdTest;
     use super::log_seq_verifier::OrderedLogs;
     use super::logs_open::LogFileQueueConf;
