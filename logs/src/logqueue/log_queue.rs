@@ -13,6 +13,8 @@ use super::logs_open::{
     LogQueueOpenned as LogOpened,
 };
 
+use super::log_api::*;
+
 /// Очередь логов
 pub struct LogFileQueue<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf> 
 where
@@ -37,6 +39,9 @@ where
     /// Кеш ид - лог файл
     log_id_to_log: RefCell<Option<HashMap<ID,(FILE,LOG)>>>,
 
+    /// Очередность id логов
+    log_id_order: RefCell<Option<Vec<ID>>>,
+
     _p: PhantomData<ERR>
 }
 
@@ -59,6 +64,7 @@ where
             tail: tail, 
             switching: switching, 
             log_id_to_log: RefCell::new(None),
+            log_id_order: RefCell::new(None),
             id_of: id_of,
             _p: PhantomData.clone() 
         }
@@ -75,29 +81,105 @@ where
     pub fn invalidate_cache( &self ) {
         let mut r = self.log_id_to_log.borrow_mut();
         *r = None;
+
+        let mut r = self.log_id_order.borrow_mut();
+        *r = None;
     }
 
-    pub fn find_log( &self, id:ID ) -> Result<Option<(FILE,LOG)>,ERR> {
-        let cache = self.log_id_to_log.borrow_mut();
-        if cache.is_none() {
-            let mut res : Option<(FILE,LOG)> = None;
-            // rebuild cache
+    // пересоздание кеша, если необходимо и обход кеша
+    fn log_id_map_cache_read<R,F>( &self, default:R, consume:F ) -> Result<R,ERR>
+    where
+        R: Sized,
+        F: for <'a> Fn(&'a HashMap<ID,(FILE,LOG)>) -> R,
+    {
+        let mut cache_opt = self.log_id_to_log.borrow_mut();
+        if cache_opt.is_none() {
             let mut cache : HashMap<ID,(FILE,LOG)> = HashMap::new();
             for file_log in &self.files() {
                 let found_id = (self.id_of)(file_log.clone())?;
-                if id == found_id {
-                    res = Some(file_log.clone());
-                }
                 cache.insert(found_id, file_log.clone());
             }
-
-            let mut x = self.log_id_to_log.borrow_mut();
-            *x = Some(cache);
-
-            return Ok(res);
+            *cache_opt = Some(cache);
         }
-        let exists = cache.as_ref().and_then(|z| z.get(&id)).map(|x| x.clone());
-        Ok(exists)
+
+        Ok(cache_opt.as_ref().map(|x| {  
+            consume(x)
+        }).unwrap_or(default))
+    }
+
+    // пересоздание кеша, если необходимо и обход кеша
+    fn log_order_cache_read<R,F>( &self, default:R, consume:F ) -> Result<R,ERR>
+    where
+        R: Sized,
+        F: for <'a> Fn(&'a Vec<ID>) -> R
+    {
+        let mut cache_opt = self.log_id_order.borrow_mut();
+        if cache_opt.is_none() {
+            let mut cache: Vec<ID> = Vec::new();
+            for file_log in &self.files() {
+                let id = (self.id_of)(file_log.clone())?;
+                cache.push(id);
+            }
+            *cache_opt = Some(cache);
+        }
+
+        Ok(cache_opt.as_ref().map(|x| consume(x)).unwrap_or(default))
+    }
+
+    /// Поиск лог файла по его ID
+    /// 
+    /// Аргументы
+    /// ==============
+    /// - `id` идентификатор
+    /// 
+    /// Результат
+    /// =============
+    /// лог
+    pub fn find_log( &self, id:ID ) -> Result<Option<(FILE,LOG)>,ERR> {
+        self.log_id_map_cache_read(
+            None, 
+            |cache| {
+                cache.get(&id).map(|i|i.clone())
+            }
+        )
+    }
+
+    /// Получение ID лога, относительно указаного
+    /// 
+    /// Аргументы
+    /// ==============
+    /// - `id` идентификатор
+    /// - `offset` смещение
+    ///    - `0` - возвращает сам аргумент `id`
+    ///    - `-1` - предшедствующий указаному
+    ///    - `1` - следующий за указаным
+    /// 
+    /// Результат
+    /// =============
+    /// идентификатор относительно указанного
+    pub fn offset_log_id( &self, id:ID, offset: i64) -> Result<Option<ID>, ERR> {
+        if offset == 0i64 { return Ok(Some(id.clone())); }
+
+        let idx = self.log_order_cache_read(None, |ids| {
+            ids.iter().enumerate()
+                .find(|(_,found_id)| id == **found_id )
+                .map(|(idx,_)| idx)
+        })?;
+
+        if idx.is_none() { return Ok(None); }
+        let idx = idx.unwrap();
+
+        let target = (idx as i64) + offset;
+        if target < 0 { return Ok(None); }
+        let target = target as usize;
+
+        self.log_order_cache_read(None, |ids| {
+            if target >= ids.len() {
+                None
+            } else {
+                Some(ids[target].clone())
+            }
+        })
     }
 }
 
