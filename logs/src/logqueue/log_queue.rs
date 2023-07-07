@@ -1,7 +1,9 @@
+use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
+use super::log_id::LogQueueFileId;
 use super::log_switch::{
     LogSwitching,
     LogQueueState
@@ -12,10 +14,12 @@ use super::logs_open::{
 };
 
 /// Очередь логов
-pub struct LogFileQueue<FILE,LOG,ERR,LOGSwitch> 
+pub struct LogFileQueue<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf> 
 where
     LOG: Clone,
     LOGSwitch: LogSwitching<(FILE,LOG),ERR>,
+    ID: LogQueueFileId,
+    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,ERR> + Clone,
 {
     /// Список файлов
     files: Vec<(FILE,LOG)>,
@@ -27,23 +31,37 @@ where
     #[allow(dead_code)]
     switching: LOGSwitch,
 
-    //log_id_to_log: RefCell<HashMap<ID,(FILE,LOG)>>,
+    /// Получение идентификатора лога
+    id_of: LOGIdOf,
+
+    /// Кеш ид - лог файл
+    log_id_to_log: RefCell<Option<HashMap<ID,(FILE,LOG)>>>,
 
     _p: PhantomData<ERR>
 }
 
-impl<FILE,LOG,ERR,LOGSwitch> LogFileQueue<FILE,LOG,ERR,LOGSwitch> 
+impl<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf> LogFileQueue<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf> 
 where
+    ID: LogQueueFileId,
     LOG:Clone,
     FILE:Clone,
     LOGSwitch: LogSwitching<(FILE,LOG),ERR> + Clone,
+    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,ERR> + Clone,
 {
     pub fn new(
         files: Vec<(FILE,LOG)>,
         tail: (FILE,LOG),
         switching: LOGSwitch,
+        id_of: LOGIdOf
     ) -> Self {
-        Self { files: files, tail: tail, switching: switching, _p: PhantomData.clone() }
+        Self { 
+            files: files, 
+            tail: tail, 
+            switching: switching, 
+            log_id_to_log: RefCell::new(None),
+            id_of: id_of,
+            _p: PhantomData.clone() 
+        }
     }
 
     /// Переключение лога
@@ -52,13 +70,44 @@ where
         let _ = s.switch(self)?;
         Ok(())
     }
+
+    /// Сброс кеша
+    pub fn invalidate_cache( &self ) {
+        let mut r = self.log_id_to_log.borrow_mut();
+        *r = None;
+    }
+
+    pub fn find_log( &self, id:ID ) -> Result<Option<(FILE,LOG)>,ERR> {
+        let cache = self.log_id_to_log.borrow_mut();
+        if cache.is_none() {
+            let mut res : Option<(FILE,LOG)> = None;
+            // rebuild cache
+            let mut cache : HashMap<ID,(FILE,LOG)> = HashMap::new();
+            for file_log in &self.files() {
+                let found_id = (self.id_of)(file_log.clone())?;
+                if id == found_id {
+                    res = Some(file_log.clone());
+                }
+                cache.insert(found_id, file_log.clone());
+            }
+
+            let mut x = self.log_id_to_log.borrow_mut();
+            *x = Some(cache);
+
+            return Ok(res);
+        }
+        let exists = cache.as_ref().and_then(|z| z.get(&id)).map(|x| x.clone());
+        Ok(exists)
+    }
 }
 
-impl<FILE,LOG,ERR,LOGSwitch> LogOpened for LogFileQueue<FILE,LOG,ERR,LOGSwitch>
+impl<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf> LogOpened for LogFileQueue<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf>
 where
+    ID: LogQueueFileId,
     LOG:Clone,
     FILE:Clone,
     LOGSwitch: LogSwitching<(FILE,LOG),ERR>,
+    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,ERR> + Clone,
 {
     type LogFile = (FILE,LOG);
     type LogFiles = Vec<(FILE,LOG)>;
@@ -74,17 +123,20 @@ where
     }
 }
 
-impl<FILE,LOG,ERR,LOGSwitch> LogQueueState<(FILE,LOG)> for LogFileQueue<FILE,LOG,ERR,LOGSwitch> 
+impl<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf> LogQueueState<(FILE,LOG)> for LogFileQueue<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf> 
 where
+    ID: LogQueueFileId,
     FILE: Clone,
     LOG: Clone,
-    LOGSwitch: LogSwitching<(FILE,LOG),ERR>,
+    LOGSwitch: LogSwitching<(FILE,LOG),ERR> + Clone,
+    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,ERR> + Clone,
 {
     type ERR = ERR;
     fn get_current_file( &self ) -> Result<(FILE,LOG),Self::ERR> {
         Ok( self.tail.clone() )
     }
     fn switch_current_file( &mut self, new_file: (FILE,LOG) ) -> Result<(),Self::ERR> {
+        self.invalidate_cache();
         self.files.push(new_file.clone());
         self.tail = new_file;
         Ok(())
@@ -92,37 +144,42 @@ where
 }
 
 /// Конфигурация логов
-struct LogQueueConf<FILE,LOG,ERR,LOGOpenCfg,LOGOpenRes,LOGSwitch>
+struct LogQueueConf<ID,FILE,LOG,ERR,LOGOpenCfg,LOGOpenRes,LOGSwitch,LOGIdOf>
 where
+    ID: LogQueueFileId,
     FILE: Clone,
     LOGOpenRes: LogOpened<LogFile = (FILE,LOG), LogFiles = Vec<(FILE,LOG)>>,
     LOGOpenCfg: LogOpenConf<Open = LOGOpenRes, OpenError = ERR>,
     LOGSwitch: LogSwitching<(FILE,LOG),ERR> + Clone,
+    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,ERR> + Clone,
 {
     log_open: LOGOpenCfg,
     log_switch: LOGSwitch,
+    id_of: LOGIdOf,
 
-    _p: PhantomData<ERR>
+    _p: PhantomData<(ERR,ID)>
 }
 
-impl<FILE,LOG,ERR,LOGOpenCfg,LOGOpenRes,LOGSwitch> 
-    LogQueueConf<FILE,LOG,ERR,LOGOpenCfg,LOGOpenRes,LOGSwitch> 
+impl<ID,FILE,LOG,ERR,LOGOpenCfg,LOGOpenRes,LOGSwitch,LOGIdOf> 
+    LogQueueConf<ID,FILE,LOG,ERR,LOGOpenCfg,LOGOpenRes,LOGSwitch,LOGIdOf> 
 where
+    ID: LogQueueFileId,
     FILE: Clone,
     LOG: Clone,
     LOGOpenRes: LogOpened<LogFile = (FILE,LOG), LogFiles = Vec<(FILE,LOG)>>,
     LOGOpenCfg: LogOpenConf<Open = LOGOpenRes, OpenError = ERR>,
     LOGSwitch: LogSwitching<(FILE,LOG),ERR> + Clone,
+    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,ERR> + Clone,
 {
     /// Открытие логов
-    pub fn open( &self ) -> Result<LogFileQueue<FILE,LOG,ERR,LOGSwitch>,ERR> {
+    pub fn open( &self ) -> Result<LogFileQueue<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf>,ERR> {
         let opened = self.log_open.open()?;
-        Ok(LogFileQueue {
-            files: opened.files(),
-            tail: opened.tail(),
-            switching: self.log_switch.clone(),
-            _p: PhantomData.clone(),
-        })
+        Ok(LogFileQueue::new(
+            opened.files(), 
+            opened.tail(), 
+            self.log_switch.clone(),
+            self.id_of.clone(),
+        ))
     }
 }
 
@@ -176,13 +233,14 @@ fn log_queue_conf_test() {
         _p: PhantomData.clone(),
     };
 
-    let log_queue_conf : LogQueueConf<IdTest,IdTest,String,_,_,_> = LogQueueConf { 
+    let log_queue_conf : LogQueueConf<IdTest,IdTest,IdTest,String,_,_,_,_> = LogQueueConf { 
         log_open: open_conf, 
         log_switch: log_switch, 
+        id_of: |f| Ok(IdTest::new(None)),
         _p: PhantomData.clone(),
     };
 
-    let mut log_queue : LogFileQueue<IdTest,IdTest,String,_> = log_queue_conf.open().unwrap();
+    let mut log_queue : LogFileQueue<IdTest,IdTest,IdTest,String,_,_> = log_queue_conf.open().unwrap();
 
     println!("before");
 
