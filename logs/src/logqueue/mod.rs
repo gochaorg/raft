@@ -65,3 +65,6 @@ mod log_switch;
 
 /// Очередь лог файлов
 mod log_queue;
+
+/// Ошибки
+mod err;

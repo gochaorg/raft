@@ -49,9 +49,6 @@ pub trait LogQueue<Err,RecordId>: LogNavigationNear<Err,RecordId> {
 
     /// Получение id последней записи
     fn get_last_record( &self ) -> Result<Option<RecordId>, Err>;
-
-    /// Получение id первой записи
-    fn get_first_record( &self ) -> Result<Option<RecordId>, Err>;
 }
 
 /// Выполняет добавление записи
