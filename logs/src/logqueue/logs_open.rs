@@ -126,6 +126,7 @@ where
     }
 }
 
+#[cfg(test)]
 mod test {
     #[allow(unused_imports)]
     use std::marker::PhantomData;

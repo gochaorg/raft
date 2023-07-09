@@ -159,6 +159,7 @@ where
     Ok(OrderedLogs{files: ordered_files, tail:last})
 }
 
+#[cfg(test)]
 pub mod test {
     use uuid::Uuid;
     use super::*;
