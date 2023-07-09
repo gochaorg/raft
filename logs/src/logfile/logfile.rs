@@ -566,7 +566,7 @@ where
     }
 
     /// Добавление данных в лог
-    pub fn append_data(&mut self, block_opt: &BlockOptions, data: &[u8]) -> Result<(), LogErr> {
+    pub fn append_data(&mut self, block_opt: &BlockOptions, data: &[u8]) -> Result<BlockId, LogErr> {
         {
             let mut metric = self.counters.write()?;
             metric.inc("append_data");
@@ -594,7 +594,7 @@ where
 
         tracker.add("append_data", Instant::now().duration_since(t0));
 
-        Ok(res)
+        Ok(block.head.block_id)
     }
 }
 

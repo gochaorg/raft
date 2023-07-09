@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::sync::{RwLock, Arc};
 
 use crate::logfile::{LogFile, FlatBuff, LogErr};
 use crate::logfile::block::{BlockId, Block, BlockOptions};
@@ -17,6 +18,7 @@ use super::logs_open::{
 
 use super::log_api::*;
 
+/// Очередь логов
 pub trait LogFileQueue<ERR,ID,FILE,LOG>: LogOpened<LogFiles = Vec<(FILE,LOG)>, LogFile = (FILE,LOG)> 
 {
     /// Переключение лога
@@ -479,14 +481,14 @@ enum LogReadingErr {
     LogNotFound
 }
 
-impl <ERR,LogId,FILE,BUFF> LogReading<ERR, LogRecordPtr<LogId>, Block, BlockOptions>
+impl <ERR,LogId,FILE,BUFF> LogReading<ERR, LogRecordPtr<LogId>, Box<Vec<u8>>, BlockOptions>
 for dyn LogFileQueue<ERR, LogId, FILE, LogFile<BUFF>>
 where
     LogId: LogQueueFileId,
     BUFF: FlatBuff,
     ERR: From<LogReadingErr> + From<LogErr>
 {
-    fn read_record( &self, record_id: LogRecordPtr<LogId> ) -> Result<(Block,BlockOptions), ERR> {
+    fn read_record( &self, record_id: LogRecordPtr<LogId> ) -> Result<(Box<Vec<u8>>,BlockOptions), ERR> {
         match self.find_log(record_id.file_id.clone())? {
             None => {
                 return Err( LogReadingErr::LogNotFound.into() )
@@ -494,7 +496,7 @@ where
             Some( (_,log) ) => {
                 let res = log.get_block(record_id.block_id.clone())?;
                 let opts = res.head.block_options.clone();
-                Ok((res, opts))
+                Ok((res.data, opts))
             }
         }
     }
@@ -509,5 +511,28 @@ where
                 Ok(res.head.block_options)
             }
         }
+    }
+}
+
+struct Record<'a> {
+    data: &'a [u8],
+    options: BlockOptions,
+}
+
+impl <'a,ERR,LogId,FILE,BUFF> LogWriting<ERR,LogRecordPtr<LogId>,Record<'a>>
+for dyn LogFileQueue<ERR, LogId, FILE, LogFile<BUFF>>
+where
+    LogId: LogQueueFileId,
+    BUFF: FlatBuff,
+    ERR: From<LogErr>
+{
+    fn write( &self, record:Record<'a> ) -> Result<LogRecordPtr<LogId>,ERR> {
+        let (file,mut tail) = self.tail();
+        let block_id = tail.append_data(&record.options, record.data)?;
+        let log_id = self.log_id_of(&(file,tail))?;
+        Ok(LogRecordPtr {
+            file_id: log_id,
+            block_id: block_id
+        })
     }
 }
