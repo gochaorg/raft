@@ -393,9 +393,10 @@ where
     fn get_next_record( &self, record_id: LogRecordPtr<LogId> ) -> Result<Option<LogRecordPtr<LogId>>,ERR> {
         let res = 
         self.find_log(record_id.log_file_id.clone())?.and_then(|(_file,log)| {
-            let count = log.count().ok()?;
+            let count = log.count().ok()?; // TODO здесь теряется информация о ошибке
             if record_id.block_id.value() >= (count-1) {
-                self.offset_log_id(record_id.log_file_id.clone(), 1).ok()?.and_then(|next_log_id| {
+                self.offset_log_id(record_id.log_file_id.clone(), 1).ok()? // TODO здесь теряется информация о ошибке
+                .and_then(|next_log_id| {
                     Some(LogRecordPtr{ 
                         log_file_id: next_log_id,
                         block_id: BlockId::new(0)
@@ -412,6 +413,29 @@ where
     }
 
     fn get_previous_record( &self, record_id: LogRecordPtr<LogId> ) -> Result<Option<LogRecordPtr<LogId>>,ERR> {
-        todo!()
+        let result =
+        if record_id.block_id.value() == 0 {
+            self.offset_log_id(record_id.log_file_id.clone(), -1)?
+            .and_then(|prev_log_id|{
+                self.find_log(prev_log_id.clone()).ok()? // TODO здесь теряется информация о ошибке
+                .and_then(|(_,log)|{
+                    let count = log.count().ok()?; // TODO здесь теряется информация о ошибке
+                    if count > 0 {
+                        Some(LogRecordPtr{
+                            log_file_id: prev_log_id.clone(),
+                            block_id: BlockId::new(count-1)
+                        })
+                    } else {
+                        None
+                    }
+                })
+            })
+        } else {
+            Some(LogRecordPtr{
+                log_file_id: record_id.log_file_id.clone(),
+                block_id: BlockId::new(record_id.block_id.value()-1)
+            })
+        };
+        Ok(result)
     }
 }
