@@ -17,7 +17,7 @@ use super::logs_open::{
 
 use super::log_api::*;
 
-pub trait LogFileQueue<ERR,ID,FILE,LOG>//: LogOpened<LogFiles = Vec<(FILE,LOG)>, LogFile = (FILE,LOG)> 
+pub trait LogFileQueue<ERR,ID,FILE,LOG>: LogOpened<LogFiles = Vec<(FILE,LOG)>, LogFile = (FILE,LOG)> 
 {
     /// Переключение лога
     fn switch( &mut self ) -> Result<(),ERR>;
@@ -47,6 +47,9 @@ pub trait LogFileQueue<ERR,ID,FILE,LOG>//: LogOpened<LogFiles = Vec<(FILE,LOG)>,
     /// =============
     /// идентификатор относительно указанного
     fn offset_log_id( &self, id:ID, offset: i64) -> Result<Option<ID>, ERR>;
+
+    /// Получение идентификатора лог файла
+    fn log_id_of( &self, log_file: &(FILE,LOG) ) -> Result<ID,ERR>;
 }
 
 /// Очередь логов
@@ -254,6 +257,10 @@ where
             }
         })
     }
+
+    fn log_id_of( &self, log_file: &(FILE,LOG) ) -> Result<ID,ERR> {
+        (self.id_of)( log_file.clone() )
+    }
 }
 
 /// Конфигурация логов
@@ -374,12 +381,16 @@ fn log_queue_conf_test() {
     assert!(oldnew_id_matched.load(std::sync::atomic::Ordering::SeqCst));
 }
 
+/// Указатель на запись в log queue
 #[derive(Clone,Debug,PartialEq,Eq)]
 struct LogRecordPtr<LogId> 
 where
     LogId: LogQueueFileId
 {
-    pub log_file_id: LogId,
+    /// Идентификатор лог - файла
+    pub file_id: LogId,
+
+    /// Идентификатор записи в лог файле
     pub block_id: BlockId,
 }
 
@@ -390,21 +401,21 @@ where
     BUFF: FlatBuff,
     ERR: From<LogErr>,
 {
-    fn get_next_record( &self, record_id: LogRecordPtr<LogId> ) -> Result<Option<LogRecordPtr<LogId>>,ERR> {
+    fn next_record( &self, record_id: LogRecordPtr<LogId> ) -> Result<Option<LogRecordPtr<LogId>>,ERR> {
         let res = 
-        self.find_log(record_id.log_file_id.clone())?.and_then(|(_file,log)| {
+        self.find_log(record_id.file_id.clone())?.and_then(|(_file,log)| {
             let count = log.count().ok()?; // TODO здесь теряется информация о ошибке
             if record_id.block_id.value() >= (count-1) {
-                self.offset_log_id(record_id.log_file_id.clone(), 1).ok()? // TODO здесь теряется информация о ошибке
+                self.offset_log_id(record_id.file_id.clone(), 1).ok()? // TODO здесь теряется информация о ошибке
                 .and_then(|next_log_id| {
                     Some(LogRecordPtr{ 
-                        log_file_id: next_log_id,
+                        file_id: next_log_id,
                         block_id: BlockId::new(0)
                     })
                 })
             } else {
                 Some(LogRecordPtr { 
-                    log_file_id: record_id.log_file_id.clone(), 
+                    file_id: record_id.file_id.clone(), 
                     block_id: BlockId::new(record_id.block_id.value()+1)
                 })
             }
@@ -412,17 +423,17 @@ where
         Ok(res)
     }
 
-    fn get_previous_record( &self, record_id: LogRecordPtr<LogId> ) -> Result<Option<LogRecordPtr<LogId>>,ERR> {
+    fn previous_record( &self, record_id: LogRecordPtr<LogId> ) -> Result<Option<LogRecordPtr<LogId>>,ERR> {
         let result =
         if record_id.block_id.value() == 0 {
-            self.offset_log_id(record_id.log_file_id.clone(), -1)?
+            self.offset_log_id(record_id.file_id.clone(), -1)?
             .and_then(|prev_log_id|{
                 self.find_log(prev_log_id.clone()).ok()? // TODO здесь теряется информация о ошибке
                 .and_then(|(_,log)|{
                     let count = log.count().ok()?; // TODO здесь теряется информация о ошибке
                     if count > 0 {
                         Some(LogRecordPtr{
-                            log_file_id: prev_log_id.clone(),
+                            file_id: prev_log_id.clone(),
                             block_id: BlockId::new(count-1)
                         })
                     } else {
@@ -432,10 +443,34 @@ where
             })
         } else {
             Some(LogRecordPtr{
-                log_file_id: record_id.log_file_id.clone(),
+                file_id: record_id.file_id.clone(),
                 block_id: BlockId::new(record_id.block_id.value()-1)
             })
         };
         Ok(result)
+    }
+}
+
+impl <ERR,LogId,FILE,BUFF> LogNavigateLast<ERR,LogRecordPtr<LogId>>
+for dyn LogFileQueue<ERR, LogId, FILE, LogFile<BUFF>>
+where
+    LogId: LogQueueFileId,
+    BUFF: FlatBuff,
+    ERR: From<LogErr>,
+{
+    fn last_record( &self ) -> Result<Option<LogRecordPtr<LogId>>,ERR> {
+        let (file,tail) = self.tail();
+        let cnt = tail.count()?;
+        if cnt==0 {
+            return Ok(None)
+        }
+
+        let lfile = (file,tail);
+        let log_id = self.log_id_of(&lfile)?;
+        
+        Ok(Some(LogRecordPtr {
+            file_id: log_id,
+            block_id: BlockId::new(cnt-1)
+        }))
     }
 }

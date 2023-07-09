@@ -1,14 +1,22 @@
+use super::log_id::LogQueueFileId;
+
 /// Навигация по смеженным записям
 /// 
 /// Типы
 /// - `Err` - Ошибки
 /// - `RecordId` - Идентификатор записи
-pub trait LogNavigationNear<Err,RecordId> {
+pub trait LogNavigationNear<ERR,RecordId> {
     /// Получение id следующей записи
-    fn get_next_record( &self, record_id: RecordId ) -> Result<Option<RecordId>,Err>;
+    fn next_record( &self, record_id: RecordId ) -> Result<Option<RecordId>,ERR>;
 
     /// Получение id предыдущей записи
-    fn get_previous_record( &self, record_id: RecordId ) -> Result<Option<RecordId>,Err>;    
+    fn previous_record( &self, record_id: RecordId ) -> Result<Option<RecordId>,ERR>;    
+}
+
+/// Навигация в конец
+pub trait LogNavigateLast<ERR, RecordId> {
+    /// Получение последней записи в log queue
+    fn last_record( &self ) -> Result<Option<RecordId>,ERR>;
 }
 
 /// Лог - хранит в себе сумму лог файлов [crate::logfile]
@@ -16,7 +24,9 @@ pub trait LogNavigationNear<Err,RecordId> {
 /// Типы
 /// - `Err` - Тип ошибки
 /// - `RecordId` - Идентификатор записи
-pub trait LogQueue<Err,RecordId>: LogNavigationNear<Err,RecordId> {
+pub trait LogQueue<Err,RecordId,LogId>: 
+    LogNavigationNear<Err,RecordId>
+{
     /// Запись
     type Record : LogRecord<RecordOption = Self::RecordOption>;
 
