@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::num::ParseIntError;
 use std::str::FromStr;
 use uuid::Uuid;
-use crate::logfile::block::{String32, BlockErr};
+use crate::logfile::block::{String32, BlockErr, BlockId};
 use crate::logfile::block::Block;
 use std::hash::Hash;
 
@@ -24,8 +24,14 @@ where
 /// Идентификатор лог файла
 pub trait LogQueueFileId : Eq + std::fmt::Display + Clone + Debug + BlockReader + BlockWriter + Hash {
     type ID: Eq + Clone;
+
+    /// Получение идентификатора
     fn id( &self ) -> Self::ID;
+
+    /// Получение идентификатора предыдущего блока
     fn previous( &self ) -> Option<Self::ID>;
+
+    /// Генерация нового идентификатора
     fn new( prev:Option<Self::ID> ) -> Self;
 }
 
@@ -251,3 +257,19 @@ impl BlockReader for LogQueueFileUUID {
         }
     }
 }
+
+
+/// Указатель на запись в log queue
+#[derive(Clone,Debug,PartialEq,Eq)]
+pub struct RecID<LogId> 
+where
+    LogId: LogQueueFileId
+{
+    /// Идентификатор лог - файла
+    pub file_id: LogId,
+
+    /// Идентификатор записи в лог файле
+    pub block_id: BlockId,
+}
+
+

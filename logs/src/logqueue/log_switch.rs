@@ -18,8 +18,10 @@ pub struct OleNewId<'a, ID> {
     pub new_id: &'a ID,
 }
 
+/// Переключение текущего лог файла на новый
 pub trait LogSwitching<FILE,ERR> 
 {
+    /// Переключение лог файла
     fn switch<S:LogQueueState<FILE,ERR = ERR>>( &mut self, log_state: &mut S ) -> Result<(),ERR>;
 }
 
@@ -41,8 +43,6 @@ where
 
     /// Создание пустого лог файла
     pub new_file: FNewFile,
-
-    pub _p : PhantomData<(FILE,ID,ERR)>
 }
 
 impl<FILE,ERR,ID,FReadId,FWriteId,FNewFile> LogSwitching<FILE,ERR> 

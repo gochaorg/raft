@@ -16,6 +16,7 @@ where
     fn not_found_next_log( id: &ID, logs:Vec<&(ITEM,ID)> ) -> ERR;
 }
 
+/// Извлечение и лог файла - идентификатора
 pub trait IdOf<A,ID,ERR> {
     /// получить идентификатор-ссылку
     fn id_of(a:&A) -> Result<ID,ERR>;

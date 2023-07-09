@@ -1,12 +1,10 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::marker::PhantomData;
-use std::sync::{RwLock, Arc};
 
 use crate::logfile::{LogFile, FlatBuff, LogErr};
-use crate::logfile::block::{BlockId, Block, BlockOptions};
+use crate::logfile::block::{BlockId, BlockOptions};
 
-use super::log_id::LogQueueFileId;
+use super::log_id::*;
 use super::log_switch::{
     LogSwitching,
     LogQueueState
@@ -80,8 +78,6 @@ where
 
     /// Очередность id логов
     log_id_order: RefCell<Option<Vec<ID>>>,
-
-    _p: PhantomData<ERR>
 }
 
 impl<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf> LogFileQueueImpl<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf> 
@@ -113,7 +109,6 @@ where
             log_id_to_log: RefCell::new(None),
             log_id_order: RefCell::new(None),
             id_of: id_of,
-            _p: PhantomData.clone() 
         }
     }
 
@@ -266,7 +261,7 @@ where
 }
 
 /// Конфигурация логов
-struct LogQueueConf<ID,FILE,LOG,ERR,LOGOpenCfg,LOGOpenRes,LOGSwitch,LOGIdOf>
+pub struct LogQueueConf<ID,FILE,LOG,ERR,LOGOpenCfg,LOGOpenRes,LOGSwitch,LOGIdOf>
 where
     ID: LogQueueFileId,
     FILE: Clone,
@@ -275,11 +270,9 @@ where
     LOGSwitch: LogSwitching<(FILE,LOG),ERR> + Clone,
     LOGIdOf: Fn((FILE,LOG)) -> Result<ID,ERR> + Clone,
 {
-    log_open: LOGOpenCfg,
-    log_switch: LOGSwitch,
-    id_of: LOGIdOf,
-
-    _p: PhantomData<(ERR,ID)>
+    pub log_open: LOGOpenCfg,
+    pub log_switch: LOGSwitch,
+    pub id_of: LOGIdOf,
 }
 
 impl<ID,FILE,LOG,ERR,LOGOpenCfg,LOGOpenRes,LOGSwitch,LOGIdOf> 
@@ -337,7 +330,6 @@ fn log_queue_conf_test() {
             tail: (id3.clone(),id3.clone())
         }),
         init: || Ok( (id0.clone(),id0.clone()) ),
-        _p: PhantomData.clone()
     };
 
     let log_switch : LogSwitcher<(IdTest,IdTest),IdTest,String,_,_,_> = LogSwitcher { 
@@ -352,14 +344,12 @@ fn log_queue_conf_test() {
             let id = IdTest::new(None);
             Ok( (id.clone(), id.clone()) )
         }, 
-        _p: PhantomData.clone(),
     };
 
     let log_queue_conf : LogQueueConf<IdTest,IdTest,IdTest,String,_,_,_,_> = LogQueueConf { 
         log_open: open_conf, 
         log_switch: log_switch, 
         id_of: |f| Ok(IdTest::new(None)),
-        _p: PhantomData.clone(),
     };
 
     let mut log_queue : LogFileQueueImpl<IdTest,IdTest,IdTest,String,_,_> = log_queue_conf.open().unwrap();
@@ -383,154 +373,24 @@ fn log_queue_conf_test() {
     assert!(oldnew_id_matched.load(std::sync::atomic::Ordering::SeqCst));
 }
 
-/// Указатель на запись в log queue
-#[derive(Clone,Debug,PartialEq,Eq)]
-struct LogRecordPtr<LogId> 
-where
-    LogId: LogQueueFileId
-{
-    /// Идентификатор лог - файла
-    pub file_id: LogId,
 
-    /// Идентификатор записи в лог файле
-    pub block_id: BlockId,
+pub struct Record<'a> {
+    pub data: &'a [u8],
+    pub options: BlockOptions,
 }
 
-impl<ERR,LogId, FILE, BUFF> LogNavigationNear<ERR,LogRecordPtr<LogId>> 
-for dyn LogFileQueue<ERR, LogId, FILE, LogFile<BUFF>>
-where
-    LogId: LogQueueFileId,
-    BUFF: FlatBuff,
-    ERR: From<LogErr>,
-{
-    fn next_record( &self, record_id: LogRecordPtr<LogId> ) -> Result<Option<LogRecordPtr<LogId>>,ERR> {
-        let res = 
-        self.find_log(record_id.file_id.clone())?.and_then(|(_file,log)| {
-            let count = log.count().ok()?; // TODO здесь теряется информация о ошибке
-            if record_id.block_id.value() >= (count-1) {
-                self.offset_log_id(record_id.file_id.clone(), 1).ok()? // TODO здесь теряется информация о ошибке
-                .and_then(|next_log_id| {
-                    Some(LogRecordPtr{ 
-                        file_id: next_log_id,
-                        block_id: BlockId::new(0)
-                    })
-                })
-            } else {
-                Some(LogRecordPtr { 
-                    file_id: record_id.file_id.clone(), 
-                    block_id: BlockId::new(record_id.block_id.value()+1)
-                })
-            }
-        });
-        Ok(res)
-    }
-
-    fn previous_record( &self, record_id: LogRecordPtr<LogId> ) -> Result<Option<LogRecordPtr<LogId>>,ERR> {
-        let result =
-        if record_id.block_id.value() == 0 {
-            self.offset_log_id(record_id.file_id.clone(), -1)?
-            .and_then(|prev_log_id|{
-                self.find_log(prev_log_id.clone()).ok()? // TODO здесь теряется информация о ошибке
-                .and_then(|(_,log)|{
-                    let count = log.count().ok()?; // TODO здесь теряется информация о ошибке
-                    if count > 0 {
-                        Some(LogRecordPtr{
-                            file_id: prev_log_id.clone(),
-                            block_id: BlockId::new(count-1)
-                        })
-                    } else {
-                        None
-                    }
-                })
-            })
-        } else {
-            Some(LogRecordPtr{
-                file_id: record_id.file_id.clone(),
-                block_id: BlockId::new(record_id.block_id.value()-1)
-            })
-        };
-        Ok(result)
-    }
-}
-
-impl <ERR,LogId,FILE,BUFF> LogNavigateLast<ERR,LogRecordPtr<LogId>>
-for dyn LogFileQueue<ERR, LogId, FILE, LogFile<BUFF>>
-where
-    LogId: LogQueueFileId,
-    BUFF: FlatBuff,
-    ERR: From<LogErr>,
-{
-    fn last_record( &self ) -> Result<Option<LogRecordPtr<LogId>>,ERR> {
-        let (file,tail) = self.tail();
-        let cnt = tail.count()?;
-        if cnt==0 {
-            return Ok(None)
-        }
-
-        let lfile = (file,tail);
-        let log_id = self.log_id_of(&lfile)?;
-        
-        Ok(Some(LogRecordPtr {
-            file_id: log_id,
-            block_id: BlockId::new(cnt-1)
-        }))
-    }
-}
-
-enum LogReadingErr {
-    LogNotFound
-}
-
-impl <ERR,LogId,FILE,BUFF> LogReading<ERR, LogRecordPtr<LogId>, Box<Vec<u8>>, BlockOptions>
-for dyn LogFileQueue<ERR, LogId, FILE, LogFile<BUFF>>
-where
-    LogId: LogQueueFileId,
-    BUFF: FlatBuff,
-    ERR: From<LogReadingErr> + From<LogErr>
-{
-    fn read_record( &self, record_id: LogRecordPtr<LogId> ) -> Result<(Box<Vec<u8>>,BlockOptions), ERR> {
-        match self.find_log(record_id.file_id.clone())? {
-            None => {
-                return Err( LogReadingErr::LogNotFound.into() )
-            },
-            Some( (_,log) ) => {
-                let res = log.get_block(record_id.block_id.clone())?;
-                let opts = res.head.block_options.clone();
-                Ok((res.data, opts))
-            }
-        }
-    }
-
-    fn read_options( &self, record_id: LogRecordPtr<LogId> ) -> Result<BlockOptions, ERR> {
-        match self.find_log(record_id.file_id.clone())? {
-            None => {
-                return Err( LogReadingErr::LogNotFound.into() )
-            },
-            Some( (_,log) ) => {
-                let res = log.get_block_header_read(record_id.block_id.clone())?;
-                Ok(res.head.block_options)
-            }
-        }
-    }
-}
-
-struct Record<'a> {
-    data: &'a [u8],
-    options: BlockOptions,
-}
-
-impl <'a,ERR,LogId,FILE,BUFF> LogWriting<ERR,LogRecordPtr<LogId>,Record<'a>>
+impl <'a,ERR,LogId,FILE,BUFF> LogWriting<ERR,RecID<LogId>,Record<'a>>
 for dyn LogFileQueue<ERR, LogId, FILE, LogFile<BUFF>>
 where
     LogId: LogQueueFileId,
     BUFF: FlatBuff,
     ERR: From<LogErr>
 {
-    fn write( &self, record:Record<'a> ) -> Result<LogRecordPtr<LogId>,ERR> {
+    fn write( &self, record:Record<'a> ) -> Result<RecID<LogId>,ERR> {
         let (file,mut tail) = self.tail();
         let block_id = tail.append_data(&record.options, record.data)?;
         let log_id = self.log_id_of(&(file,tail))?;
-        Ok(LogRecordPtr {
+        Ok(RecID {
             file_id: log_id,
             block_id: block_id
         })

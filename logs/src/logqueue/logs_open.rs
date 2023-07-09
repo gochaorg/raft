@@ -43,8 +43,6 @@ where
 
     /// Первичная инициализация
     pub init: FInit,
-
-    pub _p: PhantomData<(LOG,FILE,ERR)>
 }
 
 /// Открытые лог файлы
@@ -165,7 +163,6 @@ mod test {
                 }                
             ),
             init: || Ok( (id0.clone(),id0.clone()) ),
-            _p: PhantomData.clone()
         };
 
         let open_files:LogFilesOpenned<IdTest,IdTest> = queue_conf.open().unwrap();

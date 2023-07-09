@@ -46,25 +46,39 @@ pub use log_api::*;
 pub mod find_logs;
 
 /// Шаблон пути
-mod path_tmpl;
+pub mod path_tmpl;
 
 /// Генерация нового файла
-mod new_file;
+pub mod new_file;
 
 /// Открытие лог файлов
 mod logs_open;
+pub use logs_open::*;
 
 /// Идентификатор лога
 mod log_id;
+pub use log_id::*;
 
 // Валидация логов
 mod log_seq_verifier;
+pub use log_seq_verifier::*;
 
 /// Переключение лог файла
 mod log_switch;
+pub use log_switch::*;
 
 /// Очередь лог файлов
 mod log_queue;
+pub use log_queue::*;
 
 /// Ошибки
 mod err;
+pub use err::*;
+
+/// чтение очереди и навигация
+mod log_queue_read;
+pub use log_queue_read::*;
+
+/// Запись в очередь
+mod log_queue_write;
+pub use log_queue_write::*;

@@ -1,5 +1,3 @@
-use super::log_id::LogQueueFileId;
-
 /// Навигация по смеженным записям
 /// 
 /// Типы
@@ -28,6 +26,7 @@ pub trait LogReading<ERR,RecordId,Record,RecordOptions> {
     fn read_options( &self, record_id: RecordId ) -> Result<RecordOptions, ERR>;
 }
 
+/// Запись в лог
 pub trait LogWriting<ERR,RecordId,Record> {
     fn write( &self, record:Record ) -> Result<RecordId,ERR>;
 }
