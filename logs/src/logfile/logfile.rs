@@ -556,6 +556,15 @@ where
         Ok(Block { head: head.head, data: data })
     }
 
+    /// Чтение заголовка блока по id
+    pub fn get_block_header_read(&self, block_id: BlockId) -> Result<BlockHeadRead, LogErr> {
+        let mut ptr = Arc::new(RwLock::new(self.clone())).pointer_to_end()?;
+        ptr = ptr.jump(block_id)?;
+        
+        let head = ptr.current_head().clone();
+        Ok(head)
+    }
+
     /// Добавление данных в лог
     pub fn append_data(&mut self, block_opt: &BlockOptions, data: &[u8]) -> Result<(), LogErr> {
         {

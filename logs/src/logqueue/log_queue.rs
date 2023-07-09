@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use crate::logfile::{LogFile, FlatBuff, LogErr};
-use crate::logfile::block::BlockId;
+use crate::logfile::block::{BlockId, Block, BlockOptions};
 
 use super::log_id::LogQueueFileId;
 use super::log_switch::{
@@ -472,5 +472,42 @@ where
             file_id: log_id,
             block_id: BlockId::new(cnt-1)
         }))
+    }
+}
+
+enum LogReadingErr {
+    LogNotFound
+}
+
+impl <ERR,LogId,FILE,BUFF> LogReading<ERR, LogRecordPtr<LogId>, Block, BlockOptions>
+for dyn LogFileQueue<ERR, LogId, FILE, LogFile<BUFF>>
+where
+    LogId: LogQueueFileId,
+    BUFF: FlatBuff,
+    ERR: From<LogReadingErr> + From<LogErr>
+{
+    fn read_record( &self, record_id: LogRecordPtr<LogId> ) -> Result<(Block,BlockOptions), ERR> {
+        match self.find_log(record_id.file_id.clone())? {
+            None => {
+                return Err( LogReadingErr::LogNotFound.into() )
+            },
+            Some( (_,log) ) => {
+                let res = log.get_block(record_id.block_id.clone())?;
+                let opts = res.head.block_options.clone();
+                Ok((res, opts))
+            }
+        }
+    }
+
+    fn read_options( &self, record_id: LogRecordPtr<LogId> ) -> Result<BlockOptions, ERR> {
+        match self.find_log(record_id.file_id.clone())? {
+            None => {
+                return Err( LogReadingErr::LogNotFound.into() )
+            },
+            Some( (_,log) ) => {
+                let res = log.get_block_header_read(record_id.block_id.clone())?;
+                Ok(res.head.block_options)
+            }
+        }
     }
 }

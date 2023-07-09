@@ -19,13 +19,23 @@ pub trait LogNavigateLast<ERR, RecordId> {
     fn last_record( &self ) -> Result<Option<RecordId>,ERR>;
 }
 
+/// Чтение отдельных записей
+pub trait LogReading<ERR,RecordId,Record,RecordOptions> {
+    /// Чтение записи и ее опций
+    fn read_record( &self, record_id: RecordId ) -> Result<(Record,RecordOptions), ERR>;
+
+    /// Чтение опций записи
+    fn read_options( &self, record_id: RecordId ) -> Result<RecordOptions, ERR>;
+}
+
 /// Лог - хранит в себе сумму лог файлов [crate::logfile]
 /// 
 /// Типы
-/// - `Err` - Тип ошибки
+/// - `ERR` - Тип ошибки
 /// - `RecordId` - Идентификатор записи
-pub trait LogQueue<Err,RecordId,LogId>: 
-    LogNavigationNear<Err,RecordId>
+pub trait LogQueue<ERR,RecordId,LogId>: 
+    LogNavigationNear<ERR,RecordId> + 
+    LogNavigateLast<ERR,RecordId>
 {
     /// Запись
     type Record : LogRecord<RecordOption = Self::RecordOption>;
@@ -34,43 +44,40 @@ pub trait LogQueue<Err,RecordId,LogId>:
     type RecordOption;
 
     /// Выполняет добавление записи
-    type LogAppend: LogRecordAppender<Err = Err, RecordId = RecordId>;
+    type LogAppend: LogRecordAppender<ERR = ERR, RecordId = RecordId>;
 
     /// Некий лог файл
     type LogFile;
 
     /// Получение списка лог файлов
-    fn get_log_files( &self ) -> Result<Vec<Self::LogFile>, Err>;
+    fn get_log_files( &self ) -> Result<Vec<Self::LogFile>, ERR>;
 
     /// Переключение активного лог файла
-    fn switch_log_file( &mut self ) -> Result<(), Err>;
+    fn switch_log_file( &mut self ) -> Result<(), ERR>;
 
     /// Добавление записи в лог
-    fn append( &mut self, data: &[u8] ) -> Result<Self::LogAppend, Err>;
+    fn append( &mut self, data: &[u8] ) -> Result<Self::LogAppend, ERR>;
 
     /// Чтение записи из лога
-    fn read_record( &self, record_id: RecordId ) -> Result<Self::Record, Err>;
+    fn read_record( &self, record_id: RecordId ) -> Result<Self::Record, ERR>;
 
     /// Чтение заголовка
-    fn read_header( &self, record_id: RecordId ) -> Result<Self::RecordOption, Err>;
+    fn read_header( &self, record_id: RecordId ) -> Result<Self::RecordOption, ERR>;
 
     /// Подсчет кол-ва записей
-    fn get_records_count( &self ) -> Result<u64, Err>;
-
-    /// Получение id последней записи
-    fn get_last_record( &self ) -> Result<Option<RecordId>, Err>;
+    fn get_records_count( &self ) -> Result<u64, ERR>;
 }
 
 /// Выполняет добавление записи
 pub trait LogRecordAppender {
     /// Ошибки
-    type Err;
+    type ERR;
 
     /// Идентификатор записи
     type RecordId;
 
     /// добавление записи
-    fn run() -> Result<Self::RecordId, Self::Err>;
+    fn run() -> Result<Self::RecordId, Self::ERR>;
 }
 
 /// Запись лог файла
