@@ -28,5 +28,5 @@ pub trait LogReading<ERR,RecordId,Record,RecordOptions> {
 
 /// Запись в лог
 pub trait LogWriting<ERR,RecordId,Record> {
-    fn write( &self, record:Record ) -> Result<RecordId,ERR>;
+    fn write( self, record:Record ) -> Result<RecordId,ERR>;
 }

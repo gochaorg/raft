@@ -162,6 +162,8 @@ where
 #[cfg(test)]
 pub mod test {
     use uuid::Uuid;
+    use crate::logfile::block::BlockOptions;
+
     use super::*;
 
     #[derive(Debug,Clone,PartialEq,Hash)]
@@ -189,7 +191,7 @@ pub mod test {
     }
     impl BlockWriter for IdTest {
         type ERR = String;
-        fn block_write( &self, _block: &mut crate::logfile::block::Block ) -> Result<(),Self::ERR> {
+        fn block_write( &self, _options: &mut BlockOptions, _data: &mut Vec<u8> ) -> Result<(),Self::ERR> {
             Ok(())
         }
     }

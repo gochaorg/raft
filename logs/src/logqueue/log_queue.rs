@@ -4,13 +4,14 @@ use std::collections::HashMap;
 use crate::logfile::{LogFile, FlatBuff, LogErr};
 use crate::logfile::block::{BlockId, BlockOptions};
 
+use super::find_logs::FsLogFind;
 use super::log_id::*;
 use super::log_switch::{
     LogSwitching,
     LogQueueState
 };
 use super::logs_open::{
-    LogQueueConf as LogOpenConf,
+    LogQueueOpenConf,
     LogQueueOpenned as LogOpened,
 };
 
@@ -266,7 +267,7 @@ where
     ID: LogQueueFileId,
     FILE: Clone,
     LOGOpenRes: LogOpened<LogFile = (FILE,LOG), LogFiles = Vec<(FILE,LOG)>>,
-    LOGOpenCfg: LogOpenConf<Open = LOGOpenRes, OpenError = ERR>,
+    LOGOpenCfg: LogQueueOpenConf<Open = LOGOpenRes, OpenError = ERR>,
     LOGSwitch: LogSwitching<(FILE,LOG),ERR> + Clone,
     LOGIdOf: Fn((FILE,LOG)) -> Result<ID,ERR> + Clone,
 {
@@ -282,7 +283,7 @@ where
     FILE: Clone,
     LOG: Clone,
     LOGOpenRes: LogOpened<LogFile = (FILE,LOG), LogFiles = Vec<(FILE,LOG)>>,
-    LOGOpenCfg: LogOpenConf<Open = LOGOpenRes, OpenError = ERR>,
+    LOGOpenCfg: LogQueueOpenConf<Open = LOGOpenRes, OpenError = ERR>,
     LOGSwitch: LogSwitching<(FILE,LOG),ERR> + Clone,
     LOGIdOf: Fn((FILE,LOG)) -> Result<ID,ERR> + Clone,
 {
@@ -338,7 +339,7 @@ mod test {
 
         let log_switch : LogSwitcher<(IdTest,IdTest),IdTest,String,_,_,_> = LogSwitcher { 
             read_id_of: |f_id:&(IdTest,IdTest)| Ok( f_id.0.clone() ), 
-            write_id_to: |f,ids:OleNewId<'_,IdTest>| {
+            write_id_to: |f,ids:OldNewId<'_,IdTest>| {
                 println!("old id={} new id={}", ids.old_id, ids.new_id);
                 oldnew_id_matched1.store(true, std::sync::atomic::Ordering::SeqCst);
                 ids.new_id.previous().map(|i| ids.old_id.id() == i );
@@ -377,4 +378,262 @@ mod test {
         assert!(oldnew_id_matched.load(std::sync::atomic::Ordering::SeqCst));
     }
 
+}
+
+#[cfg(test)]
+mod full_test {
+    use std::any::{TypeId, type_name};
+    use std::io::prelude::*;
+    use std::fs::*;
+    use std::path::PathBuf;
+    use std::env::*;
+    use std::sync::{Arc, RwLock};
+    use std::time::Duration;
+
+    struct Prepared {
+        log_dir_root: PathBuf,
+    }
+
+    fn prepare() -> Prepared {
+        let target = current_dir().unwrap().join("target");
+        if ! target.is_dir() { panic!("target dir not found!") };
+
+        let full_test = target.join("test").join("full_test");
+        if full_test.exists() {
+            remove_dir_all(full_test.clone()).expect("can't remove full_test dir");
+        }
+        create_dir_all(full_test.clone()).expect("can't create full_test dir");
+
+        println!("test preprared");
+
+        Prepared {
+            log_dir_root: full_test.clone()
+        }
+    }
+
+    use crate::bbuff::absbuff::FileBuff;
+    use crate::logfile::LogFile;
+    use crate::logfile::block::{BlockId, BlockOptions};
+    use crate::logqueue::new_file::NewFileGenerator;
+    use crate::logqueue::path_tmpl::PathTemplateParser;
+    use crate::logqueue::{log_id::*, LogFileQueueConf, LoqErr, validate_sequence, SeqValidateOp, IdOf, ErrThrow, 
+        LogQueueOpenConf, LogQueueConf, LogSwitcher, OldNewId, LogFileQueue, log_queue
+    };
+    use crate::logqueue::find_logs::FsLogFind;
+    use super::super::log_queue_read::*;
+    use super::super::log_queue_write::*;
+
+    fn open_file( path:PathBuf ) -> Result<LogFile<FileBuff>,LoqErr> {
+        let buff = 
+        FileBuff::open_read_write(path.clone()).map_err(|err| LoqErr::OpenFileBuff { 
+            file: path.clone(), 
+            error: err
+        })?;
+
+        let log = LogFile::new(buff)
+        .map_err(|err| LoqErr::OpenLog { 
+            file: path.clone(), 
+            error: err
+        })?;
+
+        Ok(log)
+    }
+
+    impl SeqValidateOp<(PathBuf,LogFile<FileBuff>), LoqErr, LogQueueFileNumID>
+    for (PathBuf,LogFile<FileBuff>) {
+        fn items_count(a:&(PathBuf,LogFile<FileBuff>)) -> Result<u32,LoqErr> {
+            let (filename,log) = a;
+            match log.count() {
+                Ok(count) => Ok(count),
+                Err(err) => Err(
+                    LoqErr::CantReadRecordsCount {
+                        file: filename.clone(),
+                        error: err.clone()
+                    }
+                )
+            }
+        }
+    }
+
+    fn id_of( a:&(PathBuf,LogFile<FileBuff>) ) -> Result<LogQueueFileNumID,LoqErr> {
+        let (filename,log) = a;
+        let id_type = type_name::<LogQueueFileNumID>().to_string();
+
+        let block = 
+            log.get_block(BlockId::new(0))
+            .map_err(|err| LoqErr::CantReadLogId { 
+                file: filename.clone(), 
+                error: err, 
+                log_id_type: id_type.clone() 
+            })?;
+
+        let id = LogQueueFileNumID::block_read(&block)
+        .map_err(|err| LoqErr::CantParseLogId { 
+            file: filename.clone(), 
+            error: err, 
+            log_id_type: id_type.clone() 
+        })?;
+
+        Ok(id)
+    }
+
+    impl IdOf<(PathBuf,LogFile<FileBuff>),LogQueueFileNumID,LoqErr>
+    for (PathBuf,LogFile<FileBuff>) {
+        fn id_of(a:&(PathBuf,LogFile<FileBuff>)) -> Result<LogQueueFileNumID,LoqErr> {
+            id_of(a)
+        }
+    }
+
+    impl ErrThrow<(PathBuf,LogFile<FileBuff>), LoqErr, LogQueueFileNumID> for LoqErr {
+        fn two_heads(heads:Vec<((PathBuf,LogFile<FileBuff>),LogQueueFileNumID)>) -> LoqErr {
+            LoqErr::OpenTwoHeads { 
+                heads: heads.iter().map(
+                    |((filename,_),id)| {
+                    (filename.clone(), id.clone())
+                }).collect()
+            }
+        }
+
+        fn no_heads() -> LoqErr {
+            LoqErr::OpenNoHeads
+        }
+
+        fn not_found_next_log( 
+            id: &LogQueueFileNumID, 
+            logs:Vec<&((PathBuf,LogFile<FileBuff>),LogQueueFileNumID)> 
+        ) -> LoqErr {
+            LoqErr::OpenLogNotFound { 
+                id: id.clone(), 
+                logs: logs.iter().map(|((filename,_),id)|{
+                    (filename.clone(), id.clone())
+                }).collect()
+            }
+        }
+    } 
+
+    #[test]
+    fn do_test() {
+        let prepared = prepare();
+
+        println!("run test");
+
+        let fs_log_find = 
+            FsLogFind::new( 
+                prepared.log_dir_root.to_str().unwrap(), 
+                "*.binlog", 
+                true ).unwrap();
+
+        let log_file_queue_conf = fs_log_find.to_conf::<LoqErr>();
+
+        let path_tmpl_parser = PathTemplateParser::default();
+        let path_tmpl = path_tmpl_parser.parse(
+            &format!("{root}/{name}",
+            root = prepared.log_dir_root.to_str().unwrap(),
+            name = "${time:local:yyyy-mm-ddThh-mi-ss}-${rnd:5}.binlog"
+        )).unwrap();
+
+        let log_file_new = 
+            NewFileGenerator {
+                open: |path| OpenOptions::new().create(true).read(true).write(true).open(path),
+                path_template: path_tmpl,
+                max_duration: Some(Duration::from_secs(5)),
+                max_attemps: Some(5),
+                throttling: Some(Duration::from_millis(100))
+            };
+        let log_file_new = Arc::new(RwLock::new(log_file_new));
+
+        let log_file_queue_conf: 
+        LogFileQueueConf<
+            LogFile<FileBuff>, 
+            PathBuf, 
+            LoqErr,
+            _, _, _, _>
+         = LogFileQueueConf {
+            find_files: log_file_queue_conf,
+            open_log_file: |f| open_file(f),
+            validate: |found_files:&Vec<(PathBuf,LogFile<FileBuff>)>| { 
+                validate_sequence::<(PathBuf,LogFile<FileBuff>),LoqErr,LoqErr,LogQueueFileNumID>(found_files)
+            },
+            init: || {
+                let mut generator = log_file_new.write().unwrap();
+                let new_file = generator.generate().unwrap();
+                let path = new_file.path.clone();
+                let mut log = open_file(new_file.path.clone())?;
+                //------------------------
+                let mut options = BlockOptions::default();
+                let mut data = Vec::<u8>::new();
+                let id = LogQueueFileNumID { id: 0, previous: None };
+                id.block_write(&mut options, &mut data).
+                    map_err(|err| LoqErr::LogIdWriteFailed { 
+                    file: new_file.path.clone(),
+                    error: err
+                })?;
+                log.append_data(&options, &data)
+                    .map_err(|err|
+                    LoqErr::LogIdWriteFailed2 { 
+                        file: new_file.path.clone(), 
+                        error: err 
+                    })?;
+                //------------------------
+                Ok((path,log))
+            }
+        };
+
+        let log_switch : LogSwitcher<(PathBuf,LogFile<FileBuff>), LogQueueFileNumID, LoqErr, _, _, _> =
+        LogSwitcher { 
+            read_id_of: |log_file_pair: &(PathBuf,LogFile<FileBuff>)| {
+                id_of(log_file_pair)
+            }, 
+            write_id_to: 
+                |log_file_pair: &mut (PathBuf,LogFile<FileBuff>),
+                 ids: OldNewId<LogQueueFileNumID>
+                | 
+            { 
+                let (filename, log) = log_file_pair;
+                let mut options = BlockOptions::default();
+                let mut data = Vec::<u8>::new();
+                ids.new_id.block_write(&mut options, &mut data)
+                    .map_err(|err| LoqErr::LogIdWriteFailed { 
+                        file: filename.clone(), 
+                        error: err
+                })?;
+                log.append_data(&options, &data)
+                    .map_err(|err| LoqErr::LogIdWriteFailed2 { 
+                        file: filename.clone(), 
+                        error: err 
+                    })?;
+                Ok(())
+            },
+            new_file: || {
+                let mut generator = log_file_new.write().unwrap();
+                let new_file = generator.generate().unwrap();
+                let path = new_file.path.clone();
+                let log = open_file(new_file.path.clone());
+                log.map(|log| (path,log))
+            } 
+        };
+
+        let log_queue_conf = LogQueueConf {
+            log_open:   log_file_queue_conf,
+            log_switch: log_switch,
+            id_of:      |log_file_pair:(PathBuf,LogFile<FileBuff>)| {
+                id_of(&log_file_pair)
+            }
+        };
+
+        let mut log_queue = log_queue_conf.open().unwrap();
+        println!("log_queue openned");
+
+        let mut log_queue: Box<dyn LogFileQueue<LoqErr,LogQueueFileNumID,PathBuf,LogFile<FileBuff>>>
+            = Box::new(log_queue);
+
+        let rec = Record {
+            data: &Vec::<u8>::new(),
+            options: BlockOptions::default(),
+        };
+        //log_queue.write( rec );
+
+        log_queue.switch().unwrap();
+
+    }
 }

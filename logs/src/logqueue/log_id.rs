@@ -2,14 +2,14 @@ use std::fmt::Debug;
 use std::num::ParseIntError;
 use std::str::FromStr;
 use uuid::Uuid;
-use crate::logfile::block::{String32, BlockErr, BlockId};
+use crate::logfile::block::{String32, BlockErr, BlockId, BlockHead, BlockOptions};
 use crate::logfile::block::Block;
 use std::hash::Hash;
 
 /// Запись идентификатора в блок
 pub trait BlockWriter {
     type ERR;
-    fn block_write( &self, block: &mut Block ) -> Result<(),Self::ERR>;
+    fn block_write( &self, options: &mut BlockOptions, data: &mut Vec<u8> ) -> Result<(),Self::ERR>;
 }
 
 /// Чтение индентификатора из блока
@@ -75,26 +75,26 @@ impl LogQueueFileId for LogQueueFileNumID {
 impl BlockWriter for LogQueueFileNumID {
     type ERR = LogIdReadWriteErr;
 
-    fn block_write( &self, block: &mut Block ) -> Result<(),Self::ERR> {
-        let value : Option<String32> = block.head.block_options.get(LOG_FILE_ID_KEY);
+    fn block_write( &self, options: &mut BlockOptions, _data: &mut Vec<u8> ) -> Result<(),Self::ERR> {
+        let value : Option<String32> = options.get(LOG_FILE_ID_KEY);
         if value.is_some() {
             return Err(LogIdReadWriteErr::ValueAlreadyDefined(value.unwrap()));
         }
 
-        let type_of_value : Option<String32> = block.head.block_options.get(LOG_FILE_ID_TYPE_KEY);
+        let type_of_value : Option<String32> = options.get(LOG_FILE_ID_TYPE_KEY);
         if type_of_value.is_some() {
             return Err(LogIdReadWriteErr::TypeValueAlreadyDefined(type_of_value.unwrap()));
         }
 
-        let prev : Option<String32> = block.head.block_options.get(LOG_FILE_ID_PREV_KEY);
+        let prev : Option<String32> = options.get(LOG_FILE_ID_PREV_KEY);
         if prev.is_some() {
             return Err(LogIdReadWriteErr::PrevValueAlreadyDefined(prev.unwrap()));
         }
         
-        block.head.block_options.set(LOG_FILE_ID_TYPE_KEY, LOG_FILE_NUM_TYPE)?;
-        block.head.block_options.set(LOG_FILE_ID_KEY, self.id.to_string())?;
+        options.set(LOG_FILE_ID_TYPE_KEY, LOG_FILE_NUM_TYPE)?;
+        options.set(LOG_FILE_ID_KEY, self.id.to_string())?;
         if self.previous.is_some() {
-            block.head.block_options.set(LOG_FILE_ID_PREV_KEY, self.previous.unwrap().to_string())?;
+            options.set(LOG_FILE_ID_PREV_KEY, self.previous.unwrap().to_string())?;
         }
 
         Ok(())
@@ -171,6 +171,7 @@ pub const LOG_FILE_UUID_TYPE: &str =    "LogQueueFileUUID";
 pub const LOG_FILE_NUM_TYPE: &str =     "LogQueueFileNumID";
 
 /// Ошибки чтения / записи идентификатора
+#[derive(Debug,Clone)]
 pub enum LogIdReadWriteErr {
     BlockErr(BlockErr),
     ValueAlreadyDefined(String32),
@@ -203,26 +204,26 @@ impl From<ParseIntError> for LogIdReadWriteErr {
 impl BlockWriter for LogQueueFileUUID {
     type ERR = LogIdReadWriteErr;
 
-    fn block_write( &self, block: &mut Block ) -> Result<(),Self::ERR> {
-        let value : Option<String32> = block.head.block_options.get(LOG_FILE_ID_KEY);
+    fn block_write( &self, options: &mut BlockOptions, _data: &mut Vec<u8> ) -> Result<(),Self::ERR> {
+        let value : Option<String32> = options.get(LOG_FILE_ID_KEY);
         if value.is_some() {
             return Err(LogIdReadWriteErr::ValueAlreadyDefined(value.unwrap()));
         }
 
-        let type_of_value : Option<String32> = block.head.block_options.get(LOG_FILE_ID_TYPE_KEY);
+        let type_of_value : Option<String32> = options.get(LOG_FILE_ID_TYPE_KEY);
         if type_of_value.is_some() {
             return Err(LogIdReadWriteErr::TypeValueAlreadyDefined(type_of_value.unwrap()));
         }
 
-        let prev : Option<String32> = block.head.block_options.get(LOG_FILE_ID_PREV_KEY);
+        let prev : Option<String32> = options.get(LOG_FILE_ID_PREV_KEY);
         if prev.is_some() {
             return Err(LogIdReadWriteErr::PrevValueAlreadyDefined(prev.unwrap()));
         }
         
-        block.head.block_options.set(LOG_FILE_ID_TYPE_KEY, LOG_FILE_UUID_TYPE)?;
-        block.head.block_options.set(LOG_FILE_ID_KEY, self.uuid.to_string())?;
+        options.set(LOG_FILE_ID_TYPE_KEY, LOG_FILE_UUID_TYPE)?;
+        options.set(LOG_FILE_ID_KEY, self.uuid.to_string())?;
         if self.previous.is_some() {
-            block.head.block_options.set(LOG_FILE_ID_PREV_KEY, self.previous.unwrap().to_string())?;
+            options.set(LOG_FILE_ID_PREV_KEY, self.previous.unwrap().to_string())?;
         }
 
         Ok(())

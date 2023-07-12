@@ -56,6 +56,17 @@ impl FsLogFind {
             None => Err(format!("can't parse wildcard: \"{wildcard}\""))
         }
     }
+
+    pub fn to_conf<ERR>( &self ) -> impl Fn() -> Result<Vec<PathBuf>,ERR> {
+        let conf = self.clone();
+        move || {
+            let mut res : Vec<PathBuf> = vec![];
+            for x in &conf {
+                res.push(x)
+            }
+            Ok(res)
+        }
+    }
 }
 
 #[test]

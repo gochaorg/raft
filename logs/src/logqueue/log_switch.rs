@@ -13,7 +13,7 @@ pub trait LogQueueState<FILE> {
 }
 
 /// Информация о старом и новом id
-pub struct OleNewId<'a, ID> {
+pub struct OldNewId<'a, ID> {
     pub old_id: &'a ID,
     pub new_id: &'a ID,
 }
@@ -32,7 +32,7 @@ where
     FILE: Clone,
     ID: LogQueueFileId,
     FReadId: Fn(&FILE) -> Result<ID,ERR>,
-    FWriteId: for <'a> Fn(&mut FILE, OleNewId<'a,ID>) -> Result<(),ERR>,
+    FWriteId: for <'a> Fn(&mut FILE, OldNewId<'a,ID>) -> Result<(),ERR>,
     FNewFile: FnMut() -> Result<FILE,ERR>,
 {
     /// Чтение id лог файла
@@ -51,7 +51,7 @@ where
     FILE: Clone,
     ID: LogQueueFileId,
     FReadId: Fn(&FILE) -> Result<ID,ERR>,
-    FWriteId: for <'a> Fn(&mut FILE, OleNewId<'a,ID>) -> Result<(),ERR>,
+    FWriteId: for <'a> Fn(&mut FILE, OldNewId<'a,ID>) -> Result<(),ERR>,
     FNewFile: FnMut() -> Result<FILE,ERR>,
 {
     /// Переключение текущего лога
@@ -59,7 +59,7 @@ where
         let old_file = log_state.get_current_file()?;
         let old_id = (self.read_id_of)(&old_file)?;
         let new_id = ID::new(Some(old_id.id()));
-        let ids = OleNewId { old_id:&old_id, new_id:&new_id };
+        let ids = OldNewId { old_id:&old_id, new_id:&new_id };
 
         let mut new_file = (self.new_file)()?;
         (self.write_id_to)(&mut new_file, ids)?;

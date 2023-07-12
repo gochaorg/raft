@@ -1,8 +1,8 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, path::PathBuf};
 use super::log_seq_verifier::OrderedLogs;
 
 /// Конфигурация лог файлов, которую можно открыть
-pub trait LogQueueConf {
+pub trait LogQueueOpenConf {
     type Open;
     type OpenError;
 
@@ -79,7 +79,7 @@ where
     }
 }
 
-impl<LOG,FILE,ERR,FOpen,FFind,FValidate,FInit> LogQueueConf 
+impl<LOG,FILE,ERR,FOpen,FFind,FValidate,FInit> LogQueueOpenConf 
 for LogFileQueueConf<LOG,FILE,ERR,FOpen,FFind,FValidate,FInit> 
 where
     LOG:Clone,
