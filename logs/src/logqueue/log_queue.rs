@@ -301,6 +301,8 @@ where
 
 #[cfg(test)]
 mod test {
+    use crate::logqueue::FindFiles;
+
     #[test]
     fn log_queue_conf_test() {
         use std::sync::Arc;
@@ -322,8 +324,15 @@ mod test {
         let oldnew_id_matched = Arc::new(AtomicBool::new(false));
         let oldnew_id_matched1 = oldnew_id_matched.clone();
 
+        struct FFiles(Vec<IdTest>);
+        impl FindFiles<IdTest,String> for FFiles {
+            fn find_files( &self ) -> Result<Vec<IdTest>,String> {
+                Ok(self.0.clone())
+            }
+        };
+
         let open_conf: LogFileQueueConf<IdTest,IdTest,String,_,_,_,_> = LogFileQueueConf {
-            find_files: || Ok(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()]),
+            find_files: FFiles(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()]),
             open_log_file: |f| Ok::<IdTest,String>( f.clone() ),
             validate: |f| Ok(OrderedLogs {
                 files: vec![
@@ -549,7 +558,7 @@ mod full_test {
             LoqErr,
             _, _, _, _>
          = LogFileQueueConf {
-            find_files: log_file_queue_conf,
+            find_files: fs_log_find,
             open_log_file: |f| open_file(f),
             validate: |found_files:&Vec<(PathBuf,LogFile<FileBuff>)>| { 
                 validate_sequence::<(PathBuf,LogFile<FileBuff>),LoqErr,LoqErr,LogQueueFileNumID>(found_files)

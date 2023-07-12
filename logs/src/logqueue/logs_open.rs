@@ -1,5 +1,5 @@
 use std::{marker::PhantomData, path::PathBuf};
-use super::log_seq_verifier::OrderedLogs;
+use super::{log_seq_verifier::OrderedLogs, find_logs::FsLogFind};
 
 /// Конфигурация лог файлов, которую можно открыть
 pub trait LogQueueOpenConf {
@@ -22,13 +22,18 @@ pub trait LogQueueOpenned {
     fn tail( &self ) -> Self::LogFile;
 }
 
+/// Поиск файлов
+pub trait FindFiles<FOUND,ERR> {
+    fn find_files( &self ) -> Result<Vec<FOUND>,ERR>;
+}
+
 /// Минимальная конфигурация для открытия логов
 pub struct LogFileQueueConf<LOG,FILE,ERR,FOpen,FFind,FValidate,FInit>
 where 
     LOG:Clone,
     FILE:Clone,
     FOpen: Fn(FILE) -> Result<LOG, ERR>,
-    FFind: Fn() -> Result<Vec<FILE>, ERR>,
+    FFind: FindFiles<FILE,ERR>,
     FValidate: Fn(&Vec<(FILE,LOG)>) -> Result<OrderedLogs<(FILE,LOG)>,ERR>,
     FInit: Fn() -> Result<(FILE,LOG), ERR>,
 {
@@ -84,7 +89,7 @@ for LogFileQueueConf<LOG,FILE,ERR,FOpen,FFind,FValidate,FInit>
 where
     LOG:Clone,
     FOpen: Fn(FILE) -> Result<LOG, ERR>,
-    FFind: Fn() -> Result<Vec<FILE>, ERR>,
+    FFind: FindFiles<FILE,ERR>,
     FValidate: Fn(&Vec<(FILE,LOG)>) -> Result<OrderedLogs<(FILE,LOG)>,ERR>,
     FInit: Fn() -> Result<(FILE,LOG), ERR>,
     FILE: Clone
@@ -93,7 +98,7 @@ where
     type Open = LogFilesOpenned<LOG,FILE>;
 
     fn open( &self ) -> Result<Self::Open, Self::OpenError> {
-        let found_files = (self.find_files)()?;
+        let found_files = self.find_files.find_files()?;
         if !found_files.is_empty() {
             let not_validated_open_files = found_files.iter().fold( 
                 Ok::<Vec::<(FILE,LOG)>,ERR>(Vec::<(FILE,LOG)>::new()), 
@@ -146,11 +151,19 @@ mod test {
         let id2 = IdTest::new(Some(id1.id()));
         let id3 = IdTest::new(Some(id2.id()));
 
+        struct FFiles(Vec<IdTest>);
+        impl FindFiles<IdTest,String> for FFiles {
+            fn find_files( &self ) -> Result<Vec<IdTest>,String> {
+                Ok(self.0.clone())
+            }
+        };
+
         let queue_conf: LogFileQueueConf<IdTest,IdTest,String,_,_,_,_> = 
         LogFileQueueConf {
-            find_files: || {
-                Ok(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()])
-            },
+            // find_files: || {
+            //     Ok(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()])
+            // },
+            find_files: FFiles(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()]),
             open_log_file: |f| Ok::<IdTest,String>( f.clone() ),
             validate: |_files:&Vec<(IdTest,IdTest)>| Ok( 
                 OrderedLogs {
@@ -172,5 +185,11 @@ mod test {
             println!("log {}", f);
         }
 
+    }
+}
+
+impl<ERR> FindFiles<PathBuf,ERR> for FsLogFind {
+    fn find_files( &self ) -> Result<Vec<PathBuf>,ERR> {
+        self.to_conf::<ERR>()()
     }
 }
