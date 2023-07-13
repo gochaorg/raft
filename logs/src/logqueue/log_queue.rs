@@ -301,7 +301,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::logqueue::FindFiles;
+    use crate::logqueue::{FindFiles, OpenLogFile};
 
     #[test]
     fn log_queue_conf_test() {
@@ -324,16 +324,23 @@ mod test {
         let oldnew_id_matched = Arc::new(AtomicBool::new(false));
         let oldnew_id_matched1 = oldnew_id_matched.clone();
 
-        struct FFiles(Vec<IdTest>);
-        impl FindFiles<IdTest,String> for FFiles {
+        struct FindFilesStub(Vec<IdTest>);
+        impl FindFiles<IdTest,String> for FindFilesStub {
             fn find_files( &self ) -> Result<Vec<IdTest>,String> {
                 Ok(self.0.clone())
             }
-        };
+        }
+
+        struct OpenFileStub;
+        impl OpenLogFile<IdTest,IdTest,String> for OpenFileStub {
+            fn open_log_file( &self, file:IdTest ) -> Result<IdTest, String> {
+                Ok(file.clone())
+            }
+        }
 
         let open_conf: LogFileQueueConf<IdTest,IdTest,String,_,_,_,_> = LogFileQueueConf {
-            find_files: FFiles(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()]),
-            open_log_file: |f| Ok::<IdTest,String>( f.clone() ),
+            find_files: FindFilesStub(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()]),
+            open_log_file: OpenFileStub,
             validate: |f| Ok(OrderedLogs {
                 files: vec![
                     (id1.clone(),id1.clone()), 
@@ -426,7 +433,7 @@ mod full_test {
     use crate::logqueue::new_file::NewFileGenerator;
     use crate::logqueue::path_tmpl::PathTemplateParser;
     use crate::logqueue::{log_id::*, LogFileQueueConf, LoqErr, validate_sequence, SeqValidateOp, IdOf, ErrThrow, 
-        LogQueueOpenConf, LogQueueConf, LogSwitcher, OldNewId, LogFileQueue, log_queue
+        LogQueueOpenConf, LogQueueConf, LogSwitcher, OldNewId, LogFileQueue, log_queue, OpenLogFile
     };
     use crate::logqueue::find_logs::FsLogFind;
     use super::super::log_queue_read::*;
@@ -532,8 +539,6 @@ mod full_test {
                 "*.binlog", 
                 true ).unwrap();
 
-        let log_file_queue_conf = fs_log_find.to_conf::<LoqErr>();
-
         let path_tmpl_parser = PathTemplateParser::default();
         let path_tmpl = path_tmpl_parser.parse(
             &format!("{root}/{name}",
@@ -551,6 +556,13 @@ mod full_test {
             };
         let log_file_new = Arc::new(RwLock::new(log_file_new));
 
+        struct OpenLogFileStub;
+        impl OpenLogFile<PathBuf,LogFile<FileBuff>,LoqErr> for OpenLogFileStub {
+            fn open_log_file( &self, file:PathBuf ) -> Result<LogFile<FileBuff>, LoqErr> {
+                open_file(file)
+            }
+        }
+
         let log_file_queue_conf: 
         LogFileQueueConf<
             LogFile<FileBuff>, 
@@ -559,7 +571,7 @@ mod full_test {
             _, _, _, _>
          = LogFileQueueConf {
             find_files: fs_log_find,
-            open_log_file: |f| open_file(f),
+            open_log_file: OpenLogFileStub,
             validate: |found_files:&Vec<(PathBuf,LogFile<FileBuff>)>| { 
                 validate_sequence::<(PathBuf,LogFile<FileBuff>),LoqErr,LoqErr,LogQueueFileNumID>(found_files)
             },

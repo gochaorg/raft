@@ -22,9 +22,22 @@ pub trait LogQueueOpenned {
     fn tail( &self ) -> Self::LogFile;
 }
 
-/// Поиск файлов
+/// Поиск файлов логов
 pub trait FindFiles<FOUND,ERR> {
     fn find_files( &self ) -> Result<Vec<FOUND>,ERR>;
+}
+
+/// Открытие лог файла
+pub trait OpenLogFile<FILE,LOG,ERR> {
+    fn open_log_file( &self, file:FILE ) -> Result<LOG, ERR>;
+}
+
+/// Валидация логов
+pub trait ValidateLogFiles<LogFile,ERR> 
+where 
+    LogFile: Clone
+{
+    fn validate( &self ) -> Result<OrderedLogs<LogFile>,ERR>;
 }
 
 /// Минимальная конфигурация для открытия логов
@@ -32,7 +45,7 @@ pub struct LogFileQueueConf<LOG,FILE,ERR,FOpen,FFind,FValidate,FInit>
 where 
     LOG:Clone,
     FILE:Clone,
-    FOpen: Fn(FILE) -> Result<LOG, ERR>,
+    FOpen: OpenLogFile<FILE,LOG,ERR>,
     FFind: FindFiles<FILE,ERR>,
     FValidate: Fn(&Vec<(FILE,LOG)>) -> Result<OrderedLogs<(FILE,LOG)>,ERR>,
     FInit: Fn() -> Result<(FILE,LOG), ERR>,
@@ -88,7 +101,7 @@ impl<LOG,FILE,ERR,FOpen,FFind,FValidate,FInit> LogQueueOpenConf
 for LogFileQueueConf<LOG,FILE,ERR,FOpen,FFind,FValidate,FInit> 
 where
     LOG:Clone,
-    FOpen: Fn(FILE) -> Result<LOG, ERR>,
+    FOpen: OpenLogFile<FILE,LOG,ERR>,
     FFind: FindFiles<FILE,ERR>,
     FValidate: Fn(&Vec<(FILE,LOG)>) -> Result<OrderedLogs<(FILE,LOG)>,ERR>,
     FInit: Fn() -> Result<(FILE,LOG), ERR>,
@@ -104,7 +117,8 @@ where
                 Ok::<Vec::<(FILE,LOG)>,ERR>(Vec::<(FILE,LOG)>::new()), 
                 |res,file| {
                 res.and_then(|mut res| {
-                    let log_file = (self.open_log_file)(file.clone())?;
+                    let log_file = 
+                        self.open_log_file.open_log_file(file.clone())?;
                     res.push((file.clone(),log_file));
                     Ok(res)
                 })
@@ -151,20 +165,27 @@ mod test {
         let id2 = IdTest::new(Some(id1.id()));
         let id3 = IdTest::new(Some(id2.id()));
 
-        struct FFiles(Vec<IdTest>);
-        impl FindFiles<IdTest,String> for FFiles {
+        struct FindFilesStub(Vec<IdTest>);
+        impl FindFiles<IdTest,String> for FindFilesStub {
             fn find_files( &self ) -> Result<Vec<IdTest>,String> {
                 Ok(self.0.clone())
             }
-        };
+        }
+
+        struct OpenLogFileStub;
+        impl OpenLogFile<IdTest,IdTest,String> for OpenLogFileStub {
+            fn open_log_file( &self, file:IdTest ) -> Result<IdTest, String> {
+                Ok(file.clone())
+            }
+        }
 
         let queue_conf: LogFileQueueConf<IdTest,IdTest,String,_,_,_,_> = 
         LogFileQueueConf {
             // find_files: || {
             //     Ok(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()])
             // },
-            find_files: FFiles(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()]),
-            open_log_file: |f| Ok::<IdTest,String>( f.clone() ),
+            find_files: FindFilesStub(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()]),
+            open_log_file: OpenLogFileStub,
             validate: |_files:&Vec<(IdTest,IdTest)>| Ok( 
                 OrderedLogs {
                     files: vec![
