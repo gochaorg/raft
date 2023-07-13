@@ -40,6 +40,14 @@ where
     fn validate( &self, log_files: &Vec<LogFile> ) -> Result<OrderedLogs<LogFile>,ERR>;
 }
 
+/// Инициализация первого лог файла
+pub trait InitializeFirstLog<LogFile,ERR>
+where
+    LogFile: Clone
+{
+    fn initialize_first_log( &self ) -> Result<LogFile, ERR>;
+}
+
 /// Минимальная конфигурация для открытия логов
 pub struct LogFileQueueConf<LOG,FILE,ERR,FOpen,FFind,FValidate,FInit>
 where 
@@ -48,7 +56,7 @@ where
     FOpen: OpenLogFile<FILE,LOG,ERR>,
     FFind: FindFiles<FILE,ERR>,
     FValidate: ValidateLogFiles<(FILE,LOG),ERR>,
-    FInit: Fn() -> Result<(FILE,LOG), ERR>,
+    FInit: InitializeFirstLog<(FILE,LOG),ERR>,
 {
     /// Поиск лог файлов
     pub find_files: FFind,
@@ -61,6 +69,8 @@ where
 
     /// Первичная инициализация
     pub init: FInit,
+
+    pub _p : PhantomData<(LOG,FILE,ERR)>
 }
 
 /// Открытые лог файлы
@@ -100,12 +110,12 @@ where
 impl<LOG,FILE,ERR,FOpen,FFind,FValidate,FInit> LogQueueOpenConf 
 for LogFileQueueConf<LOG,FILE,ERR,FOpen,FFind,FValidate,FInit> 
 where
+    FILE: Clone,
     LOG:Clone,
     FOpen: OpenLogFile<FILE,LOG,ERR>,
     FFind: FindFiles<FILE,ERR>,
     FValidate: ValidateLogFiles<(FILE,LOG),ERR>,
-    FInit: Fn() -> Result<(FILE,LOG), ERR>,
-    FILE: Clone
+    FInit: InitializeFirstLog<(FILE,LOG),ERR>,
 {
     type OpenError = ERR;
     type Open = LogFilesOpenned<LOG,FILE>;
@@ -134,7 +144,7 @@ where
                 _p: PhantomData.clone(),
             })
         }else{
-            let (tail_file, tail_log) =(self.init)()?;
+            let (tail_file, tail_log) = self.init.initialize_first_log()?;  // (self.init)()?;
             Ok(LogFilesOpenned{ 
                 files: vec![(tail_file.clone(), tail_log.clone())], 
                 tail_file: tail_file, 
@@ -186,6 +196,13 @@ mod test {
             }
         }
 
+        struct InitializeStub(IdTest);
+        impl InitializeFirstLog<(IdTest,IdTest),String> for InitializeStub {
+            fn initialize_first_log( &self ) -> Result<(IdTest,IdTest), String> {
+                Ok( (self.0.clone(), self.0.clone()) )
+            }
+        }
+
         let queue_conf: LogFileQueueConf<IdTest,IdTest,String,_,_,_,_> = 
         LogFileQueueConf {
             find_files: FindFilesStub(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()]),
@@ -201,7 +218,8 @@ mod test {
                     tail: (id3.clone(),id3.clone())
                 }
             ),
-            init: || Ok( (id0.clone(),id0.clone()) ),
+            init: InitializeStub(id0.clone()),
+            _p: PhantomData.clone()
         };
 
         let open_files:LogFilesOpenned<IdTest,IdTest> = queue_conf.open().unwrap();

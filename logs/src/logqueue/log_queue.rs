@@ -301,7 +301,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::logqueue::{FindFiles, OpenLogFile, ValidateLogFiles};
+    use std::marker::PhantomData;
+
+    use crate::logqueue::{FindFiles, OpenLogFile, ValidateLogFiles, InitializeFirstLog};
 
     #[test]
     fn log_queue_conf_test() {
@@ -345,6 +347,13 @@ mod test {
             }
         }
 
+        struct InitStub(IdTest);
+        impl InitializeFirstLog<(IdTest,IdTest),String> for InitStub {
+            fn initialize_first_log( &self ) -> Result<(IdTest,IdTest), String> {
+                Ok((self.0.clone(), self.0.clone()))
+            }
+        }
+
         let open_conf: LogFileQueueConf<IdTest,IdTest,String,_,_,_,_> = LogFileQueueConf {
             find_files: FindFilesStub(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()]),
             open_log_file: OpenFileStub,
@@ -357,7 +366,8 @@ mod test {
                 ],
                 tail: (id3.clone(),id3.clone())
             }),
-            init: || Ok( (id0.clone(),id0.clone()) ),
+            init: InitStub(id0.clone()),
+            _p: PhantomData.clone(),
         };
 
         let log_switch : LogSwitcher<(IdTest,IdTest),IdTest,String,_,_,_> = LogSwitcher { 
@@ -408,6 +418,7 @@ mod full_test {
     use std::any::{TypeId, type_name};
     use std::io::prelude::*;
     use std::fs::*;
+    use std::marker::PhantomData;
     use std::path::PathBuf;
     use std::env::*;
     use std::sync::{Arc, RwLock};
@@ -440,7 +451,7 @@ mod full_test {
     use crate::logqueue::new_file::NewFileGenerator;
     use crate::logqueue::path_tmpl::PathTemplateParser;
     use crate::logqueue::{log_id::*, LogFileQueueConf, LoqErr, validate_sequence, SeqValidateOp, IdOf, ErrThrow, 
-        LogQueueOpenConf, LogQueueConf, LogSwitcher, OldNewId, LogFileQueue, log_queue, OpenLogFile, ValidateLogFiles
+        LogQueueOpenConf, LogQueueConf, LogSwitcher, OldNewId, LogFileQueue, log_queue, OpenLogFile, ValidateLogFiles, InitializeFirstLog
     };
     use crate::logqueue::find_logs::FsLogFind;
     use super::super::log_queue_read::*;
@@ -577,18 +588,14 @@ mod full_test {
             }
         }
 
-        let log_file_queue_conf: 
-        LogFileQueueConf<
-            LogFile<FileBuff>, 
-            PathBuf, 
-            LoqErr,
-            _, _, _, _>
-         = LogFileQueueConf {
-            find_files: fs_log_find,
-            open_log_file: OpenLogFileStub,
-            validate: ValidateStub,
-            init: || {
-                let mut generator = log_file_new.write().unwrap();
+        struct InitStub<'a,F>( Arc<RwLock<NewFileGenerator<'a,F>>> )
+        where F: Fn(PathBuf) -> Result<File,std::io::Error>;
+
+        impl<'a,F> InitializeFirstLog<(PathBuf,LogFile<FileBuff>),LoqErr> for InitStub<'a,F> 
+        where F: Fn(PathBuf) -> Result<File,std::io::Error>
+        {
+            fn initialize_first_log( &self ) -> Result<(PathBuf,LogFile<FileBuff>), LoqErr> {
+                let mut generator = self.0.write().unwrap();
                 let new_file = generator.generate().unwrap();
                 let path = new_file.path.clone();
                 let mut log = open_file(new_file.path.clone())?;
@@ -610,6 +617,20 @@ mod full_test {
                 //------------------------
                 Ok((path,log))
             }
+        }
+
+        let log_file_queue_conf: 
+        LogFileQueueConf<
+            LogFile<FileBuff>, 
+            PathBuf, 
+            LoqErr,
+            _, _, _, _>
+         = LogFileQueueConf {
+            find_files: fs_log_find,
+            open_log_file: OpenLogFileStub,
+            validate: ValidateStub,
+            init: InitStub(log_file_new.clone()),
+            _p: PhantomData.clone()
         };
 
         let log_switch : LogSwitcher<(PathBuf,LogFile<FileBuff>), LogQueueFileNumID, LoqErr, _, _, _> =
