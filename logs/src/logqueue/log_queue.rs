@@ -572,7 +572,7 @@ mod full_test {
         let log_file_new = 
             NewFileGenerator {
                 open: |path| OpenOptions::new().create(true).read(true).write(true).open(path),
-                path_template: path_tmpl,
+                path_template: parse(&path_tmpl_parser, "aaa"),
                 max_duration: Some(Duration::from_secs(5)),
                 max_attemps: Some(5),
                 throttling: Some(Duration::from_millis(100))

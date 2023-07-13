@@ -30,11 +30,23 @@ impl<'a> PathTemplate<'a> {
         }
         str
     }
+
+    pub fn clone<'r>( &'a self ) -> PathTemplate<'r> {
+        PathTemplate { 
+            generators: self.generators.iter()
+                .map(|i| {
+                    let c = i.lock().unwrap();
+                    c.clone()
+                })
+                .collect()
+        }
+    }
 }
 
 /// Элемент имени файла
 pub trait PathValue {
     fn generate( &mut self ) -> String;
+    fn clone<'a,'r>( &'a self ) -> Rc<Mutex<dyn PathValue + 'r>>;
 }
 
 /// Обычный текст в имени файла
@@ -42,6 +54,9 @@ pub struct PlainValue( pub String );
 impl PathValue for PlainValue {
     fn generate( &mut self ) -> String {
         self.0.clone()
+    }
+    fn clone<'a,'r>( &'a self ) -> Rc<Mutex<dyn PathValue + 'r>> {
+        Rc::new(Mutex::new(PlainValue(self.0.clone())))
     }
 }
 
@@ -52,9 +67,13 @@ impl PathValue for CurrentDateTimeValue {
         let dt = Utc::now();
         dt.format(&self.0)
     }
+    fn clone<'a,'r>( &'a self ) -> Rc<Mutex<dyn PathValue + 'r>> {
+        Rc::new(Mutex::new(CurrentDateTimeValue(self.0.clone())))
+    }
 }
 
 /// Случайное значение в имени файла
+#[derive(Clone)]
 pub struct RandomValue {
     dic: String,
     dic_char_count: usize,
@@ -79,6 +98,15 @@ impl PathValue for RandomValue {
         }
         str
     }
+
+    fn clone<'a,'r>( &'a self ) -> Rc<Mutex<dyn PathValue + 'r>> {
+        Rc::new(Mutex::new(RandomValue {
+            dic: self.dic.clone(),
+            dic_char_count: self.dic_char_count.clone(),
+            count: self.count.clone(),
+            rnd: self.rnd.clone()
+        }))
+    }
 }
 
 impl Default for RandomValue {
@@ -95,11 +123,11 @@ impl Default for RandomValue {
 
 /// Парсер шаблона имени файла
 #[derive(Clone)]
-pub struct PathTemplateParser {
-    pub variables: HashMap<String, Rc<Mutex<dyn PathValue>> >
+pub struct PathTemplateParser<'a> {
+    pub variables: HashMap<String, Rc<Mutex<dyn PathValue + 'a>> >
 }
 
-impl Default for PathTemplateParser {
+impl<'a> Default for PathTemplateParser<'a> {
     fn default() -> Self {
         PathTemplateParser { 
             variables: HashMap::new()
@@ -107,7 +135,7 @@ impl Default for PathTemplateParser {
     }
 }
 
-impl Debug for PathTemplateParser {
+impl<'a> Debug for PathTemplateParser<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut str = String::new();
         str.push_str("PathTemplateParser { variables: ");
@@ -123,8 +151,8 @@ impl Debug for PathTemplateParser {
 }
 
 #[allow(dead_code)]
-impl PathTemplateParser {
-    pub fn parse<'a>(&self, source: &'a str) -> Result<PathTemplate, String> {
+impl<'a> PathTemplateParser<'a> {
+    pub fn parse<'b>(&self, source: &'b str) -> Result<PathTemplate, String> {
         let p_tmpl = RefCell::new(Vec::<Rc<Mutex<dyn PathValue>>>::new());
 
         let tmpl = TemplateParser::default();
