@@ -301,7 +301,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::logqueue::{FindFiles, OpenLogFile};
+    use crate::logqueue::{FindFiles, OpenLogFile, ValidateLogFiles};
 
     #[test]
     fn log_queue_conf_test() {
@@ -338,10 +338,17 @@ mod test {
             }
         }
 
+        struct ValidateStub(OrderedLogs<(IdTest,IdTest)>);
+        impl ValidateLogFiles<(IdTest,IdTest),String> for ValidateStub {
+            fn validate( &self, log_files: &Vec<(IdTest,IdTest)> ) -> Result<OrderedLogs<(IdTest,IdTest)>,String> {
+                Ok( self.0.clone() )
+            }
+        }
+
         let open_conf: LogFileQueueConf<IdTest,IdTest,String,_,_,_,_> = LogFileQueueConf {
             find_files: FindFilesStub(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()]),
             open_log_file: OpenFileStub,
-            validate: |f| Ok(OrderedLogs {
+            validate: ValidateStub(OrderedLogs {
                 files: vec![
                     (id1.clone(),id1.clone()), 
                     (id2.clone(),id2.clone()), 
@@ -433,7 +440,7 @@ mod full_test {
     use crate::logqueue::new_file::NewFileGenerator;
     use crate::logqueue::path_tmpl::PathTemplateParser;
     use crate::logqueue::{log_id::*, LogFileQueueConf, LoqErr, validate_sequence, SeqValidateOp, IdOf, ErrThrow, 
-        LogQueueOpenConf, LogQueueConf, LogSwitcher, OldNewId, LogFileQueue, log_queue, OpenLogFile
+        LogQueueOpenConf, LogQueueConf, LogSwitcher, OldNewId, LogFileQueue, log_queue, OpenLogFile, ValidateLogFiles
     };
     use crate::logqueue::find_logs::FsLogFind;
     use super::super::log_queue_read::*;
@@ -563,6 +570,13 @@ mod full_test {
             }
         }
 
+        struct ValidateStub;
+        impl ValidateLogFiles<(PathBuf,LogFile<FileBuff>),LoqErr> for ValidateStub {
+            fn validate( &self, log_files: &Vec<(PathBuf,LogFile<FileBuff>)> ) -> Result<crate::logqueue::OrderedLogs<(PathBuf,LogFile<FileBuff>)>,LoqErr> {
+                validate_sequence::<(PathBuf,LogFile<FileBuff>),LoqErr,LoqErr,LogQueueFileNumID>(log_files)
+            }
+        }
+
         let log_file_queue_conf: 
         LogFileQueueConf<
             LogFile<FileBuff>, 
@@ -572,9 +586,7 @@ mod full_test {
          = LogFileQueueConf {
             find_files: fs_log_find,
             open_log_file: OpenLogFileStub,
-            validate: |found_files:&Vec<(PathBuf,LogFile<FileBuff>)>| { 
-                validate_sequence::<(PathBuf,LogFile<FileBuff>),LoqErr,LoqErr,LogQueueFileNumID>(found_files)
-            },
+            validate: ValidateStub,
             init: || {
                 let mut generator = log_file_new.write().unwrap();
                 let new_file = generator.generate().unwrap();

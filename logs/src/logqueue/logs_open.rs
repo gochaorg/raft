@@ -37,7 +37,7 @@ pub trait ValidateLogFiles<LogFile,ERR>
 where 
     LogFile: Clone
 {
-    fn validate( &self ) -> Result<OrderedLogs<LogFile>,ERR>;
+    fn validate( &self, log_files: &Vec<LogFile> ) -> Result<OrderedLogs<LogFile>,ERR>;
 }
 
 /// Минимальная конфигурация для открытия логов
@@ -47,7 +47,7 @@ where
     FILE:Clone,
     FOpen: OpenLogFile<FILE,LOG,ERR>,
     FFind: FindFiles<FILE,ERR>,
-    FValidate: Fn(&Vec<(FILE,LOG)>) -> Result<OrderedLogs<(FILE,LOG)>,ERR>,
+    FValidate: ValidateLogFiles<(FILE,LOG),ERR>,
     FInit: Fn() -> Result<(FILE,LOG), ERR>,
 {
     /// Поиск лог файлов
@@ -103,7 +103,7 @@ where
     LOG:Clone,
     FOpen: OpenLogFile<FILE,LOG,ERR>,
     FFind: FindFiles<FILE,ERR>,
-    FValidate: Fn(&Vec<(FILE,LOG)>) -> Result<OrderedLogs<(FILE,LOG)>,ERR>,
+    FValidate: ValidateLogFiles<(FILE,LOG),ERR>,
     FInit: Fn() -> Result<(FILE,LOG), ERR>,
     FILE: Clone
 {
@@ -124,8 +124,8 @@ where
                 })
             })?;
 
-            //let (tail_file, tail_log) = (self.validate)(&not_validated_open_files)?;
-            let validated_order = (self.validate)(&not_validated_open_files)?;
+            let validated_order = 
+                self.validate.validate(&not_validated_open_files)?;
 
             Ok(LogFilesOpenned{ 
                 files: not_validated_open_files, 
@@ -179,14 +179,18 @@ mod test {
             }
         }
 
+        struct ValidateStub( OrderedLogs<(IdTest,IdTest)> );
+        impl ValidateLogFiles<(IdTest,IdTest),String> for ValidateStub {
+            fn validate( &self, log_files: &Vec<(IdTest,IdTest)> ) -> Result<OrderedLogs<(IdTest,IdTest)>,String> {
+                Ok( self.0.clone() )
+            }
+        }
+
         let queue_conf: LogFileQueueConf<IdTest,IdTest,String,_,_,_,_> = 
         LogFileQueueConf {
-            // find_files: || {
-            //     Ok(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()])
-            // },
             find_files: FindFilesStub(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()]),
             open_log_file: OpenLogFileStub,
-            validate: |_files:&Vec<(IdTest,IdTest)>| Ok( 
+            validate: ValidateStub(
                 OrderedLogs {
                     files: vec![
                     (id1.clone(),id1.clone()), 
@@ -195,7 +199,7 @@ mod test {
                     (id0.clone(),id0.clone()), 
                     ],
                     tail: (id3.clone(),id3.clone())
-                }                
+                }
             ),
             init: || Ok( (id0.clone(),id0.clone()) ),
         };
