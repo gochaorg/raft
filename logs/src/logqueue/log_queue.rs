@@ -449,9 +449,9 @@ mod full_test {
     use crate::logfile::LogFile;
     use crate::logfile::block::{BlockId, BlockOptions};
     use crate::logqueue::new_file::NewFileGenerator;
-    use crate::logqueue::path_tmpl::PathTemplateParser;
+    use crate::logqueue::path_tmpl::{PathTemplateParser, PathTemplate};
     use crate::logqueue::{log_id::*, LogFileQueueConf, LoqErr, validate_sequence, SeqValidateOp, IdOf, ErrThrow, 
-        LogQueueOpenConf, LogQueueConf, LogSwitcher, OldNewId, LogFileQueue, log_queue, OpenLogFile, ValidateLogFiles, InitializeFirstLog
+        LogQueueOpenConf, LogQueueConf, LogSwitcher, OldNewId, LogFileQueue, log_queue, OpenLogFile, ValidateLogFiles, InitializeFirstLog, LogWriting
     };
     use crate::logqueue::find_logs::FsLogFind;
     use super::super::log_queue_read::*;
@@ -551,6 +551,10 @@ mod full_test {
 
         println!("run test");
 
+        fn parse<'a,'b,'c>( parser: &'a PathTemplateParser, tmp:&'b str ) -> PathTemplate<'c> {
+            todo!()
+        }
+
         let fs_log_find = 
             FsLogFind::new( 
                 prepared.log_dir_root.to_str().unwrap(), 
@@ -563,6 +567,7 @@ mod full_test {
             root = prepared.log_dir_root.to_str().unwrap(),
             name = "${time:local:yyyy-mm-ddThh-mi-ss}-${rnd:5}.binlog"
         )).unwrap();
+        let path_tmpl = parse(&path_tmpl_parser, "aaa");
 
         let log_file_new = 
             NewFileGenerator {
@@ -658,7 +663,7 @@ mod full_test {
                     })?;
                 Ok(())
             },
-            new_file: || {
+            new_file: move || {
                 let mut generator = log_file_new.write().unwrap();
                 let new_file = generator.generate().unwrap();
                 let path = new_file.path.clone();
@@ -678,16 +683,14 @@ mod full_test {
         let mut log_queue = log_queue_conf.open().unwrap();
         println!("log_queue openned");
 
-        let mut log_queue: Box<dyn LogFileQueue<LoqErr,LogQueueFileNumID,PathBuf,LogFile<FileBuff>>>
+        log_queue.write(10);
+
+        let mut log_queue: Box<dyn LogFileQueue<LoqErr,LogQueueFileNumID,PathBuf,LogFile<FileBuff>> + '_>
             = Box::new(log_queue);
 
-        let rec = Record {
-            data: &Vec::<u8>::new(),
-            options: BlockOptions::default(),
-        };
-        //log_queue.write( rec );
+        log_queue.write(20);
 
-        log_queue.switch().unwrap();
+        //log_queue.switch().unwrap();
 
     }
 }

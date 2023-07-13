@@ -1,29 +1,24 @@
-use crate::logfile::{block::BlockOptions, LogFile, FlatBuff, LogErr};
+use std::path::PathBuf;
 
-use super::{LogWriting, RecID, LogFileQueue, LogQueueFileId};
+use crate::{logfile::{block::BlockOptions, LogFile, FlatBuff, LogErr}, bbuff::absbuff::FileBuff};
 
-/// Добавляемся запись
-pub struct Record<'a> {
-    /// Данные
-    pub data: &'a [u8],
-    /// опции ключ/значение
-    pub options: BlockOptions,
+use super::{LogWriting, RecID, LogFileQueue, LogQueueFileId, LoqErr, LogFileQueueImpl, LogQueueFileNumID, LogSwitching};
+
+impl<LOGSwitch,LOGIdOf> LogWriting<LoqErr,RecID<LogQueueFileNumID>> 
+for &LogFileQueueImpl<LogQueueFileNumID,PathBuf,LogFile<FileBuff>,LoqErr,LOGSwitch,LOGIdOf>
+where
+    LOGSwitch: LogSwitching<(PathBuf,LogFile<FileBuff>),LoqErr>,
+    LOGIdOf: Fn((PathBuf,LogFile<FileBuff>)) -> Result<LogQueueFileNumID,LoqErr> + Clone,
+{
+    fn write<Record>( self, record:Record ) -> Result<RecID<LogQueueFileNumID>,LoqErr> {
+        todo!()
+    }
 }
 
-impl <'a,ERR,LogId,FILE,BUFF> LogWriting<ERR,RecID<LogId>,Record<'a>>
-for Box<dyn LogFileQueue<ERR, LogId, FILE, LogFile<BUFF>>>
-where
-    LogId: LogQueueFileId,
-    BUFF: FlatBuff,
-    ERR: From<LogErr>
+impl LogWriting<LoqErr,RecID<LogQueueFileNumID>> 
+for Box<dyn LogFileQueue<LoqErr,LogQueueFileNumID,PathBuf,LogFile<FileBuff>>>
 {
-    fn write( self, record:Record<'a> ) -> Result<RecID<LogId>,ERR> {
-        let (file,mut tail) = self.tail();
-        let block_id = tail.append_data(&record.options, record.data)?;
-        let log_id = self.log_id_of(&(file,tail))?;
-        Ok(RecID {
-            file_id: log_id,
-            block_id: block_id
-        })
+    fn write<Record>( self, record:Record ) -> Result<RecID<LogQueueFileNumID>,LoqErr> {
+        todo!()
     }
 }
