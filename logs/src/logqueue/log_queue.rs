@@ -65,14 +65,14 @@ where
     files: Vec<(FILE,LOG)>,
 
     /// Актуальный лог
-    tail: (FILE,LOG),
+    pub tail: (FILE,LOG),
 
     /// Переключение лог файла
     #[allow(dead_code)]
     switching: LOGSwitch,
 
     /// Получение идентификатора лога
-    id_of: LOGIdOf,
+    pub id_of: LOGIdOf,
 
     /// Кеш ид - лог файл
     log_id_to_log: RefCell<Option<HashMap<ID,(FILE,LOG)>>>,
@@ -567,12 +567,11 @@ mod full_test {
             root = prepared.log_dir_root.to_str().unwrap(),
             name = "${time:local:yyyy-mm-ddThh-mi-ss}-${rnd:5}.binlog"
         )).unwrap();
-        let path_tmpl = parse(&path_tmpl_parser, "aaa");
 
         let log_file_new = 
             NewFileGenerator {
                 open: |path| OpenOptions::new().create(true).read(true).write(true).open(path),
-                path_template: parse(&path_tmpl_parser, "aaa"),
+                path_template: path_tmpl,
                 max_duration: Some(Duration::from_secs(5)),
                 max_attemps: Some(5),
                 throttling: Some(Duration::from_millis(100))
@@ -683,12 +682,12 @@ mod full_test {
         let mut log_queue = log_queue_conf.open().unwrap();
         println!("log_queue openned");
 
-        log_queue.write(10);
+        log_queue.write(10).unwrap();
 
         let mut log_queue: Box<dyn LogFileQueue<LoqErr,LogQueueFileNumID,PathBuf,LogFile<FileBuff>> + '_>
             = Box::new(log_queue);
 
-        log_queue.write(20);
+        log_queue.write(20).unwrap();
 
         //log_queue.switch().unwrap();
 

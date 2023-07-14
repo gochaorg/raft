@@ -152,7 +152,7 @@ impl<'a> Debug for PathTemplateParser<'a> {
 
 #[allow(dead_code)]
 impl<'a> PathTemplateParser<'a> {
-    pub fn parse<'b>(&self, source: &'b str) -> Result<PathTemplate, String> {
+    pub fn parse<'r>(&self, source: &str) -> Result<PathTemplate<'r>, String> {
         let p_tmpl = RefCell::new(Vec::<Rc<Mutex<dyn PathValue>>>::new());
 
         let tmpl = TemplateParser::default();
@@ -232,7 +232,18 @@ impl<'a> PathTemplateParser<'a> {
         };
 
         let p_tmpl = p_tmpl.borrow().clone();
-        Ok( PathTemplate { generators: p_tmpl } )
+        let res: Result<Vec<Rc<Mutex<dyn PathValue>>>, String> = p_tmpl.iter().fold( Ok(Vec::<Rc<Mutex<dyn PathValue + 'r>>>::new()), |res,i| {
+            res.and_then(|mut res| {
+                match i.lock() {
+                    Ok(i) => {
+                        res.push( i.clone() );
+                        Ok(res)
+                    },
+                    Err(err) => Err(format!("can't lock item: {}", err.to_string()))
+                }
+            })
+        });
+        res.map(|res| PathTemplate { generators: res })
     }
 }
 

@@ -1,3 +1,5 @@
+use crate::logfile::{block::BlockOptions, LogErr};
+
 /// Навигация по смеженным записям
 /// 
 /// Типы
@@ -26,7 +28,19 @@ pub trait LogReading<ERR,RecordId,Record,RecordOptions> {
     fn read_options( &self, record_id: RecordId ) -> Result<RecordOptions, ERR>;
 }
 
+/// Подготовленные данные для записи
+pub struct PreparedRecord {
+    pub data: Box<[u8]>,
+    pub options: BlockOptions,
+}
+
+pub struct LogWriteErr(pub LogErr);
+
 /// Запись в лог
-pub trait LogWriting<ERR,RecordId> {
-    fn write<Record>( self, record:Record ) -> Result<RecordId,ERR>;
+pub trait LogWriting<ERR,RecordId> 
+where
+    ERR: From<LogWriteErr>
+{
+    fn write<Record>( self, record:Record ) -> Result<RecordId,ERR>
+    where Record: Into<PreparedRecord>;
 }

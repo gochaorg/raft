@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::{logfile::{LogErr, LogFile}, bbuff::absbuff::{ABuffError, FileBuff}};
 
-use super::{LogIdReadWriteErr, LogQueueFileNumID};
+use super::{LogIdReadWriteErr, LogQueueFileNumID, LogWriteErr};
 
 /// Ошибки очереди логов
 #[derive(Clone,Debug)]
@@ -54,5 +54,15 @@ pub enum LoqErr {
     LogIdWriteFailed2 {
         file: PathBuf,
         error: LogErr,
+    },
+
+    LogDataWriteFailed {
+        error: LogErr
+    }
+}
+
+impl From<LogWriteErr> for LoqErr {
+    fn from(value: LogWriteErr) -> Self {
+        LoqErr::LogDataWriteFailed { error: value.0 }
     }
 }
