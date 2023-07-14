@@ -61,6 +61,7 @@ where
     },
 
     LogDataWrite {
+        file: FILE,
         error: LogErr
     },
 

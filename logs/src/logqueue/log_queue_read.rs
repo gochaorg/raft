@@ -5,16 +5,19 @@ use crate::logfile::{LogFile, FlatBuff, LogErr, block::{BlockId, BlockOptions}};
 use super::{LogNavigationNear, log_id::{RecID, LogQueueFileId}, log_queue::LogFileQueue, LogNavigateLast, LogReading, LoqErr};
 
 /// Реализация чтения логов для dyn LogFileQueue
-impl<ERR,LogId, FILE, BUFF> LogNavigationNear<ERR> 
-for dyn LogFileQueue<ERR, LogId, FILE, LogFile<BUFF>>
+impl<LogId, FILE, BUFF> LogNavigationNear
+for & dyn LogFileQueue<LoqErr<FILE,LogId>, LogId, FILE, LogFile<BUFF>>
 where
     LogId: LogQueueFileId,
     BUFF: FlatBuff,
-    ERR: From<LogErr>,
+    FILE: Clone + Debug,
 {
     type RecordId = RecID<LogId>;
+    type FILE = FILE;
+    type LogId = LogId;
 
-    fn next_record( &self, record_id: RecID<LogId> ) -> Result<Option<RecID<LogId>>,ERR> {
+    fn next_record( &self, record_id: RecID<LogId> ) -> 
+    Result<Option<RecID<LogId>>,LoqErr<Self::FILE,Self::LogId>> {
         let res = 
         self.find_log(record_id.log_file_id.clone())?.and_then(|(_file,log)| {
             let count = log.count().ok()?; // TODO здесь теряется информация о ошибке
@@ -36,7 +39,8 @@ where
         Ok(res)
     }
 
-    fn previous_record( &self, record_id: RecID<LogId> ) -> Result<Option<RecID<LogId>>,ERR> {
+    fn previous_record( &self, record_id: RecID<LogId> ) -> 
+    Result<Option<RecID<LogId>>,LoqErr<Self::FILE,Self::LogId>> {
         let result =
         if record_id.block_id.value() == 0 {
             self.offset_log_id(record_id.log_file_id.clone(), -1)?
@@ -64,23 +68,31 @@ where
     }
 }
 
-impl <ERR,LogId,FILE,BUFF> LogNavigateLast<ERR>
-for & dyn LogFileQueue<ERR, LogId, FILE, LogFile<BUFF>>
+impl <LogId,FILE,BUFF> LogNavigateLast
+for & dyn LogFileQueue<LoqErr<FILE,LogId>, LogId, FILE, LogFile<BUFF>>
 where
     LogId: LogQueueFileId,
     BUFF: FlatBuff,
-    ERR: From<LogErr>,
+    FILE: Clone + Debug,    
 {
     type RecordId = RecID<LogId>;
+    type FILE = FILE;
+    type LogId = LogId;
 
-    fn last_record( &self ) -> Result<Option<RecID<LogId>>,ERR> {
-        let (file,tail) = self.tail();
-        let cnt = tail.count()?;
+    fn last_record( &self ) -> Result<Option<RecID<LogId>>,LoqErr<Self::FILE,Self::LogId>> {
+        let (file_name,tail) = self.tail();
+        let file_name0 = file_name.clone();
+        let cnt = tail.count()
+            .map_err(|err| LoqErr::LogCountFail { 
+                file: file_name0, 
+                error: err 
+        })?;
+
         if cnt==0 {
             return Ok(None)
         }
 
-        let lfile = (file,tail);
+        let lfile = (file_name,tail);
         let log_id = self.log_id_of(&lfile)?;
         
         Ok(Some(RecID {
@@ -91,7 +103,7 @@ where
 }
 
 impl <LogId,FILE,BUFF> LogReading<Box<Vec<u8>>, BlockOptions>
-for dyn LogFileQueue<LoqErr<FILE,LogId>, LogId, FILE, LogFile<BUFF>>
+for & dyn LogFileQueue<LoqErr<FILE,LogId>, LogId, FILE, LogFile<BUFF>>
 where
     LogId: LogQueueFileId,
     FILE: Clone + Debug,

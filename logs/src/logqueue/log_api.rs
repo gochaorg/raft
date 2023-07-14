@@ -6,24 +6,30 @@ use super::LoqErr;
 /// 
 /// Типы
 /// - `Err` - Ошибки
-pub trait LogNavigationNear<ERR> {
+pub trait LogNavigationNear {
     /// Идентификатор записи
     type RecordId: Sized;
 
+    type FILE: Clone + Debug;
+    type LogId: Clone + Debug;
+
     /// Получение id следующей записи
-    fn next_record( &self, record_id: Self::RecordId ) -> Result<Option<Self::RecordId>,ERR>;
+    fn next_record( &self, record_id: Self::RecordId ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;
 
     /// Получение id предыдущей записи
-    fn previous_record( &self, record_id: Self::RecordId ) -> Result<Option<Self::RecordId>,ERR>;    
+    fn previous_record( &self, record_id: Self::RecordId ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;    
 }
 
 /// Навигация в конец
-pub trait LogNavigateLast<ERR> {
+pub trait LogNavigateLast {
     /// Идентификатор записи
     type RecordId: Sized;
 
+    type FILE: Clone + Debug;
+    type LogId: Clone + Debug;
+
     /// Получение последней записи в log queue
-    fn last_record( &self ) -> Result<Option<Self::RecordId>,ERR>;
+    fn last_record( &self ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;
 }
 
 /// Чтение отдельных записей

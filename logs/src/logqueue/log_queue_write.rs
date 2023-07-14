@@ -21,7 +21,10 @@ where
         let (file, mut log) = self.tail();
         let b_id = log.append_data(&prepared.options, &prepared.data)
             .map_err(|err| 
-                LoqErr::LogDataWrite { error: err }
+                LoqErr::LogDataWrite { 
+                    file: file.clone(),
+                    error: err 
+                }
             )?;
         let id = self.log_id_of(&(file,log))?;
         Ok( RecID { log_file_id:id, block_id: b_id } )
