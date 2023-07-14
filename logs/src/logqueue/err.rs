@@ -50,17 +50,17 @@ where
         logs: Vec<(FILE,LogId)>
     },
 
-    LogIdWriteFailed {
+    LogIdWrite {
         file: FILE,
         error: LogIdReadWriteErr
     },
 
-    LogIdWriteFailed2 {
+    LogIdWrite2 {
         file: FILE,
         error: LogErr,
     },
 
-    LogDataWriteFailed {
+    LogDataWrite {
         error: LogErr
     },
 
@@ -77,15 +77,5 @@ where
         file: FILE,
         error: LogErr,
         block_id: BlockId,
-    }
-}
-
-impl<FILE,LogId> From<LogWriteErr> for LoqErr<FILE,LogId> 
-where 
-    FILE: Clone + Debug,
-    LogId: Clone + Debug,
-{
-    fn from(value: LogWriteErr) -> Self {
-        LoqErr::LogDataWriteFailed { error: value.0 }
     }
 }

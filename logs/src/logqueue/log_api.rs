@@ -52,10 +52,11 @@ pub struct PreparedRecord {
 pub struct LogWriteErr(pub LogErr);
 
 /// Запись в лог
-pub trait LogWriting<ERR,RecordId> 
-where
-    ERR: From<LogWriteErr>
+pub trait LogWriting<RecordId> 
 {
-    fn write<Record>( self, record:Record ) -> Result<RecordId,ERR>
+    type FILE: Clone + Debug;
+    type LogId: Clone + Debug;
+
+    fn write<Record>( self, record:Record ) -> Result<RecordId,LoqErr<Self::FILE,Self::LogId>>
     where Record: Into<PreparedRecord>;
 }

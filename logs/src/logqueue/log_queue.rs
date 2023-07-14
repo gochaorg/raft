@@ -604,13 +604,13 @@ mod full_test {
                 let mut data = Vec::<u8>::new();
                 let id = LogQueueFileNumID { id: 0, previous: None };
                 id.block_write(&mut options, &mut data).
-                    map_err(|err| LoqErr::LogIdWriteFailed { 
+                    map_err(|err| LoqErr::LogIdWrite { 
                     file: new_file.path.clone(),
                     error: err
                 })?;
                 log.append_data(&options, &data)
                     .map_err(|err|
-                    LoqErr::LogIdWriteFailed2 { 
+                    LoqErr::LogIdWrite2 { 
                         file: new_file.path.clone(), 
                         error: err 
                     })?;
@@ -647,12 +647,12 @@ mod full_test {
                 let mut options = BlockOptions::default();
                 let mut data = Vec::<u8>::new();
                 ids.new_id.block_write(&mut options, &mut data)
-                    .map_err(|err| LoqErr::LogIdWriteFailed { 
+                    .map_err(|err| LoqErr::LogIdWrite { 
                         file: filename.clone(), 
                         error: err
                 })?;
                 log.append_data(&options, &data)
-                    .map_err(|err| LoqErr::LogIdWriteFailed2 { 
+                    .map_err(|err| LoqErr::LogIdWrite2 { 
                         file: filename.clone(), 
                         error: err 
                     })?;
