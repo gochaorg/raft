@@ -1,67 +1,90 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, fmt::Debug};
 
-use crate::{logfile::{LogErr, LogFile}, bbuff::absbuff::{ABuffError, FileBuff}};
+use crate::{logfile::{LogErr, LogFile, block::BlockId}, bbuff::absbuff::{ABuffError, FileBuff}};
 
 use super::{LogIdReadWriteErr, LogQueueFileNumID, LogWriteErr};
 
 /// Ошибки очереди логов
 #[derive(Clone,Debug)]
-pub enum LoqErr {
+pub enum LoqErr<FILE,LogId>
+where 
+    FILE: Clone + Debug,
+    LogId: Clone + Debug
+{
     /// Не возможно прочитать кол-во записей в логе
     CantReadRecordsCount {
-        file: PathBuf,
+        file: FILE,
         error: LogErr
     },
 
     CantReadLogId {
-        file: PathBuf,        
+        file: FILE,        
         error: LogErr,
         log_id_type: String,
     },
 
     CantParseLogId {
-        file: PathBuf,
+        file: FILE,
         error: LogIdReadWriteErr,
         log_id_type: String,
     },
 
     OpenFileBuff {
-        file: PathBuf,
+        file: FILE,
         error: ABuffError,
     },
 
     OpenLog {
-        file: PathBuf,
+        file: FILE,
         error: LogErr,
     },
 
     OpenTwoHeads {
-        heads: Vec<(PathBuf,LogQueueFileNumID)>
+        heads: Vec<(FILE,LogId)>
     },
 
     OpenNoHeads,
 
     OpenLogNotFound {
-        id: LogQueueFileNumID,
-        logs: Vec<(PathBuf,LogQueueFileNumID)>
+        id: LogId,
+        logs: Vec<(FILE,LogId)>
     },
 
     LogIdWriteFailed {
-        file: PathBuf,
+        file: FILE,
         error: LogIdReadWriteErr
     },
 
     LogIdWriteFailed2 {
-        file: PathBuf,
+        file: FILE,
         error: LogErr,
     },
 
     LogDataWriteFailed {
         error: LogErr
+    },
+
+    LogCountFail {
+        file: FILE,
+        error: LogErr
+    },
+
+    LogIdNotMatched {
+        log_id: LogId
+    },
+
+    LogGetBlock {
+        file: FILE,
+        error: LogErr,
+        block_id: BlockId,
     }
 }
 
-impl From<LogWriteErr> for LoqErr {
+impl<FILE,LogId> From<LogWriteErr> for LoqErr<FILE,LogId> 
+where 
+    FILE: Clone + Debug,
+    LogId: Clone + Debug,
+{
     fn from(value: LogWriteErr) -> Self {
         LoqErr::LogDataWriteFailed { error: value.0 }
     }

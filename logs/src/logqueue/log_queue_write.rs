@@ -1,37 +1,24 @@
-use std::path::PathBuf;
-
 use crate::{logfile::{block::BlockOptions, LogFile, FlatBuff, LogErr}, bbuff::absbuff::FileBuff, logqueue::LogWriteErr};
 
 use super::{LogWriting, RecID, LogFileQueue, LogQueueFileId, LoqErr, LogFileQueueImpl, LogQueueFileNumID, LogSwitching, PreparedRecord};
 
-impl<LOGSwitch,LOGIdOf> LogWriting<LoqErr,RecID<LogQueueFileNumID>> 
-for &LogFileQueueImpl<LogQueueFileNumID,PathBuf,LogFile<FileBuff>,LoqErr,LOGSwitch,LOGIdOf>
-where
-    LOGSwitch: LogSwitching<(PathBuf,LogFile<FileBuff>),LoqErr>,
-    LOGIdOf: Fn((PathBuf,LogFile<FileBuff>)) -> Result<LogQueueFileNumID,LoqErr> + Clone,
+impl<ERR,FILE,BUFF,LogId> LogWriting<ERR,RecID<LogId>> 
+for & dyn LogFileQueue<ERR,LogId,FILE,LogFile<BUFF>>
+where 
+    ERR: From<LogWriteErr>,
+    FILE: Clone,
+    BUFF: FlatBuff,
+    LogId: LogQueueFileId
 {
-    fn write<Record>( self, record:Record ) -> Result<RecID<LogQueueFileNumID>,LoqErr> 
-    where Record: Into<PreparedRecord>
-    {
-        let prepared : PreparedRecord = record.into();
-        let (file, mut log) = self.tail.clone();
-        let b_id = log.append_data(&prepared.options, &prepared.data).map_err(|err| LogWriteErr(err))?;
-        let id = (self.id_of)( (file,log).clone() )?;
-        Ok( RecID { file_id:id, block_id: b_id } )
-    }
-}
-
-impl LogWriting<LoqErr,RecID<LogQueueFileNumID>> 
-for Box<dyn LogFileQueue<LoqErr,LogQueueFileNumID,PathBuf,LogFile<FileBuff>>>
-{
-    fn write<Record>( self, record:Record ) -> Result<RecID<LogQueueFileNumID>,LoqErr> 
+    fn write<Record>( self, record:Record ) -> Result<RecID<LogId>,ERR> 
     where Record: Into<PreparedRecord>
     {
         let prepared : PreparedRecord = record.into();
         let (file, mut log) = self.tail();
-        let b_id = log.append_data(&prepared.options, &prepared.data).map_err(|err| LogWriteErr(err))?;
+        let b_id = log.append_data(&prepared.options, &prepared.data)
+            .map_err(|err| LogWriteErr(err))?;
         let id = self.log_id_of(&(file,log))?;
-        Ok( RecID { file_id:id, block_id: b_id } )
+        Ok( RecID { log_file_id:id, block_id: b_id } )
     }
 }
 

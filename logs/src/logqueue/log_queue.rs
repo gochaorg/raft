@@ -457,7 +457,7 @@ mod full_test {
     use super::super::log_queue_read::*;
     use super::super::log_queue_write::*;
 
-    fn open_file( path:PathBuf ) -> Result<LogFile<FileBuff>,LoqErr> {
+    fn open_file( path:PathBuf ) -> Result<LogFile<FileBuff>,LoqErr<PathBuf,LogQueueFileNumID>> {
         let buff = 
         FileBuff::open_read_write(path.clone()).map_err(|err| LoqErr::OpenFileBuff { 
             file: path.clone(), 
@@ -473,9 +473,9 @@ mod full_test {
         Ok(log)
     }
 
-    impl SeqValidateOp<(PathBuf,LogFile<FileBuff>), LoqErr, LogQueueFileNumID>
+    impl SeqValidateOp<(PathBuf,LogFile<FileBuff>), LoqErr<PathBuf,LogQueueFileNumID>, LogQueueFileNumID>
     for (PathBuf,LogFile<FileBuff>) {
-        fn items_count(a:&(PathBuf,LogFile<FileBuff>)) -> Result<u32,LoqErr> {
+        fn items_count(a:&(PathBuf,LogFile<FileBuff>)) -> Result<u32,LoqErr<PathBuf,LogQueueFileNumID>> {
             let (filename,log) = a;
             match log.count() {
                 Ok(count) => Ok(count),
@@ -489,7 +489,7 @@ mod full_test {
         }
     }
 
-    fn id_of( a:&(PathBuf,LogFile<FileBuff>) ) -> Result<LogQueueFileNumID,LoqErr> {
+    fn id_of( a:&(PathBuf,LogFile<FileBuff>) ) -> Result<LogQueueFileNumID,LoqErr<PathBuf,LogQueueFileNumID>> {
         let (filename,log) = a;
         let id_type = type_name::<LogQueueFileNumID>().to_string();
 
@@ -511,15 +511,15 @@ mod full_test {
         Ok(id)
     }
 
-    impl IdOf<(PathBuf,LogFile<FileBuff>),LogQueueFileNumID,LoqErr>
+    impl IdOf<(PathBuf,LogFile<FileBuff>),LogQueueFileNumID,LoqErr<PathBuf,LogQueueFileNumID>>
     for (PathBuf,LogFile<FileBuff>) {
-        fn id_of(a:&(PathBuf,LogFile<FileBuff>)) -> Result<LogQueueFileNumID,LoqErr> {
+        fn id_of(a:&(PathBuf,LogFile<FileBuff>)) -> Result<LogQueueFileNumID,LoqErr<PathBuf,LogQueueFileNumID>> {
             id_of(a)
         }
     }
 
-    impl ErrThrow<(PathBuf,LogFile<FileBuff>), LoqErr, LogQueueFileNumID> for LoqErr {
-        fn two_heads(heads:Vec<((PathBuf,LogFile<FileBuff>),LogQueueFileNumID)>) -> LoqErr {
+    impl ErrThrow<(PathBuf,LogFile<FileBuff>), LoqErr<PathBuf,LogQueueFileNumID>, LogQueueFileNumID> for LoqErr<PathBuf,LogQueueFileNumID> {
+        fn two_heads(heads:Vec<((PathBuf,LogFile<FileBuff>),LogQueueFileNumID)>) -> LoqErr<PathBuf,LogQueueFileNumID> {
             LoqErr::OpenTwoHeads { 
                 heads: heads.iter().map(
                     |((filename,_),id)| {
@@ -528,14 +528,14 @@ mod full_test {
             }
         }
 
-        fn no_heads() -> LoqErr {
+        fn no_heads() -> LoqErr<PathBuf,LogQueueFileNumID> {
             LoqErr::OpenNoHeads
         }
 
         fn not_found_next_log( 
             id: &LogQueueFileNumID, 
             logs:Vec<&((PathBuf,LogFile<FileBuff>),LogQueueFileNumID)> 
-        ) -> LoqErr {
+        ) -> LoqErr<PathBuf,LogQueueFileNumID> {
             LoqErr::OpenLogNotFound { 
                 id: id.clone(), 
                 logs: logs.iter().map(|((filename,_),id)|{
@@ -550,10 +550,6 @@ mod full_test {
         let prepared = prepare();
 
         println!("run test");
-
-        fn parse<'a,'b,'c>( parser: &'a PathTemplateParser, tmp:&'b str ) -> PathTemplate<'c> {
-            todo!()
-        }
 
         let fs_log_find = 
             FsLogFind::new( 
@@ -579,26 +575,26 @@ mod full_test {
         let log_file_new = Arc::new(RwLock::new(log_file_new));
 
         struct OpenLogFileStub;
-        impl OpenLogFile<PathBuf,LogFile<FileBuff>,LoqErr> for OpenLogFileStub {
-            fn open_log_file( &self, file:PathBuf ) -> Result<LogFile<FileBuff>, LoqErr> {
+        impl OpenLogFile<PathBuf,LogFile<FileBuff>,LoqErr<PathBuf,LogQueueFileNumID>> for OpenLogFileStub {
+            fn open_log_file( &self, file:PathBuf ) -> Result<LogFile<FileBuff>, LoqErr<PathBuf,LogQueueFileNumID>> {
                 open_file(file)
             }
         }
 
         struct ValidateStub;
-        impl ValidateLogFiles<(PathBuf,LogFile<FileBuff>),LoqErr> for ValidateStub {
-            fn validate( &self, log_files: &Vec<(PathBuf,LogFile<FileBuff>)> ) -> Result<crate::logqueue::OrderedLogs<(PathBuf,LogFile<FileBuff>)>,LoqErr> {
-                validate_sequence::<(PathBuf,LogFile<FileBuff>),LoqErr,LoqErr,LogQueueFileNumID>(log_files)
+        impl ValidateLogFiles<(PathBuf,LogFile<FileBuff>),LoqErr<PathBuf,LogQueueFileNumID>> for ValidateStub {
+            fn validate( &self, log_files: &Vec<(PathBuf,LogFile<FileBuff>)> ) -> Result<crate::logqueue::OrderedLogs<(PathBuf,LogFile<FileBuff>)>,LoqErr<PathBuf,LogQueueFileNumID>> {
+                validate_sequence::<(PathBuf,LogFile<FileBuff>),LoqErr<PathBuf,LogQueueFileNumID>,LoqErr<PathBuf,LogQueueFileNumID>,LogQueueFileNumID>(log_files)
             }
         }
 
         struct InitStub<'a,F>( Arc<RwLock<NewFileGenerator<'a,F>>> )
         where F: Fn(PathBuf) -> Result<File,std::io::Error>;
 
-        impl<'a,F> InitializeFirstLog<(PathBuf,LogFile<FileBuff>),LoqErr> for InitStub<'a,F> 
+        impl<'a,F> InitializeFirstLog<(PathBuf,LogFile<FileBuff>),LoqErr<PathBuf,LogQueueFileNumID>> for InitStub<'a,F> 
         where F: Fn(PathBuf) -> Result<File,std::io::Error>
         {
-            fn initialize_first_log( &self ) -> Result<(PathBuf,LogFile<FileBuff>), LoqErr> {
+            fn initialize_first_log( &self ) -> Result<(PathBuf,LogFile<FileBuff>), LoqErr<PathBuf,LogQueueFileNumID>> {
                 let mut generator = self.0.write().unwrap();
                 let new_file = generator.generate().unwrap();
                 let path = new_file.path.clone();
@@ -627,7 +623,7 @@ mod full_test {
         LogFileQueueConf<
             LogFile<FileBuff>, 
             PathBuf, 
-            LoqErr,
+            LoqErr<PathBuf,LogQueueFileNumID>,
             _, _, _, _>
          = LogFileQueueConf {
             find_files: fs_log_find,
@@ -637,7 +633,7 @@ mod full_test {
             _p: PhantomData.clone()
         };
 
-        let log_switch : LogSwitcher<(PathBuf,LogFile<FileBuff>), LogQueueFileNumID, LoqErr, _, _, _> =
+        let log_switch : LogSwitcher<(PathBuf,LogFile<FileBuff>), LogQueueFileNumID, LoqErr<PathBuf,LogQueueFileNumID>, _, _, _> =
         LogSwitcher { 
             read_id_of: |log_file_pair: &(PathBuf,LogFile<FileBuff>)| {
                 id_of(log_file_pair)
@@ -682,14 +678,19 @@ mod full_test {
         let mut log_queue = log_queue_conf.open().unwrap();
         println!("log_queue openned");
 
-        log_queue.write(10).unwrap();
-
-        let mut log_queue: Box<dyn LogFileQueue<LoqErr,LogQueueFileNumID,PathBuf,LogFile<FileBuff>> + '_>
+        let mut log_queue: Box<dyn LogFileQueue<LoqErr<PathBuf,LogQueueFileNumID>,LogQueueFileNumID,PathBuf,LogFile<FileBuff>> + '_>
             = Box::new(log_queue);
 
         log_queue.write(20).unwrap();
+        println!("log_queue writed");
 
-        //log_queue.switch().unwrap();
+        log_queue.switch().unwrap();
+        println!("log_queue switched");
+
+        log_queue.write(30).unwrap();
+        println!("log_queue writed");
+
+        //log_queue.last
 
     }
 }

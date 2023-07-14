@@ -267,7 +267,7 @@ where
     LogId: LogQueueFileId
 {
     /// Идентификатор лог - файла
-    pub file_id: LogId,
+    pub log_file_id: LogId,
 
     /// Идентификатор записи в лог файле
     pub block_id: BlockId,
