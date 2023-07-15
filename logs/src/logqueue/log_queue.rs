@@ -74,6 +74,9 @@ where
     /// Получение идентификатора лога
     pub id_of: LOGIdOf,
 
+    /// текущий id лога
+    current_log_id: RefCell<Option<ID>>,
+
     /// Кеш ид - лог файл
     log_id_to_log: RefCell<Option<HashMap<ID,(FILE,LOG)>>>,
 
@@ -107,8 +110,9 @@ where
             files: files, 
             tail: tail, 
             switching: switching, 
+            current_log_id: RefCell::new(None),
             log_id_to_log: RefCell::new(None),
-            log_id_order: RefCell::new(None),
+            log_id_order: RefCell::new(None),            
             id_of: id_of,
         }
     }
@@ -119,6 +123,9 @@ where
         *r = None;
 
         let mut r = self.log_id_order.borrow_mut();
+        *r = None;
+
+        let mut r = self.current_log_id.borrow_mut();
         *r = None;
     }
 
@@ -160,6 +167,19 @@ where
         }
 
         Ok(cache_opt.as_ref().map(|x| consume(x)).unwrap_or(default))
+    }
+
+    fn current_log_id_read<R,F>( &self, default:R, consume:F ) -> Result<R,ERR>
+    where
+        R: Sized,
+        F: Fn(ID) -> R 
+    {
+        let mut cache_opt = self.current_log_id.borrow_mut();
+        if cache_opt.is_none() {            
+            let id = (self.id_of)(self.tail.clone())?;
+            *cache_opt = Some(id);
+        }
+        Ok(consume(cache_opt.unwrap()))
     }
 }
 
@@ -449,13 +469,11 @@ mod full_test {
     use crate::logfile::LogFile;
     use crate::logfile::block::{BlockId, BlockOptions};
     use crate::logqueue::new_file::NewFileGenerator;
-    use crate::logqueue::path_tmpl::{PathTemplateParser, PathTemplate};
+    use crate::logqueue::path_tmpl::PathTemplateParser;
     use crate::logqueue::{log_id::*, LogFileQueueConf, LoqErr, validate_sequence, SeqValidateOp, IdOf, ErrThrow, 
-        LogQueueOpenConf, LogQueueConf, LogSwitcher, OldNewId, LogFileQueue, log_queue, OpenLogFile, ValidateLogFiles, InitializeFirstLog, LogWriting, LogNavigateLast
+        LogQueueConf, LogSwitcher, OldNewId, LogFileQueue, OpenLogFile, ValidateLogFiles, InitializeFirstLog, LogWriting, LogNavigateLast
     };
     use crate::logqueue::find_logs::FsLogFind;
-    use super::super::log_queue_read::*;
-    use super::super::log_queue_write::*;
 
     fn open_file( path:PathBuf ) -> Result<LogFile<FileBuff>,LoqErr<PathBuf,LogQueueFileNumID>> {
         let buff = 
