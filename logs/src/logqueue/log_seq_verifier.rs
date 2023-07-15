@@ -177,6 +177,7 @@ pub mod test {
         }
     }
     impl Eq for IdTest {}
+    impl Copy for IdTest {}
     impl LogQueueFileId for IdTest {
         type ID = Uuid;
         fn id( &self ) -> Self::ID {            

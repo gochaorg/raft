@@ -451,7 +451,7 @@ mod full_test {
     use crate::logqueue::new_file::NewFileGenerator;
     use crate::logqueue::path_tmpl::{PathTemplateParser, PathTemplate};
     use crate::logqueue::{log_id::*, LogFileQueueConf, LoqErr, validate_sequence, SeqValidateOp, IdOf, ErrThrow, 
-        LogQueueOpenConf, LogQueueConf, LogSwitcher, OldNewId, LogFileQueue, log_queue, OpenLogFile, ValidateLogFiles, InitializeFirstLog, LogWriting
+        LogQueueOpenConf, LogQueueConf, LogSwitcher, OldNewId, LogFileQueue, log_queue, OpenLogFile, ValidateLogFiles, InitializeFirstLog, LogWriting, LogNavigateLast
     };
     use crate::logqueue::find_logs::FsLogFind;
     use super::super::log_queue_read::*;
@@ -681,16 +681,24 @@ mod full_test {
         let mut log_queue: Box<dyn LogFileQueue<LoqErr<PathBuf,LogQueueFileNumID>,LogQueueFileNumID,PathBuf,LogFile<FileBuff>> + '_>
             = Box::new(log_queue);
 
-        log_queue.write(20).unwrap();
-        println!("log_queue writed");
+        let rec = log_queue.write(20).unwrap();
+        println!("log_queue writed, rec id = {:?}",rec);
 
         log_queue.switch().unwrap();
         println!("log_queue switched");
 
-        log_queue.write(30).unwrap();
-        println!("log_queue writed");
+        let rec = log_queue.write(30).unwrap();
+        println!("log_queue writed, rec id = {:?}",rec);
 
-        //log_queue.last
+        let rec = log_queue.write(32).unwrap();
+        println!("log_queue writed, rec id = {:?}",rec);
+
+        let rec = log_queue.write(34).unwrap();
+        println!("log_queue writed, rec id = {:?}",rec);
+
+        let rec = log_queue.last_record().unwrap();
+        println!("last rec = {:?}",rec);
+        //let rec_id = log_queue.last
 
     }
 }

@@ -22,7 +22,7 @@ where
 }
 
 /// Идентификатор лог файла
-pub trait LogQueueFileId : Eq + std::fmt::Display + Clone + Debug + BlockReader + BlockWriter + Hash {
+pub trait LogQueueFileId : Eq + std::fmt::Display + Clone + Copy + Debug + BlockReader + BlockWriter + Hash {
     type ID: Eq + Clone;
 
     /// Получение идентификатора
@@ -52,6 +52,8 @@ impl std::fmt::Display for LogQueueFileNumID {
 }
 
 impl Eq for LogQueueFileNumID {}
+
+impl Copy for LogQueueFileNumID {}
 
 impl LogQueueFileId for LogQueueFileNumID {
     type ID = u128;
@@ -147,6 +149,8 @@ impl std::fmt::Display for LogQueueFileUUID {
 }
 
 impl Eq for LogQueueFileUUID {}
+
+impl Copy for LogQueueFileUUID {}
 
 impl LogQueueFileId for LogQueueFileUUID {
     type ID = Uuid;

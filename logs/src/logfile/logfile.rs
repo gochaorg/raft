@@ -64,7 +64,7 @@ where
     B: FlatBuff,
 {
     buff: B,
-    last_blocks: Box<Vec<BlockHeadRead>>,
+    last_blocks: Arc<RwLock<Vec<BlockHeadRead>>>,
     block_buff: streambuff::ByteBuff,
     pub counters: Arc<RwLock<Counters>>,
     pub tracker: Arc<Tracker>,
@@ -89,14 +89,23 @@ where
             }),
         );
 
-        for (idx, bh) in self.last_blocks.iter().enumerate() {
-            msg.push_str(&format!(
-                "\nlast block [{idx}] #{b_id} off={off} block_size={block_size} {data_size:?}",
-                b_id = bh.head.block_id,
-                off = bh.position,
-                data_size = bh.data_size,
-                block_size = bh.block_size()
-            ));
+        {
+            match self.last_blocks.read() {
+                Ok(last_block) => {
+                    for (idx, bh) in last_block.iter().enumerate() {
+                        msg.push_str(&format!(
+                            "\nlast block [{idx}] #{b_id} off={off} block_size={block_size} {data_size:?}",
+                            b_id = bh.head.block_id,
+                            off = bh.position,
+                            data_size = bh.data_size,
+                            block_size = bh.block_size()
+                        ));
+                    }
+                },
+                Err(err) => {
+                    msg.push_str(&format!("\n can't lock {}", err.to_string()))
+                }
+            }
         }
 
         write!(f, "{}", msg)
@@ -148,7 +157,7 @@ where
         if buff_size == 0 {
             return Ok(LogFile {
                 buff: buff,
-                last_blocks: Box::new(Vec::<BlockHeadRead>::new()),
+                last_blocks: Arc::new(RwLock::new(Vec::<BlockHeadRead>::new())),
                 counters: Arc::new(RwLock::new(Counters::new())),
                 tracker: Arc::new(Tracker::new()),
                 block_buff: streambuff::ByteBuff::new(),
@@ -157,8 +166,9 @@ where
 
         let block_head_read = Tail::try_read_head_at(buff_size as u64, &buff)?;
 
-        let mut last_blocks = Box::new(Vec::<BlockHeadRead>::new());
+        let mut last_blocks = Vec::<BlockHeadRead>::new();
         last_blocks.push(block_head_read.clone());
+        let mut last_blocks = Arc::new(RwLock::new(last_blocks));
 
         Ok(LogFile {
             buff: buff,
@@ -184,23 +194,30 @@ where
             self.counters.write()?.inc("append_next_block");
         }
 
-        if self.last_blocks.is_empty() {
+        let is_empty = {
+            self.last_blocks.write()?.is_empty()
+        };
+
+        if is_empty {
             self.append_first_block(block)
         } else {
-            let last_block = &self.last_blocks[0];
-            self.append_next_block(last_block.position.value() + last_block.block_size(), block)
+            let write_at = {
+                let last_block = &self.last_blocks.write()?[0];
+                last_block.position.value() + last_block.block_size()
+            };
+            self.append_next_block(write_at, block, is_empty)
         }
     }
 
     /// Добавление первого блока
     fn append_first_block(&mut self, block: &Block) -> Result<(), LogErr> {
-        self.append_next_block(0, block)
+        self.append_next_block(0, block, true)
     }
 
     /// Добавление второго и последующих блоков
     ///
     /// Обновляет/вставляет ссылку на записанный блок в `last_blocks[0]`
-    fn append_next_block(&mut self, position: u64, block: &Block) -> Result<(), LogErr> {
+    fn append_next_block(&mut self, position: u64, block: &Block, is_empty:bool) -> Result<(), LogErr> {
         let sub_track = self
             .tracker
             .sub_tracker("append_next_block/block.write_to/");
@@ -211,10 +228,13 @@ where
 
         let t1 = Instant::now();
 
-        if self.last_blocks.is_empty() {
-            self.last_blocks.push(writed_block)
-        } else {
-            self.last_blocks[0] = writed_block;
+        {
+            let mut last_blocks = self.last_blocks.write()?;
+            if is_empty {
+                last_blocks.push(writed_block)
+            } else {
+                last_blocks[0] = writed_block;
+            }
         }
 
         {
@@ -463,7 +483,7 @@ where
         block_opt: &BlockOptions,
         data: &[u8],
         tracker: &Tracker,
-    ) -> Block {
+    ) -> Result<Block,LogErr> {
         // build BlockData
         let mut block_data = Vec::<u8>::new();
         tracker.track("resize", || block_data.resize(data.len(), 0));
@@ -471,10 +491,10 @@ where
 
         let block_data = Box::new(block_data);
 
-        // build BlockOptions
-        //let block_opt = BlockOptions::default();
+        //let mut last_blocks = self.last_blocks.write()?;
+        let is_empty = { self.last_blocks.read()?.is_empty() };
 
-        if self.last_blocks.is_empty() {
+        if is_empty {
             let res = Block {
                 head: BlockHead {
                     block_id: BlockId::new(0),
@@ -484,46 +504,70 @@ where
                 },
                 data: block_data,
             };
-            return res;
+            return Ok(res);
         }
 
-        let last_block = &self.last_blocks[0];
-        let block_id = BlockId::new(last_block.head.block_id.value() + 1);
+        let block_id = {
+            let block_id = {
+                let last_blocks = self.last_blocks.read()?;
+                let last_block = &last_blocks[0];
+                    BlockId::new(last_block.head.block_id.value() + 1)
+            };
 
-        let mut update_ref = |ref_idx: usize| {
-            if ref_idx >= self.last_blocks.len() {
-                while ref_idx >= self.last_blocks.len() {
-                    match self.last_blocks.last() {
-                        Some(last) => self.last_blocks.push(last.clone()),
-                        None => {}
+            let update_ref = |ref_idx: usize| {
+                let len = || {
+                    Ok::<usize,LogErr>(self.last_blocks.read()?.len())
+                };
+
+                if ref_idx >= len()? {
+                    while ref_idx >= len()? {
+                        let last = { 
+                            let last_blocks = self.last_blocks.read()?;
+                            last_blocks.last().cloned()
+                        };
+                        match last {
+                            Some(last) => {
+                                let mut last_blocks  = self.last_blocks.write().unwrap();
+                                last_blocks.push(last.clone())
+                            },
+                            None => {}
+                        }
+                    }
+                } else {
+                    let mut last_blocks = self.last_blocks.write()?;
+                    last_blocks[ref_idx] = last_blocks[ref_idx - 1].clone()
+                }
+
+                Ok::<(),LogErr>(())
+            };
+
+            tracker.track("update backrefs", || {
+                for i in 1..32 {
+                    let level = 32 - i;
+                    let n = u32::pow(2, level);
+                    let idx = level;
+                    if block_id.value() % n == 0 {
+                        update_ref(idx as usize).unwrap()
                     }
                 }
-            } else {
-                self.last_blocks[ref_idx] = self.last_blocks[ref_idx - 1].clone()
-            }
+            });
+
+            block_id
         };
-
-        tracker.track("update backrefs", || {
-            for i in 1..32 {
-                let level = 32 - i;
-                let n = u32::pow(2, level);
-                let idx = level;
-                if block_id.value() % n == 0 {
-                    update_ref(idx as usize)
-                }
-            }
-        });
-
-        let back_refs: Vec<(BlockId, FileOffset)> = tracker.track("build back_refs vector", || {
-            self.last_blocks
-                .iter()
-                .map(|bhr| (bhr.head.block_id.clone(), bhr.position.clone()))
-                .collect()
-        });
+        
+        let back_refs: Vec<(BlockId, FileOffset)> = {
+            let last_blocks = self.last_blocks.read()?;
+            tracker.track("build back_refs vector", || {
+                last_blocks
+                    .iter()
+                    .map(|bhr| (bhr.head.block_id.clone(), bhr.position.clone()))
+                    .collect()
+            })
+        };
 
         let back_refs = Box::new(back_refs);
 
-        Block {
+        Ok(Block {
             head: BlockHead {
                 block_id: block_id,
                 data_type_id: data_id,
@@ -531,7 +575,7 @@ where
                 block_options: block_opt.clone(),
             },
             data: block_data,
-        }
+        })
     }
 
     /// Подсчет кол-ва элементов
@@ -583,7 +627,7 @@ where
                 data,
                 &tracker.sub_tracker("append_data/build_next_block/"),
             )
-        });
+        })?;
         let res = tracker.track("append_data/append_block", || self.append_block(&block));
 
         let res = res?;
@@ -596,6 +640,27 @@ where
 
         Ok(block.head.block_id)
     }
+}
+
+#[test]
+fn test_append_data() {
+    let bb = ByteBuff::new_empty_unlimited();
+
+    println!("create log from empty buff");
+    let mut log = LogFile::new(bb.clone()).unwrap();
+
+    let opts = BlockOptions::default();
+    let data = vec![0u8, 1u8];
+    let bid0 = log.append_data(&opts, &data).unwrap();
+    println!("bid0 = {}",bid0);
+
+    let bid1 = log.append_data(&opts, &data).unwrap();
+    println!("bid1 = {}",bid1);
+
+    let bid2 = log.append_data(&opts, &data).unwrap();
+    println!("bid2 = {}",bid2);
+    assert!(bid2.value() > bid1.value());
+    assert!(bid1.value() > bid0.value());
 }
 
 pub trait GetPointer<B>
@@ -612,15 +677,17 @@ where
 {
     fn pointer_to_end(self) -> Result<LogPointer<B>, LogErr> {
         let lock = self.read()?;
-        if lock.last_blocks.is_empty() {
-            return Err(LogErr::LogIsEmpty);
-        }
 
-        let last_block = &lock.last_blocks[0];
-        Ok(LogPointer {
-            log_file: self.clone(),
-            current_block: last_block.clone(),
-        })
+        let last_blocks = lock.last_blocks.read()?;
+        if last_blocks.is_empty() {
+            Err(LogErr::LogIsEmpty)
+        } else {
+            let last_block = &last_blocks[0];
+            Ok(LogPointer {
+                log_file: self.clone(),
+                current_block: last_block.clone(),
+            })
+        }
     }
 }
 

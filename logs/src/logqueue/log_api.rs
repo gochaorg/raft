@@ -29,7 +29,7 @@ pub trait LogNavigateLast {
     type LogId: Clone + Debug;
 
     /// Получение последней записи в log queue
-    fn last_record( &self ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;
+    fn last_record( self ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;
 }
 
 /// Чтение отдельных записей
