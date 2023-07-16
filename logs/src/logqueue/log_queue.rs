@@ -1,11 +1,17 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
+use core::fmt::Debug;
+
+#[allow(unused)]
 use crate::logfile::{LogFile, FlatBuff, LogErr};
+
+#[allow(unused)]
 use crate::logfile::block::{BlockId, BlockOptions};
 
+#[allow(unused)]
 use super::find_logs::FsLogFind;
-use super::log_id::*;
+use super::{log_id::*, LoqErr};
 use super::log_switch::{
     LogSwitching,
     LogQueueState
@@ -15,13 +21,15 @@ use super::logs_open::{
     LogQueueOpenned as LogOpened,
 };
 
+#[allow(unused)]
 use super::log_api::*;
 
 /// Очередь логов
-pub trait LogFileQueue<ERR,ID,FILE,LOG>: LogOpened<LogFiles = Vec<(FILE,LOG)>, LogFile = (FILE,LOG)> 
+pub trait LogFileQueue<ID,FILE,LOG>: LogOpened<LogFiles = Vec<(FILE,LOG)>, LogFile = (FILE,LOG)> 
+where ID: Clone + Debug, FILE: Clone + Debug 
 {
     /// Переключение лога
-    fn switch( &mut self ) -> Result<(),ERR>;
+    fn switch( &mut self ) -> Result<(),LoqErr<FILE,ID>>;
 
     /// Поиск лог файла по его ID
     /// 
@@ -32,7 +40,7 @@ pub trait LogFileQueue<ERR,ID,FILE,LOG>: LogOpened<LogFiles = Vec<(FILE,LOG)>, L
     /// Результат
     /// =============
     /// лог
-    fn find_log( &self, id:ID ) -> Result<Option<(FILE,LOG)>,ERR>;
+    fn find_log( &self, id:ID ) -> Result<Option<(FILE,LOG)>,LoqErr<FILE,ID>>;
 
     /// Получение ID лога, относительно указаного
     /// 
@@ -47,19 +55,20 @@ pub trait LogFileQueue<ERR,ID,FILE,LOG>: LogOpened<LogFiles = Vec<(FILE,LOG)>, L
     /// Результат
     /// =============
     /// идентификатор относительно указанного
-    fn offset_log_id( &self, id:ID, offset: i64) -> Result<Option<ID>, ERR>;
+    fn offset_log_id( &self, id:ID, offset: i64) -> Result<Option<ID>, LoqErr<FILE,ID>>;
 
     /// Получение идентификатора лог файла
-    fn log_id_of( &self, log_file: &(FILE,LOG) ) -> Result<ID,ERR>;
+    fn log_id_of( &self, log_file: &(FILE,LOG) ) -> Result<ID,LoqErr<FILE,ID>>;
 }
 
 /// Очередь логов
-pub struct LogFileQueueImpl<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf> 
+pub struct LogFileQueueImpl<ID,FILE,LOG,LOGSwitch,LOGIdOf> 
 where
-    LOG: Clone,
-    LOGSwitch: LogSwitching<(FILE,LOG),ERR>,
+    LOG: Clone + Debug,
+    FILE: Clone + Debug,
+    LOGSwitch: LogSwitching<(FILE,LOG),LoqErr<FILE,ID>>,
     ID: LogQueueFileId,
-    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,ERR> + Clone,
+    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,LoqErr<FILE,ID>> + Clone,
 {
     /// Список файлов
     files: Vec<(FILE,LOG)>,
@@ -84,13 +93,13 @@ where
     log_id_order: RefCell<Option<Vec<ID>>>,
 }
 
-impl<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf> LogFileQueueImpl<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf> 
+impl<ID,FILE,LOG,LOGSwitch,LOGIdOf> LogFileQueueImpl<ID,FILE,LOG,LOGSwitch,LOGIdOf> 
 where
     ID: LogQueueFileId,
-    LOG:Clone,
-    FILE:Clone,
-    LOGSwitch: LogSwitching<(FILE,LOG),ERR> + Clone,
-    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,ERR> + Clone,
+    LOG:Clone+Debug,
+    FILE:Clone+Debug,
+    LOGSwitch: LogSwitching<(FILE,LOG),LoqErr<FILE,ID>> + Clone,
+    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,LoqErr<FILE,ID>> + Clone,
 {
     /// Конструктор
     /// 
@@ -130,7 +139,7 @@ where
     }
 
     // пересоздание кеша, если необходимо и обход кеша
-    fn log_id_map_cache_read<R,F>( &self, default:R, consume:F ) -> Result<R,ERR>
+    fn log_id_map_cache_read<R,F>( &self, default:R, consume:F ) -> Result<R,LoqErr<FILE,ID>>
     where
         R: Sized,
         F: for <'a> Fn(&'a HashMap<ID,(FILE,LOG)>) -> R,
@@ -151,7 +160,7 @@ where
     }
 
     // пересоздание кеша, если необходимо и обход кеша
-    fn log_order_cache_read<R,F>( &self, default:R, consume:F ) -> Result<R,ERR>
+    fn log_order_cache_read<R,F>( &self, default:R, consume:F ) -> Result<R,LoqErr<FILE,ID>>
     where
         R: Sized,
         F: for <'a> Fn(&'a Vec<ID>) -> R
@@ -169,7 +178,8 @@ where
         Ok(cache_opt.as_ref().map(|x| consume(x)).unwrap_or(default))
     }
 
-    fn current_log_id_read<R,F>( &self, default:R, consume:F ) -> Result<R,ERR>
+    #[allow(unused)]
+    fn current_log_id_read<R,F>( &self, default:R, consume:F ) -> Result<R,LoqErr<FILE,ID>>
     where
         R: Sized,
         F: Fn(ID) -> R 
@@ -183,14 +193,14 @@ where
     }
 }
 
-impl<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf> LogOpened 
-for LogFileQueueImpl<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf>
+impl<ID,FILE,LOG,LOGSwitch,LOGIdOf> LogOpened 
+for LogFileQueueImpl<ID,FILE,LOG,LOGSwitch,LOGIdOf>
 where
     ID: LogQueueFileId,
-    LOG:Clone,
-    FILE:Clone,
-    LOGSwitch: LogSwitching<(FILE,LOG),ERR>,
-    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,ERR> + Clone,
+    LOG:Clone + Debug,
+    FILE:Clone + Debug,
+    LOGSwitch: LogSwitching<(FILE,LOG),LoqErr<FILE,ID>>,
+    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,LoqErr<FILE,ID>> + Clone,
 {
     type LogFile = (FILE,LOG);
     type LogFiles = Vec<(FILE,LOG)>;
@@ -206,16 +216,16 @@ where
     }
 }
 
-impl<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf> LogQueueState<(FILE,LOG)> 
-for LogFileQueueImpl<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf> 
+impl<ID,FILE,LOG,LOGSwitch,LOGIdOf> LogQueueState<(FILE,LOG)> 
+for LogFileQueueImpl<ID,FILE,LOG,LOGSwitch,LOGIdOf> 
 where
     ID: LogQueueFileId,
-    FILE: Clone,
-    LOG: Clone,
-    LOGSwitch: LogSwitching<(FILE,LOG),ERR> + Clone,
-    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,ERR> + Clone,
+    FILE: Clone + Debug,
+    LOG: Clone + Debug,
+    LOGSwitch: LogSwitching<(FILE,LOG),LoqErr<FILE,ID>> + Clone,
+    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,LoqErr<FILE,ID>> + Clone,
 {
-    type ERR = ERR;
+    type ERR = LoqErr<FILE,ID>;
     fn get_current_file( &self ) -> Result<(FILE,LOG),Self::ERR> {
         Ok( self.tail.clone() )
     }
@@ -227,22 +237,22 @@ where
     }
 }
 
-impl<ERR,ID,FILE,LOG,LOGSwitch,LOGIdOf> LogFileQueue<ERR,ID,FILE,LOG>
-for LogFileQueueImpl<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf>
+impl<ID,FILE,LOG,LOGSwitch,LOGIdOf> LogFileQueue<ID,FILE,LOG>
+for LogFileQueueImpl<ID,FILE,LOG,LOGSwitch,LOGIdOf>
 where
     ID: LogQueueFileId,
-    FILE: Clone,
-    LOG: Clone,
-    LOGSwitch: LogSwitching<(FILE,LOG),ERR> + Clone,
-    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,ERR> + Clone,
+    FILE: Clone + Debug,
+    LOG: Clone + Debug,
+    LOGSwitch: LogSwitching<(FILE,LOG),LoqErr<FILE,ID>> + Clone,
+    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,LoqErr<FILE,ID>> + Clone,
 {
-    fn switch( &mut self ) -> Result<(),ERR> {
+    fn switch( &mut self ) -> Result<(),LoqErr<FILE,ID>> {
         let mut s = self.switching.clone();
         let _ = s.switch(self)?;
         Ok(())
     }
 
-    fn find_log( &self, id:ID ) -> Result<Option<(FILE,LOG)>,ERR> {
+    fn find_log( &self, id:ID ) -> Result<Option<(FILE,LOG)>,LoqErr<FILE,ID>> {
         self.log_id_map_cache_read(
             None, 
             |cache| {
@@ -251,7 +261,7 @@ where
         )
     }
 
-    fn offset_log_id( &self, id:ID, offset: i64) -> Result<Option<ID>, ERR> {
+    fn offset_log_id( &self, id:ID, offset: i64) -> Result<Option<ID>, LoqErr<FILE,ID>> {
         if offset == 0i64 { return Ok(Some(id.clone())); }
 
         let idx = self.log_order_cache_read(None, |ids| {
@@ -276,39 +286,39 @@ where
         })
     }
 
-    fn log_id_of( &self, log_file: &(FILE,LOG) ) -> Result<ID,ERR> {
+    fn log_id_of( &self, log_file: &(FILE,LOG) ) -> Result<ID,LoqErr<FILE,ID>> {
         (self.id_of)( log_file.clone() )
     }
 }
 
 /// Конфигурация логов
-pub struct LogQueueConf<ID,FILE,LOG,ERR,LOGOpenCfg,LOGOpenRes,LOGSwitch,LOGIdOf>
+pub struct LogQueueConf<ID,FILE,LOG,LOGOpenCfg,LOGOpenRes,LOGSwitch,LOGIdOf>
 where
     ID: LogQueueFileId,
-    FILE: Clone,
+    FILE: Clone + Debug,
     LOGOpenRes: LogOpened<LogFile = (FILE,LOG), LogFiles = Vec<(FILE,LOG)>>,
-    LOGOpenCfg: LogQueueOpenConf<Open = LOGOpenRes, OpenError = ERR>,
-    LOGSwitch: LogSwitching<(FILE,LOG),ERR> + Clone,
-    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,ERR> + Clone,
+    LOGOpenCfg: LogQueueOpenConf<Open = LOGOpenRes, OpenError = LoqErr<FILE,ID>>,
+    LOGSwitch: LogSwitching<(FILE,LOG),LoqErr<FILE,ID>> + Clone,
+    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,LoqErr<FILE,ID>> + Clone,
 {
     pub log_open: LOGOpenCfg,
     pub log_switch: LOGSwitch,
     pub id_of: LOGIdOf,
 }
 
-impl<ID,FILE,LOG,ERR,LOGOpenCfg,LOGOpenRes,LOGSwitch,LOGIdOf> 
-    LogQueueConf<ID,FILE,LOG,ERR,LOGOpenCfg,LOGOpenRes,LOGSwitch,LOGIdOf> 
+impl<ID,FILE,LOG,LOGOpenCfg,LOGOpenRes,LOGSwitch,LOGIdOf> 
+    LogQueueConf<ID,FILE,LOG,LOGOpenCfg,LOGOpenRes,LOGSwitch,LOGIdOf> 
 where
     ID: LogQueueFileId,
-    FILE: Clone,
-    LOG: Clone,
+    FILE: Clone + Debug,
+    LOG: Clone + Debug,
     LOGOpenRes: LogOpened<LogFile = (FILE,LOG), LogFiles = Vec<(FILE,LOG)>>,
-    LOGOpenCfg: LogQueueOpenConf<Open = LOGOpenRes, OpenError = ERR>,
-    LOGSwitch: LogSwitching<(FILE,LOG),ERR> + Clone,
-    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,ERR> + Clone,
+    LOGOpenCfg: LogQueueOpenConf<Open = LOGOpenRes, OpenError = LoqErr<FILE,ID>>,
+    LOGSwitch: LogSwitching<(FILE,LOG),LoqErr<FILE,ID>> + Clone,
+    LOGIdOf: Fn((FILE,LOG)) -> Result<ID,LoqErr<FILE,ID>> + Clone,
 {
     /// Открытие логов
-    pub fn open( &self ) -> Result<LogFileQueueImpl<ID,FILE,LOG,ERR,LOGSwitch,LOGIdOf>,ERR> {
+    pub fn open( &self ) -> Result<LogFileQueueImpl<ID,FILE,LOG,LOGSwitch,LOGIdOf>,LoqErr<FILE,ID>> {
         let opened = self.log_open.open()?;
         Ok(LogFileQueueImpl::new(
             opened.files(), 
@@ -336,6 +346,7 @@ mod test {
         use super::super::log_seq_verifier::OrderedLogs;
         use super::super::logs_open::LogFileQueueConf;
         use super::super::log_switch::*;
+        #[allow(unused)]
         use super::super::log_id::*;
 
         let id0 = IdTest::new(None);
@@ -347,34 +358,34 @@ mod test {
         let oldnew_id_matched1 = oldnew_id_matched.clone();
 
         struct FindFilesStub(Vec<IdTest>);
-        impl FindFiles<IdTest,String> for FindFilesStub {
-            fn find_files( &self ) -> Result<Vec<IdTest>,String> {
+        impl FindFiles<IdTest,LoqErr<IdTest,IdTest>> for FindFilesStub {
+            fn find_files( &self ) -> Result<Vec<IdTest>,LoqErr<IdTest,IdTest>> {
                 Ok(self.0.clone())
             }
         }
 
         struct OpenFileStub;
-        impl OpenLogFile<IdTest,IdTest,String> for OpenFileStub {
-            fn open_log_file( &self, file:IdTest ) -> Result<IdTest, String> {
+        impl OpenLogFile<IdTest,IdTest,LoqErr<IdTest,IdTest>> for OpenFileStub {
+            fn open_log_file( &self, file:IdTest ) -> Result<IdTest, LoqErr<IdTest,IdTest>> {
                 Ok(file.clone())
             }
         }
 
         struct ValidateStub(OrderedLogs<(IdTest,IdTest)>);
-        impl ValidateLogFiles<(IdTest,IdTest),String> for ValidateStub {
-            fn validate( &self, log_files: &Vec<(IdTest,IdTest)> ) -> Result<OrderedLogs<(IdTest,IdTest)>,String> {
+        impl ValidateLogFiles<(IdTest,IdTest),LoqErr<IdTest,IdTest>> for ValidateStub {
+            fn validate( &self, log_files: &Vec<(IdTest,IdTest)> ) -> Result<OrderedLogs<(IdTest,IdTest)>,LoqErr<IdTest,IdTest>> {
                 Ok( self.0.clone() )
             }
         }
 
         struct InitStub(IdTest);
-        impl InitializeFirstLog<(IdTest,IdTest),String> for InitStub {
-            fn initialize_first_log( &self ) -> Result<(IdTest,IdTest), String> {
+        impl InitializeFirstLog<(IdTest,IdTest),LoqErr<IdTest,IdTest>> for InitStub {
+            fn initialize_first_log( &self ) -> Result<(IdTest,IdTest), LoqErr<IdTest,IdTest>> {
                 Ok((self.0.clone(), self.0.clone()))
             }
         }
 
-        let open_conf: LogFileQueueConf<IdTest,IdTest,String,_,_,_,_> = LogFileQueueConf {
+        let open_conf = LogFileQueueConf {
             find_files: FindFilesStub(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()]),
             open_log_file: OpenFileStub,
             validate: ValidateStub(OrderedLogs {
@@ -390,7 +401,7 @@ mod test {
             _p: PhantomData.clone(),
         };
 
-        let log_switch : LogSwitcher<(IdTest,IdTest),IdTest,String,_,_,_> = LogSwitcher { 
+        let log_switch = LogSwitcher { 
             read_id_of: |f_id:&(IdTest,IdTest)| Ok( f_id.0.clone() ), 
             write_id_to: |f,ids:OldNewId<'_,IdTest>| {
                 println!("old id={} new id={}", ids.old_id, ids.new_id);
@@ -404,13 +415,13 @@ mod test {
             }, 
         };
 
-        let log_queue_conf : LogQueueConf<IdTest,IdTest,IdTest,String,_,_,_,_> = LogQueueConf { 
+        let log_queue_conf = LogQueueConf { 
             log_open: open_conf, 
             log_switch: log_switch, 
             id_of: |f| Ok(IdTest::new(None)),
         };
 
-        let mut log_queue : LogFileQueueImpl<IdTest,IdTest,IdTest,String,_,_> = log_queue_conf.open().unwrap();
+        let mut log_queue : LogFileQueueImpl<IdTest,IdTest,IdTest,_,_> = log_queue_conf.open().unwrap();
 
         println!("before");
 
@@ -435,8 +446,8 @@ mod test {
 
 #[cfg(test)]
 mod full_test {
+    #[allow(unused)]
     use std::any::{TypeId, type_name};
-    use std::io::prelude::*;
     use std::fs::*;
     use std::marker::PhantomData;
     use std::path::PathBuf;
@@ -470,7 +481,9 @@ mod full_test {
     use crate::logfile::block::{BlockId, BlockOptions};
     use crate::logqueue::new_file::NewFileGenerator;
     use crate::logqueue::path_tmpl::PathTemplateParser;
-    use crate::logqueue::{log_id::*, LogFileQueueConf, LoqErr, validate_sequence, SeqValidateOp, IdOf, ErrThrow, 
+
+    #[allow(unused)]
+    use crate::logqueue::{log_id::*, LogFileQueueConf, LoqErr, validate_sequence, SeqValidateOp, IdOf, 
         LogQueueConf, LogSwitcher, OldNewId, LogFileQueue, OpenLogFile, ValidateLogFiles, InitializeFirstLog, LogWriting, LogNavigateLast
     };
     use crate::logqueue::find_logs::FsLogFind;
@@ -491,21 +504,21 @@ mod full_test {
         Ok(log)
     }
 
-    impl SeqValidateOp<(PathBuf,LogFile<FileBuff>), LoqErr<PathBuf,LogQueueFileNumID>, LogQueueFileNumID>
-    for (PathBuf,LogFile<FileBuff>) {
-        fn items_count(a:&(PathBuf,LogFile<FileBuff>)) -> Result<u32,LoqErr<PathBuf,LogQueueFileNumID>> {
-            let (filename,log) = a;
-            match log.count() {
-                Ok(count) => Ok(count),
-                Err(err) => Err(
-                    LoqErr::CantReadRecordsCount {
-                        file: filename.clone(),
-                        error: err.clone()
-                    }
-                )
-            }
-        }
-    }
+    // impl SeqValidateOp< PathBuf,LogFile<FileBuff>, LogQueueFileNumID>
+    // for &(PathBuf,LogFile<FileBuff>) {
+    //     fn items_count(a:&(PathBuf,LogFile<FileBuff>)) -> Result<u32,LoqErr<PathBuf,LogQueueFileNumID>> {
+    //         let (filename,log) = a;
+    //         match log.count() {
+    //             Ok(count) => Ok(count),
+    //             Err(err) => Err(
+    //                 LoqErr::CantReadRecordsCount {
+    //                     file: filename.clone(),
+    //                     error: err.clone()
+    //                 }
+    //             )
+    //         }
+    //     }
+    // }
 
     fn id_of( a:&(PathBuf,LogFile<FileBuff>) ) -> Result<LogQueueFileNumID,LoqErr<PathBuf,LogQueueFileNumID>> {
         let (filename,log) = a;
@@ -529,39 +542,12 @@ mod full_test {
         Ok(id)
     }
 
-    impl IdOf<(PathBuf,LogFile<FileBuff>),LogQueueFileNumID,LoqErr<PathBuf,LogQueueFileNumID>>
-    for (PathBuf,LogFile<FileBuff>) {
-        fn id_of(a:&(PathBuf,LogFile<FileBuff>)) -> Result<LogQueueFileNumID,LoqErr<PathBuf,LogQueueFileNumID>> {
-            id_of(a)
-        }
-    }
-
-    impl ErrThrow<(PathBuf,LogFile<FileBuff>), LoqErr<PathBuf,LogQueueFileNumID>, LogQueueFileNumID> for LoqErr<PathBuf,LogQueueFileNumID> {
-        fn two_heads(heads:Vec<((PathBuf,LogFile<FileBuff>),LogQueueFileNumID)>) -> LoqErr<PathBuf,LogQueueFileNumID> {
-            LoqErr::OpenTwoHeads { 
-                heads: heads.iter().map(
-                    |((filename,_),id)| {
-                    (filename.clone(), id.clone())
-                }).collect()
-            }
-        }
-
-        fn no_heads() -> LoqErr<PathBuf,LogQueueFileNumID> {
-            LoqErr::OpenNoHeads
-        }
-
-        fn not_found_next_log( 
-            id: &LogQueueFileNumID, 
-            logs:Vec<&((PathBuf,LogFile<FileBuff>),LogQueueFileNumID)> 
-        ) -> LoqErr<PathBuf,LogQueueFileNumID> {
-            LoqErr::OpenLogNotFound { 
-                id: id.clone(), 
-                logs: logs.iter().map(|((filename,_),id)|{
-                    (filename.clone(), id.clone())
-                }).collect()
-            }
-        }
-    } 
+    // impl IdOf<(PathBuf,LogFile<FileBuff>),LogQueueFileNumID,LoqErr<PathBuf,LogQueueFileNumID>>
+    // for (PathBuf,LogFile<FileBuff>) {
+    //     fn id_of(a:&(PathBuf,LogFile<FileBuff>)) -> Result<LogQueueFileNumID,LoqErr<PathBuf,LogQueueFileNumID>> {
+    //         id_of(a)
+    //     }
+    // } 
 
     #[test]
     fn do_test() {
@@ -602,7 +588,19 @@ mod full_test {
         struct ValidateStub;
         impl ValidateLogFiles<(PathBuf,LogFile<FileBuff>),LoqErr<PathBuf,LogQueueFileNumID>> for ValidateStub {
             fn validate( &self, log_files: &Vec<(PathBuf,LogFile<FileBuff>)> ) -> Result<crate::logqueue::OrderedLogs<(PathBuf,LogFile<FileBuff>)>,LoqErr<PathBuf,LogQueueFileNumID>> {
-                validate_sequence::<(PathBuf,LogFile<FileBuff>),LoqErr<PathBuf,LogQueueFileNumID>,LoqErr<PathBuf,LogQueueFileNumID>,LogQueueFileNumID>(log_files)
+                validate_sequence::<PathBuf,LogFile<FileBuff>,LogQueueFileNumID>(log_files)
+            }
+        }
+
+        impl SeqValidateOp<PathBuf, LogFile<FileBuff>, LogQueueFileNumID> for (PathBuf, LogFile<FileBuff>) {
+            fn items_count(a:&(PathBuf,LogFile<FileBuff>)) -> Result<u32,LoqErr<PathBuf,LogQueueFileNumID>> {
+                a.1.count().map_err(|e| LoqErr::LogCountFail { file: a.0.clone(), error: e })
+            }
+        }
+
+        impl IdOf<PathBuf, LogFile<FileBuff>, LogQueueFileNumID> for (PathBuf, LogFile<FileBuff>) {
+            fn id_of(a:&(PathBuf,LogFile<FileBuff>)) -> Result<LogQueueFileNumID,LoqErr<PathBuf,LogQueueFileNumID>> {
+                id_of(a)
             }
         }
 
@@ -696,7 +694,7 @@ mod full_test {
         let mut log_queue = log_queue_conf.open().unwrap();
         println!("log_queue openned");
 
-        let mut log_queue: Box<dyn LogFileQueue<LoqErr<PathBuf,LogQueueFileNumID>,LogQueueFileNumID,PathBuf,LogFile<FileBuff>> + '_>
+        let mut log_queue: Box<dyn LogFileQueue<LogQueueFileNumID,PathBuf,LogFile<FileBuff>> + '_>
             = Box::new(log_queue);
 
         let rec = log_queue.write(20).unwrap();

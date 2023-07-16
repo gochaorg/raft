@@ -1,37 +1,24 @@
-use super::log_id::*;
-
-/// Генерация ошибки
-pub trait ErrThrow<ITEM,ERR,ID> 
-where
-    ID:LogQueueFileId,
-{
-    /// Найдено 2 или более файла, которые могут быть началом (головой) очереди логов
-    /// Должен быть один
-    fn two_heads(heads:Vec<(ITEM,ID)>) -> ERR;
-
-    /// Не найдено начала очереди
-    fn no_heads() -> ERR;
-
-    /// Битая ссылка, голова лог файла ссылается на не существующий лог файл
-    fn not_found_next_log( id: &ID, logs:Vec<&(ITEM,ID)> ) -> ERR;
-}
+use super::{log_id::*, LoqErr};
+use std::fmt::Debug;
 
 /// Извлечение и лог файла - идентификатора
-pub trait IdOf<A,ID,ERR> {
+pub trait IdOf<FILE,LOG,ID> 
+where
+    ID: Clone+Debug,
+    FILE: Clone+Debug,
+{
     /// получить идентификатор-ссылку
-    fn id_of(a:&A) -> Result<ID,ERR>;
+    fn id_of(a:&(FILE,LOG)) -> Result<ID,LoqErr<FILE,ID>>;
 }
 
 /// Операции с лог файлов
-pub trait SeqValidateOp<A,ERR,ID>: IdOf<A,ID,ERR>
+pub trait SeqValidateOp<FILE,LOG,ID>: IdOf<FILE,LOG,ID>
 where
-    ID:LogQueueFileId
+    ID:Clone+Debug,
+    FILE: Clone+Debug,
 {
     /// кол-во элементов в логе
-    fn items_count(a:&A) -> Result<u32,ERR>;
-
-    // получить идентификатор-ссылку
-    //fn id_of(a:&A) -> Result<ID,ERR>;
+    fn items_count(a:&(FILE,LOG)) -> Result<u32,LoqErr<FILE,ID>>;
 }
 
 /// Упорядоченный лог файлы
@@ -67,20 +54,20 @@ where
 /// ============
 /// Список логов упорядоченных по времени создания
 #[allow(dead_code)]
-pub fn validate_sequence<ITEM,ERR,ERRBuild,ID>( files: &Vec<ITEM> ) -> 
-    Result<OrderedLogs<ITEM>,ERR>
+pub fn validate_sequence<FILE,LOG,ID>( files: &Vec<(FILE,LOG)> ) -> 
+    Result<OrderedLogs<(FILE,LOG)>,LoqErr<FILE,ID>>
 where
-    ITEM: Clone + SeqValidateOp<ITEM,ERR,ID>,
+    FILE: Clone+Debug,
+    (FILE,LOG): Clone + SeqValidateOp<FILE,LOG,ID>,
     ID: LogQueueFileId,
-    ERRBuild: ErrThrow<ITEM,ERR,ID>
 {
     // Выделение id файлов
     let files_with_id = files.iter().fold( 
-        Ok::<Vec<(ITEM,ID)>,ERR>(vec![]), |res,itm| {
+        Ok::<Vec<((FILE,LOG),ID)>,LoqErr<FILE,ID>>(vec![]), |res,itm| {
             res.and_then(|mut res| {
-                let count = ITEM::items_count(itm)?;
+                let count = <(FILE,LOG)>::items_count(itm)?;
                 if count > 0u32 {
-                    let id = ITEM::id_of(itm)?;
+                    let id = <(FILE,LOG)>::id_of(itm)?;
                     res.push( (itm.clone(), id.clone()) );
                     Ok(res) 
                 } else {
@@ -90,13 +77,15 @@ where
         }
     )?;
 
-    let mut head_files: Vec<(ITEM,ID)> = 
+    let mut head_files: Vec<((FILE,LOG),ID)> = 
         files_with_id.iter().filter(|(_,id)| id.previous().is_none())
         .map(|(a,b)| (a.clone(), b.clone()))
         .collect();
     
-    if head_files.len()>1 {
-        return Err(ERRBuild::two_heads(head_files));
+    if head_files.len()>1 {        
+        return Err(LoqErr::OpenTwoHeads { heads: 
+            head_files.iter().map( |((file,log),id)| (file.clone(), id.clone())).collect() 
+        });
     } else if head_files.is_empty() {
         // Найти те что ссылается на не существующую id
         let mut ids = std::collections::HashSet::<ID>::new();
@@ -107,7 +96,7 @@ where
         // обходим список
         // ищем потенциальную голову
         let mut files_set = files_with_id.clone();        
-        let mut heads = Vec::<(ITEM,ID)>::new();
+        let mut heads = Vec::<((FILE,LOG),ID)>::new();
         while files_set.len() >= 1 {
             let (f,id) = files_set[0].clone();
             match ids.iter().find(|i| id.previous().map(|a| a == i.id()).unwrap_or(false) ) {
@@ -122,9 +111,11 @@ where
         }
 
         if heads.is_empty() {
-            return Err(ERRBuild::no_heads());
+            return Err( LoqErr::OpenNoHeads );
         } else if heads.len()>1 {
-            return Err(ERRBuild::two_heads(heads));
+            return Err( LoqErr::OpenTwoHeads { heads:  
+                head_files.iter().map( |((file,log),id)| (file.clone(), id.clone())).collect() 
+            });
         }
 
         for (f,i) in heads {
@@ -135,7 +126,7 @@ where
     let (head,mut head_id) = head_files.iter().map(|(a,b)|(a.clone(),b.clone())).next().unwrap();
 
     let mut ordered_files = vec![(head)];
-    let mut files_with_id: Vec<&(ITEM,ID)> = files_with_id.iter().filter(|(_,id)| *id != head_id).collect();
+    let mut files_with_id: Vec<&((FILE,LOG),ID)> = files_with_id.iter().filter(|(_,id)| *id != head_id).collect();
 
     while ! files_with_id.is_empty() {
         match files_with_id.iter().find(|(_,id)| id.previous().map(|id| id == head_id.id()).unwrap_or(false) ) {
@@ -150,9 +141,12 @@ where
         }
     }
 
-    let ordered_files: Vec<ITEM> = ordered_files.iter().map(|a|a.clone()).collect();
+    let ordered_files: Vec<(FILE,LOG)> = ordered_files.iter().map(|a|a.clone()).collect();
     if !files_with_id.is_empty() {
-        return Err(ERRBuild::not_found_next_log(&head_id, files_with_id));
+        return Err(LoqErr::OpenLogNotFound { 
+            id:   head_id.clone(), 
+            logs: head_files.iter().map( |((file,log),id)| (file.clone(), id.clone())).collect() 
+        });
     }
 
     let last = ordered_files.last().map(|i| i.clone()).unwrap();
@@ -162,7 +156,7 @@ where
 #[cfg(test)]
 pub mod test {
     use uuid::Uuid;
-    use crate::logfile::block::BlockOptions;
+    use crate::{logfile::block::BlockOptions, logqueue::LoqErr};
 
     use super::*;
 
@@ -203,29 +197,15 @@ pub mod test {
         }
     }
 
-    impl SeqValidateOp<IdTest,String,IdTest> for IdTest {
-        fn items_count(_a:&IdTest) -> Result<u32,String> {
+    impl SeqValidateOp<IdTest,IdTest,IdTest> for (IdTest,IdTest) {
+        fn items_count(_a:&(IdTest,IdTest)) -> Result<u32,LoqErr<IdTest,IdTest>> {
             Ok(1u32)
         }
     }
 
-    impl IdOf<IdTest,IdTest,String> for IdTest {
-        fn id_of(a:&IdTest) -> Result<IdTest,String> {
-            Ok(a.clone())
-        }
-    }
-
-    impl ErrThrow<IdTest,String,IdTest> for IdTest {
-        fn two_heads(_heads:Vec<(IdTest,IdTest)>) -> String {
-            "two_heads".to_string()
-        }
-
-        fn no_heads() -> String {
-            "no_heads".to_string()
-        }
-
-        fn not_found_next_log( id: &IdTest, _logs:Vec<&(IdTest,IdTest)> ) -> String {
-            format!("not_found_next_log id={id}")
+    impl IdOf<IdTest,IdTest,IdTest> for (IdTest,IdTest) {
+        fn id_of(a:&(IdTest,IdTest)) -> Result<IdTest,LoqErr<IdTest,IdTest>> {
+            Ok(a.0.clone())
         }
     }
 
@@ -236,18 +216,23 @@ pub mod test {
         let id2 = IdTest::new(Some(id1.id()));
         let id3 = IdTest::new(Some(id2.id()));
 
-        let logs = vec![id3.clone(), id2.clone(), id0.clone(), id1.clone()];
-        match validate_sequence::<IdTest,String,IdTest,IdTest>(&logs) {
+        let logs = vec![
+            (id3.clone(), id3.clone()),
+            (id2.clone(), id2.clone()),
+            (id0.clone(), id0.clone()),
+            (id1.clone(), id1.clone())
+        ];
+        match validate_sequence::<IdTest,IdTest,IdTest>(&logs) {
             Ok(seq) => {
                 println!("ok");
-                println!("tail = {}",seq.tail);
+                println!("tail = {:?}",seq.tail);
                 for itm in seq.files {
-                    println!(" {itm}")
+                    println!(" {itm:?}")
                 }
-                assert_eq!(seq.tail, id3);
+                assert_eq!(seq.tail, (id3,id3));
             }
             Err(err) => {
-                println!("err {err}");
+                println!("err {err:?}");
                 assert!(false);
             }
         }
@@ -260,20 +245,27 @@ pub mod test {
         let id2 = IdTest::new(Some(id1.id()));
         let id3 = IdTest::new(Some(id2.id()));
 
-        let logs = vec![id3.clone(), id2.clone(), id0.clone(), id1.clone()];
-        match validate_sequence::<IdTest,String,IdTest,IdTest>(&logs) {
+        let logs = vec![
+            (id3.clone(),id3.clone()), 
+            (id2.clone(),id2.clone()),
+            (id0.clone(),id0.clone()), 
+            (id1.clone(),id1.clone()),
+        ];
+        match validate_sequence::<IdTest,IdTest,IdTest>(&logs) {
             Ok(seq) => {
                 println!("ok");
-                println!("tail = {}",seq.tail);
+                println!("tail = {:?}",seq.tail);
                 for itm in seq.files {
-                    println!(" {itm}")
+                    println!(" {itm:?}")
                 }
                 assert!(false);
             }
             Err(err) => {
-                println!("err {err}");
-                assert_eq!(err,"two_heads".to_string());
-                assert!(true);
+                println!("err {err:?}");
+                match err {
+                    LoqErr::OpenTwoHeads { heads } => {},
+                    _ => {assert!(false);}
+                }
             }
         }
     }
@@ -285,20 +277,27 @@ pub mod test {
         let id2 = IdTest::new(Some(id0.id()));
         let id3 = IdTest::new(Some(id2.id()));
 
-        let logs = vec![id3.clone(), id2.clone(), id0.clone(), id1.clone()];
-        match validate_sequence::<IdTest,String,IdTest,IdTest>(&logs) {
+        let logs = vec![
+            (id3.clone(),id3.clone()), 
+            (id2.clone(),id2.clone()), 
+            (id0.clone(),id0.clone()), 
+            (id1.clone(),id1.clone())
+        ];
+        match validate_sequence::<IdTest,IdTest,IdTest>(&logs) {
             Ok(seq) => {
                 println!("ok");
-                println!("tail = {}",seq.tail);
+                println!("tail = {:?}",seq.tail);
                 for itm in seq.files {
-                    println!(" {itm}")
+                    println!(" {itm:?}")
                 }
                 assert!(false);
             }
             Err(err) => {
-                println!("err {err}");
-                //assert_eq!(err,"two_heads".to_string());
-                assert!(err.starts_with("not_found_next_log"));
+                println!("err {err:?}");
+                match err {
+                    LoqErr::OpenLogNotFound { id, logs } => {},
+                    _ => { assert!(false); }
+                }
                 assert!(true);
             }
         }
@@ -311,21 +310,25 @@ pub mod test {
         let id2 = IdTest::new(Some(id1.id()));
         let id3 = IdTest::new(Some(id2.id()));
 
-        let logs = vec![id1.clone(), id2.clone(), id3.clone()];
-        match validate_sequence::<IdTest,String,IdTest,IdTest>(&logs) {
+        let logs = vec![
+            (id1.clone(),id1.clone()), 
+            (id2.clone(),id2.clone()), 
+            (id3.clone(),id3.clone())
+        ];
+        match validate_sequence::<IdTest,IdTest,IdTest>(&logs) {
             Ok(seq) => {
                 println!("ok");
-                println!("tail = {}",seq.tail);
+                println!("tail = {:?}",seq.tail);
                 for itm in &seq.files {
-                    println!(" {itm}")
+                    println!(" {itm:?}")
                 }
                 assert!( seq.files.len()==3 );
-                assert!( seq.files[0].id == id1.id() );
-                assert!( seq.files[1].id == id2.id() );
-                assert!( seq.files[2].id == id3.id() );
+                assert!( seq.files[0].0.id == id1.id() );
+                assert!( seq.files[1].0.id == id2.id() );
+                assert!( seq.files[2].0.id == id3.id() );
             }
             Err(err) => {
-                println!("err {err}");
+                println!("err {err:?}");
                 assert!(false);
             }
         }

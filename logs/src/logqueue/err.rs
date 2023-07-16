@@ -1,7 +1,10 @@
+#[allow(unused)]
 use std::{path::PathBuf, fmt::Debug};
 
+#[allow(unused)]
 use crate::{logfile::{LogErr, LogFile, block::BlockId}, bbuff::absbuff::{ABuffError, FileBuff}};
 
+#[allow(unused)]
 use super::{LogIdReadWriteErr, LogQueueFileNumID, LogWriteErr};
 
 /// Ошибки очереди логов

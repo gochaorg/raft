@@ -51,7 +51,7 @@ use crate::perf::{Metrics, Tracker};
 use super::super::bbuff::absbuff::*;
 use super::super::perf::Counters;
 use super::block::*;
-use std::fmt;
+use std::fmt::{self, Debug};
 use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Instant;
 
@@ -68,6 +68,13 @@ where
     block_buff: streambuff::ByteBuff,
     pub counters: Arc<RwLock<Counters>>,
     pub tracker: Arc<Tracker>,
+}
+
+impl<B> Debug for LogFile<B> 
+where B:FlatBuff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f,"LogFile")
+    }
 }
 
 impl<A> fmt::Display for LogFile<A>
@@ -168,7 +175,7 @@ where
 
         let mut last_blocks = Vec::<BlockHeadRead>::new();
         last_blocks.push(block_head_read.clone());
-        let mut last_blocks = Arc::new(RwLock::new(last_blocks));
+        let last_blocks = Arc::new(RwLock::new(last_blocks));
 
         Ok(LogFile {
             buff: buff,
@@ -630,7 +637,7 @@ where
         })?;
         let res = tracker.track("append_data/append_block", || self.append_block(&block));
 
-        let res = res?;
+        let _res = res?;
 
         {
             self.counters.write()?.inc("append_data.succ");

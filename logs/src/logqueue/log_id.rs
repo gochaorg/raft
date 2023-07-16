@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::num::ParseIntError;
 use std::str::FromStr;
 use uuid::Uuid;
-use crate::logfile::block::{String32, BlockErr, BlockId, BlockHead, BlockOptions};
+use crate::logfile::block::{String32, BlockErr, BlockId, BlockOptions};
 use crate::logfile::block::Block;
 use std::hash::Hash;
 

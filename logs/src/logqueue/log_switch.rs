@@ -1,3 +1,4 @@
+#[allow(unused)]
 use std::marker::PhantomData;
 use super::log_id::*;
 

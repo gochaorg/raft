@@ -1,12 +1,15 @@
+#[allow(unused)]
 use std::{fmt::Debug, path::PathBuf};
 
+#[allow(unused)]
 use crate::logfile::{LogFile, FlatBuff, LogErr, block::{BlockId, BlockOptions}};
 
+#[allow(unused)]
 use super::{LogNavigationNear, log_id::{RecID, LogQueueFileId}, log_queue::LogFileQueue, LogNavigateLast, LogReading, LoqErr};
 
 /// Реализация чтения логов для dyn LogFileQueue
 impl<LogId, FILE, BUFF> LogNavigationNear
-for & dyn LogFileQueue<LoqErr<FILE,LogId>, LogId, FILE, LogFile<BUFF>>
+for & dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>
 where
     LogId: LogQueueFileId,
     BUFF: FlatBuff,
@@ -69,7 +72,7 @@ where
 }
 
 impl <LogId,FILE,BUFF> LogNavigateLast
-for & dyn LogFileQueue<LoqErr<FILE,LogId>, LogId, FILE, LogFile<BUFF>>
+for & dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>
 where
     LogId: LogQueueFileId,
     BUFF: FlatBuff,
@@ -103,7 +106,7 @@ where
 }
 
 impl <LogId,FILE,BUFF> LogReading<Box<Vec<u8>>, BlockOptions>
-for & dyn LogFileQueue<LoqErr<FILE,LogId>, LogId, FILE, LogFile<BUFF>>
+for & dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>
 where
     LogId: LogQueueFileId,
     FILE: Clone + Debug,
