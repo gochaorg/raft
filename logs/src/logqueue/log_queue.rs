@@ -373,7 +373,7 @@ mod test {
 
         struct ValidateStub(OrderedLogs<(IdTest,IdTest)>);
         impl ValidateLogFiles<(IdTest,IdTest),LoqErr<IdTest,IdTest>> for ValidateStub {
-            fn validate( &self, log_files: &Vec<(IdTest,IdTest)> ) -> Result<OrderedLogs<(IdTest,IdTest)>,LoqErr<IdTest,IdTest>> {
+            fn validate( &self, _log_files: &Vec<(IdTest,IdTest)> ) -> Result<OrderedLogs<(IdTest,IdTest)>,LoqErr<IdTest,IdTest>> {
                 Ok( self.0.clone() )
             }
         }
@@ -403,7 +403,7 @@ mod test {
 
         let log_switch = LogSwitcher { 
             read_id_of: |f_id:&(IdTest,IdTest)| Ok( f_id.0.clone() ), 
-            write_id_to: |f,ids:OldNewId<'_,IdTest>| {
+            write_id_to: |_,ids:OldNewId<'_,IdTest>| {
                 println!("old id={} new id={}", ids.old_id, ids.new_id);
                 oldnew_id_matched1.store(true, std::sync::atomic::Ordering::SeqCst);
                 ids.new_id.previous().map(|i| ids.old_id.id() == i );
@@ -418,7 +418,7 @@ mod test {
         let log_queue_conf = LogQueueConf { 
             log_open: open_conf, 
             log_switch: log_switch, 
-            id_of: |f| Ok(IdTest::new(None)),
+            id_of: |_f| Ok(IdTest::new(None)),
         };
 
         let mut log_queue : LogFileQueueImpl<IdTest,IdTest,IdTest,_,_> = log_queue_conf.open().unwrap();
@@ -504,22 +504,6 @@ mod full_test {
         Ok(log)
     }
 
-    // impl SeqValidateOp< PathBuf,LogFile<FileBuff>, LogQueueFileNumID>
-    // for &(PathBuf,LogFile<FileBuff>) {
-    //     fn items_count(a:&(PathBuf,LogFile<FileBuff>)) -> Result<u32,LoqErr<PathBuf,LogQueueFileNumID>> {
-    //         let (filename,log) = a;
-    //         match log.count() {
-    //             Ok(count) => Ok(count),
-    //             Err(err) => Err(
-    //                 LoqErr::CantReadRecordsCount {
-    //                     file: filename.clone(),
-    //                     error: err.clone()
-    //                 }
-    //             )
-    //         }
-    //     }
-    // }
-
     fn id_of( a:&(PathBuf,LogFile<FileBuff>) ) -> Result<LogQueueFileNumID,LoqErr<PathBuf,LogQueueFileNumID>> {
         let (filename,log) = a;
         let id_type = type_name::<LogQueueFileNumID>().to_string();
@@ -541,13 +525,6 @@ mod full_test {
 
         Ok(id)
     }
-
-    // impl IdOf<(PathBuf,LogFile<FileBuff>),LogQueueFileNumID,LoqErr<PathBuf,LogQueueFileNumID>>
-    // for (PathBuf,LogFile<FileBuff>) {
-    //     fn id_of(a:&(PathBuf,LogFile<FileBuff>)) -> Result<LogQueueFileNumID,LoqErr<PathBuf,LogQueueFileNumID>> {
-    //         id_of(a)
-    //     }
-    // } 
 
     #[test]
     fn do_test() {
@@ -691,7 +668,7 @@ mod full_test {
             }
         };
 
-        let mut log_queue = log_queue_conf.open().unwrap();
+        let log_queue = log_queue_conf.open().unwrap();
         println!("log_queue openned");
 
         let mut log_queue: Box<dyn LogFileQueue<LogQueueFileNumID,PathBuf,LogFile<FileBuff>> + '_>

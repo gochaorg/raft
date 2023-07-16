@@ -84,7 +84,7 @@ where
     
     if head_files.len()>1 {        
         return Err(LoqErr::OpenTwoHeads { heads: 
-            head_files.iter().map( |((file,log),id)| (file.clone(), id.clone())).collect() 
+            head_files.iter().map( |((file,_log),id)| (file.clone(), id.clone())).collect() 
         });
     } else if head_files.is_empty() {
         // Найти те что ссылается на не существующую id
@@ -114,7 +114,7 @@ where
             return Err( LoqErr::OpenNoHeads );
         } else if heads.len()>1 {
             return Err( LoqErr::OpenTwoHeads { heads:  
-                head_files.iter().map( |((file,log),id)| (file.clone(), id.clone())).collect() 
+                head_files.iter().map( |((file,_log),id)| (file.clone(), id.clone())).collect() 
             });
         }
 
@@ -145,7 +145,7 @@ where
     if !files_with_id.is_empty() {
         return Err(LoqErr::OpenLogNotFound { 
             id:   head_id.clone(), 
-            logs: head_files.iter().map( |((file,log),id)| (file.clone(), id.clone())).collect() 
+            logs: head_files.iter().map( |((file,_log),id)| (file.clone(), id.clone())).collect() 
         });
     }
 
@@ -263,7 +263,7 @@ pub mod test {
             Err(err) => {
                 println!("err {err:?}");
                 match err {
-                    LoqErr::OpenTwoHeads { heads } => {},
+                    LoqErr::OpenTwoHeads { heads:_ } => {},
                     _ => {assert!(false);}
                 }
             }
@@ -295,7 +295,7 @@ pub mod test {
             Err(err) => {
                 println!("err {err:?}");
                 match err {
-                    LoqErr::OpenLogNotFound { id, logs } => {},
+                    LoqErr::OpenLogNotFound { id:_, logs:_ } => {},
                     _ => { assert!(false); }
                 }
                 assert!(true);

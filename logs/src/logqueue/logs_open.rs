@@ -191,7 +191,7 @@ mod test {
 
         struct ValidateStub( OrderedLogs<(IdTest,IdTest)> );
         impl ValidateLogFiles<(IdTest,IdTest),String> for ValidateStub {
-            fn validate( &self, log_files: &Vec<(IdTest,IdTest)> ) -> Result<OrderedLogs<(IdTest,IdTest)>,String> {
+            fn validate( &self, _log_files: &Vec<(IdTest,IdTest)> ) -> Result<OrderedLogs<(IdTest,IdTest)>,String> {
                 Ok( self.0.clone() )
             }
         }
