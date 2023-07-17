@@ -506,24 +506,7 @@ mod full_test {
 
     fn id_of( a:&(PathBuf,LogFile<FileBuff>) ) -> Result<LogQueueFileNumID,LoqErr<PathBuf,LogQueueFileNumID>> {
         let (filename,log) = a;
-        let id_type = type_name::<LogQueueFileNumID>().to_string();
-
-        let block = 
-            log.get_block(BlockId::new(0))
-            .map_err(|err| LoqErr::CantReadLogId { 
-                file: filename.clone(), 
-                error: err, 
-                log_id_type: id_type.clone() 
-            })?;
-
-        let id = LogQueueFileNumID::block_read(&block)
-        .map_err(|err| LoqErr::CantParseLogId { 
-            file: filename.clone(), 
-            error: err, 
-            log_id_type: id_type.clone() 
-        })?;
-
-        Ok(id)
+        Ok(LogQueueFileNumID::read(filename, log)?)
     }
 
     #[test]
@@ -592,22 +575,10 @@ mod full_test {
                 let new_file = generator.generate().unwrap();
                 let path = new_file.path.clone();
                 let mut log = open_file(new_file.path.clone())?;
-                //------------------------
-                let mut options = BlockOptions::default();
-                let mut data = Vec::<u8>::new();
-                let id = LogQueueFileNumID { id: 0, previous: None };
-                id.block_write(&mut options, &mut data).
-                    map_err(|err| LoqErr::LogIdWrite { 
-                    file: new_file.path.clone(),
-                    error: err
-                })?;
-                log.append_data(&options, &data)
-                    .map_err(|err|
-                    LoqErr::LogIdWrite2 { 
-                        file: new_file.path.clone(), 
-                        error: err 
-                    })?;
-                //------------------------
+
+                let id = LogQueueFileNumID::new(None);
+                id.write(&path, &mut log)?;
+
                 Ok((path,log))
             }
         }

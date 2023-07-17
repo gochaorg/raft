@@ -20,12 +20,14 @@ where
         error: LogErr
     },
 
+    /// Ошибка чтения идентификатора файла - не возможно прочитать блок
     CantReadLogId {
         file: FILE,        
         error: LogErr,
         log_id_type: String,
     },
 
+    /// Ошибка чтения идентификатора файла - не возможно распознать значения записанные в блоке
     CantParseLogId {
         file: FILE,
         error: LogIdReadWriteErr,
@@ -47,6 +49,11 @@ where
     },
 
     OpenNoHeads,
+
+    /// Нельзя записть id файла, т.к. файл уже содержит данные
+    LogNotEmpty {
+        file: FILE,
+    },
 
     OpenLogNotFound {
         id: LogId,

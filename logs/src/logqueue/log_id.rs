@@ -36,31 +36,64 @@ pub trait LogQueueFileId : Eq + std::fmt::Display + Clone + Copy + Debug + Block
     /// Генерация нового идентификатора
     fn new( prev:Option<Self::ID> ) -> Self;
 
-    // Чтение идентификатора из лог файла
-    // fn read<FILE,BUFF>( filename:&FILE, log:&LogFile<BUFF> ) -> Result<Self,LoqErr<FILE,Self>> 
-    // where
-    //     FILE: Clone + Debug,
-    //     BUFF: FlatBuff,
-    // {
-    //     let id_type = type_name::<Self>().to_string();
+    /// Чтение идентификатора из лог файла
+    /// 
+    /// Читает первый блок в лог файле
+    fn read<FILE,BUFF>( filename:&FILE, log:&LogFile<BUFF> ) -> Result<Self,LoqErr<FILE,Self>> 
+    where
+        FILE: Clone + Debug,
+        BUFF: FlatBuff,
+    {
+        let id_type = type_name::<Self>().to_string();
 
-    //     let block = 
-    //         log.get_block(BlockId::new(0))
-    //         .map_err(|err| LoqErr::CantReadLogId { 
-    //             file: filename.clone(), 
-    //             error: err, 
-    //             log_id_type: id_type.clone() 
-    //         })?;
+        let block = 
+            log.get_block(BlockId::new(0))
+            .map_err(|err| LoqErr::CantReadLogId { 
+                file: filename.clone(), 
+                error: err, 
+                log_id_type: id_type.clone() 
+            })?;
 
-    //     let id = Self::block_read(&block)
-    //     .map_err(|err| LoqErr::CantParseLogId { 
-    //         file: filename.clone(), 
-    //         error: err, 
-    //         log_id_type: id_type.clone() 
-    //     })?;
+        let id = Self::block_read(&block)
+        .map_err(|err| LoqErr::CantParseLogId { 
+            file: filename.clone(), 
+            error: err, 
+            log_id_type: id_type.clone() 
+        })?;
         
-    //     Ok(id)
-    // }
+        Ok(id)
+    }
+
+    /// Запись идентификатора лог файла, первым блоком 
+    /// файл должен быть пустым
+    fn write<FILE,BUFF>( &self, filename:&FILE, log:&mut LogFile<BUFF> ) -> Result<(),LoqErr<FILE,Self>>
+    where
+        FILE: Clone+Debug,
+        BUFF: FlatBuff,
+    {
+        let mut options = BlockOptions::default();
+        let mut data = Vec::<u8>::new();
+
+        self.block_write(&mut options, &mut data).
+            map_err(|err| LoqErr::LogIdWrite { 
+            file: filename.clone(),
+            error: err
+        })?;
+
+        let count = log.count().map_err(|e| LoqErr::LogCountFail { file: filename.clone(), error: e })?;
+        if count>0 {
+            return Err(LoqErr::LogNotEmpty { file: filename.clone() });
+        }
+
+        log.append_data(&options, &data)
+            .map_err(|err|
+            LoqErr::LogIdWrite2 { 
+                file: filename.clone(), 
+                error: err 
+            })?;
+
+        Ok(())
+    }
 }
 
 ///  Идентификатор лог файла - число
