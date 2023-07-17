@@ -1,16 +1,19 @@
+use std::fmt::Debug;
 #[allow(unused)]
 use std::marker::PhantomData;
-use super::log_id::*;
+use super::{log_id::*, LoqErr};
 
 /// Состояние очереди
-pub trait LogQueueState<FILE> {
-    type ERR;
-
+pub trait LogQueueState<FILE,LOG,LogId> 
+where
+    FILE: Clone+Debug,
+    LogId: Clone+Debug,
+{
     /// Возвращает текущий лог файл
-    fn get_current_file( &self ) -> Result<FILE,Self::ERR>;
+    fn get_current_file( &self ) -> Result<(FILE,LOG),LoqErr<FILE,LogId>>;
 
     /// Указыавет новый лог файл
-    fn switch_current_file( &mut self, new_file: FILE ) -> Result<(),Self::ERR>;
+    fn switch_current_file( &mut self, new_file: (FILE,LOG) ) -> Result<(),LoqErr<FILE,LogId>>;
 }
 
 /// Информация о старом и новом id
@@ -20,21 +23,25 @@ pub struct OldNewId<'a, ID> {
 }
 
 /// Переключение текущего лог файла на новый
-pub trait LogSwitching<FILE,ERR> 
+pub trait LogSwitching<FILE,LOG,LogId>
+where
+    FILE:  Clone+Debug,
+    LogId: Clone+Debug,
 {
     /// Переключение лог файла
-    fn switch<S:LogQueueState<FILE,ERR = ERR>>( &mut self, log_state: &mut S ) -> Result<(),ERR>;
+    fn switch<S:LogQueueState<FILE,LOG,LogId>>( &mut self, log_state: &mut S ) -> Result<(),LoqErr<FILE,LogId>>;
 }
 
 /// Переключение лог файла
 #[derive(Clone)]
-pub struct LogSwitcher<FILE,LogId,ERR,FReadId,FWriteId,FNewFile>
+pub struct LogSwitcher<FILE,LOG,LogId,FReadId,FWriteId,FNewFile>
 where
-    FILE: Clone,
+    FILE: Clone+Debug,
+    LOG: Clone,
     LogId: LogQueueFileId,
-    FReadId: Fn(&FILE) -> Result<LogId,ERR>,
-    FWriteId: for <'a> Fn(&mut FILE, OldNewId<'a,LogId>) -> Result<(),ERR>,
-    FNewFile: FnMut() -> Result<FILE,ERR>,
+    FReadId: Fn(&(FILE,LOG)) -> Result<LogId,LoqErr<FILE,LogId>>,
+    FWriteId: for <'a> Fn(&mut (FILE,LOG), OldNewId<'a,LogId>) -> Result<(),LoqErr<FILE,LogId>>,
+    FNewFile: FnMut() -> Result<(FILE,LOG),LoqErr<FILE,LogId>>,
 {
     /// Чтение id лог файла
     pub read_id_of: FReadId,
@@ -46,17 +53,18 @@ where
     pub new_file: FNewFile,
 }
 
-impl<FILE,ERR,LogId,FReadId,FWriteId,FNewFile> LogSwitching<FILE,ERR> 
-for LogSwitcher<FILE,LogId,ERR,FReadId,FWriteId,FNewFile>
+impl<FILE,LOG,LogId,FReadId,FWriteId,FNewFile> LogSwitching<FILE,LOG,LogId> 
+for LogSwitcher<FILE,LOG,LogId,FReadId,FWriteId,FNewFile>
 where
-    FILE: Clone,
+    FILE: Clone+Debug,
+    LOG: Clone,
     LogId: LogQueueFileId,
-    FReadId: Fn(&FILE) -> Result<LogId,ERR>,
-    FWriteId: for <'a> Fn(&mut FILE, OldNewId<'a,LogId>) -> Result<(),ERR>,
-    FNewFile: FnMut() -> Result<FILE,ERR>,
+    FReadId: Fn(&(FILE,LOG)) -> Result<LogId,LoqErr<FILE,LogId>>,
+    FWriteId: for <'a> Fn(&mut (FILE,LOG), OldNewId<'a,LogId>) -> Result<(),LoqErr<FILE,LogId>>,
+    FNewFile: FnMut() -> Result<(FILE,LOG),LoqErr<FILE,LogId>>,
 {
     /// Переключение текущего лога
-    fn switch<S:LogQueueState<FILE,ERR = ERR>>( &mut self, log_state: &mut S ) -> Result<(),ERR> {
+    fn switch<S:LogQueueState<FILE,LOG,LogId>>( &mut self, log_state: &mut S ) -> Result<(),LoqErr<FILE,LogId>> {
         let old_file = log_state.get_current_file()?;
         
         let old_id = (self.read_id_of)(&old_file)?;
