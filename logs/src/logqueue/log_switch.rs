@@ -1,6 +1,8 @@
 use std::fmt::Debug;
 #[allow(unused)]
 use std::marker::PhantomData;
+use crate::logfile::{LogFile, FlatBuff};
+
 use super::{log_id::*, LoqErr};
 
 /// Состояние очереди
@@ -34,47 +36,35 @@ where
 
 /// Переключение лог файла
 #[derive(Clone)]
-pub struct LogSwitcher<FILE,LOG,LogId,FReadId,FWriteId,FNewFile>
+pub struct LogSwitcher<FILE,BUFF,LogId,FNewFile>
 where
     FILE: Clone+Debug,
-    LOG: Clone,
+    BUFF: FlatBuff,
     LogId: LogQueueFileId,
-    FReadId: Fn(&(FILE,LOG)) -> Result<LogId,LoqErr<FILE,LogId>>,
-    FWriteId: for <'a> Fn(&mut (FILE,LOG), OldNewId<'a,LogId>) -> Result<(),LoqErr<FILE,LogId>>,
-    FNewFile: FnMut() -> Result<(FILE,LOG),LoqErr<FILE,LogId>>,
+    FNewFile: FnMut() -> Result<(FILE,LogFile<BUFF>),LoqErr<FILE,LogId>>,
 {
-    /// Чтение id лог файла
-    pub read_id_of: FReadId,
-
-    /// Запись id в лог файл
-    pub write_id_to: FWriteId,
-
     /// Создание пустого лог файла
     pub new_file: FNewFile,
 }
 
-impl<FILE,LOG,LogId,FReadId,FWriteId,FNewFile> LogSwitching<FILE,LOG,LogId> 
-for LogSwitcher<FILE,LOG,LogId,FReadId,FWriteId,FNewFile>
+impl<FILE,BUFF,LogId,FNewFile> LogSwitching<FILE,LogFile<BUFF>,LogId> 
+for LogSwitcher<FILE,BUFF,LogId,FNewFile>
 where
     FILE: Clone+Debug,
-    LOG: Clone,
+    BUFF: FlatBuff,
     LogId: LogQueueFileId,
-    FReadId: Fn(&(FILE,LOG)) -> Result<LogId,LoqErr<FILE,LogId>>,
-    FWriteId: for <'a> Fn(&mut (FILE,LOG), OldNewId<'a,LogId>) -> Result<(),LoqErr<FILE,LogId>>,
-    FNewFile: FnMut() -> Result<(FILE,LOG),LoqErr<FILE,LogId>>,
+    FNewFile: FnMut() -> Result<(FILE,LogFile<BUFF>),LoqErr<FILE,LogId>>,
 {
     /// Переключение текущего лога
-    fn switch<S:LogQueueState<FILE,LOG,LogId>>( &mut self, log_state: &mut S ) -> Result<(),LoqErr<FILE,LogId>> {
-        let old_file = log_state.get_current_file()?;
-        
-        let old_id = (self.read_id_of)(&old_file)?;
+    fn switch<S:LogQueueState<FILE,LogFile<BUFF>,LogId>>( &mut self, log_state: &mut S ) -> Result<(),LoqErr<FILE,LogId>> {
+        let mut old_file = log_state.get_current_file()?;
+
+        let old_id = LogId::read(&old_file.0, &mut old_file.1)?;
         let new_id = LogId::new(Some(old_id.id()));
 
-        let ids = OldNewId { old_id:&old_id, new_id:&new_id };
-
         let mut new_file = (self.new_file)()?;
-        (self.write_id_to)(&mut new_file, ids)?;
-        
+        new_id.write(&new_file.0, &mut new_file.1)?;
+
         log_state.switch_current_file(new_file.clone())?;
         Ok(())
     }

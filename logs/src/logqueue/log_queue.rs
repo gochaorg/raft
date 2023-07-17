@@ -331,121 +331,6 @@ where
 }
 
 #[cfg(test)]
-mod test {
-    use std::marker::PhantomData;
-
-    use crate::logqueue::{FindFiles, OpenLogFile, ValidateLogFiles, InitializeFirstLog};
-
-    #[test]
-    fn log_queue_conf_test() {
-        use std::sync::Arc;
-        use std::sync::atomic::AtomicBool;
-
-        use super::*;
-
-        use super::super::log_seq_verifier::test::IdTest;
-        use super::super::log_seq_verifier::OrderedLogs;
-        use super::super::logs_open::LogFileQueueConf;
-        use super::super::log_switch::*;
-        #[allow(unused)]
-        use super::super::log_id::*;
-
-        let id0 = IdTest::new(None);
-        let id1 = IdTest::new(Some(id0.id()));
-        let id2 = IdTest::new(Some(id1.id()));
-        let id3 = IdTest::new(Some(id2.id()));
-
-        let oldnew_id_matched = Arc::new(AtomicBool::new(false));
-        let oldnew_id_matched1 = oldnew_id_matched.clone();
-
-        struct FindFilesStub(Vec<IdTest>);
-        impl FindFiles<IdTest,IdTest> for FindFilesStub {
-            fn find_files( &self ) -> Result<Vec<IdTest>,LoqErr<IdTest,IdTest>> {
-                Ok(self.0.clone())
-            }
-        }
-
-        struct OpenFileStub;
-        impl OpenLogFile<IdTest,IdTest,IdTest> for OpenFileStub {
-            fn open_log_file( &self, file:IdTest ) -> Result<IdTest, LoqErr<IdTest,IdTest>> {
-                Ok(file.clone())
-            }
-        }
-
-        struct ValidateStub(OrderedLogs<(IdTest,IdTest)>);
-        impl ValidateLogFiles<IdTest,IdTest,IdTest> for ValidateStub {
-            fn validate( &self, _log_files: &Vec<(IdTest,IdTest)> ) -> Result<OrderedLogs<(IdTest,IdTest)>,LoqErr<IdTest,IdTest>> {
-                Ok( self.0.clone() )
-            }
-        }
-
-        struct InitStub(IdTest);
-        impl InitializeFirstLog<IdTest,IdTest,IdTest> for InitStub {
-            fn initialize_first_log( &self ) -> Result<(IdTest,IdTest), LoqErr<IdTest,IdTest>> {
-                Ok((self.0.clone(), self.0.clone()))
-            }
-        }
-
-        let open_conf: LogFileQueueConf<IdTest, IdTest, IdTest, OpenFileStub, FindFilesStub, ValidateStub, InitStub> = LogFileQueueConf {
-            find_files: FindFilesStub(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()]),
-            open_log_file: OpenFileStub,
-            validate: ValidateStub(OrderedLogs {
-                files: vec![
-                    (id1.clone(),id1.clone()), 
-                    (id2.clone(),id2.clone()), 
-                    (id3.clone(),id3.clone()),
-                    (id0.clone(),id0.clone()), 
-                ],
-                tail: (id3.clone(),id3.clone())
-            }),
-            init: InitStub(id0.clone()),
-            _p: PhantomData.clone(),
-        };
-
-        let log_switch = LogSwitcher { 
-            read_id_of: |f_id:&(IdTest,IdTest)| Ok( f_id.0.clone() ), 
-            write_id_to: |_,ids:OldNewId<'_,IdTest>| {
-                println!("old id={} new id={}", ids.old_id, ids.new_id);
-                oldnew_id_matched1.store(true, std::sync::atomic::Ordering::SeqCst);
-                ids.new_id.previous().map(|i| ids.old_id.id() == i );
-                Ok(())
-            }, 
-            new_file: || {
-                let id = IdTest::new(None);
-                Ok( (id.clone(), id.clone()) )
-            }, 
-        };
-
-        let log_queue_conf = LogQueueConf { 
-            log_open: open_conf, 
-            log_switch: log_switch, 
-            id_of: |_f| Ok(IdTest::new(None)),
-        };
-
-        let mut log_queue : LogFileQueueImpl<IdTest,IdTest,IdTest,_,_> = log_queue_conf.open().unwrap();
-
-        println!("before");
-
-        let count0 = log_queue.files().len();
-        for (a,_) in log_queue.files() {
-            println!("log {a}");
-        }
-
-        println!("after");
-
-        log_queue.switch().unwrap();
-        let count1 = log_queue.files().len();
-        for (a,_) in log_queue.files() {
-            println!("log {a}");
-        }
-
-        assert!(count1 > count0);
-        assert!(oldnew_id_matched.load(std::sync::atomic::Ordering::SeqCst));
-    }
-
-}
-
-#[cfg(test)]
 mod full_test {
     #[allow(unused)]
     use std::any::{TypeId, type_name};
@@ -600,16 +485,6 @@ mod full_test {
 
         let log_switch =
         LogSwitcher { 
-            read_id_of: |log_file_pair: &(PathBuf,LogFile<FileBuff>)| {
-                id_of(log_file_pair)
-            }, 
-            write_id_to: 
-                |log: &mut (PathBuf, LogFile<FileBuff>),
-                 ids: OldNewId<LogQueueFileNumID>
-                | 
-            { 
-                ids.new_id.write(&log.0, &mut log.1)
-            },
             new_file: move || {
                 let mut generator = log_file_new.write().unwrap();
                 let new_file = generator.generate().unwrap();
@@ -639,17 +514,19 @@ mod full_test {
         log_queue.switch().unwrap();
         println!("log_queue switched");
 
-        let rec = log_queue.write(30).unwrap();
-        println!("log_queue writed, rec id = {:?}",rec);
+        let rec1 = log_queue.write(30).unwrap();
+        println!("log_queue writed, rec id = {:?}",rec1);
 
-        let rec = log_queue.write(32).unwrap();
-        println!("log_queue writed, rec id = {:?}",rec);
+        let rec2 = log_queue.write(32).unwrap();
+        println!("log_queue writed, rec id = {:?}",rec2);
+        assert!(rec2.block_id.value() > rec1.block_id.value());
 
-        let rec = log_queue.write(34).unwrap();
-        println!("log_queue writed, rec id = {:?}",rec);
+        let rec3 = log_queue.write(34).unwrap();
+        println!("log_queue writed, rec id = {:?}",rec3);
+        assert!(rec3.block_id.value() > rec2.block_id.value());
 
-        let rec = log_queue.last_record().unwrap();
-        println!("last rec = {:?}",rec);
+        let rec4 = log_queue.last_record().unwrap();
+        println!("last rec = {:?}",rec4);
         //let rec_id = log_queue.last
 
     }
