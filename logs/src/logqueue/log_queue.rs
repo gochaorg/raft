@@ -364,7 +364,6 @@ mod full_test {
 
     use crate::bbuff::absbuff::FileBuff;
     use crate::logfile::LogFile;
-    use crate::logfile::block::{BlockId, BlockOptions};
     use crate::logqueue::new_file::NewFileGenerator;
     use crate::logqueue::path_tmpl::PathTemplateParser;
 
