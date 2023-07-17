@@ -2,14 +2,17 @@ use std::fmt::Debug;
 use std::num::ParseIntError;
 use std::str::FromStr;
 use uuid::Uuid;
+use crate::logfile::{LogFile, FlatBuff};
 use crate::logfile::block::{String32, BlockErr, BlockId, BlockOptions};
 use crate::logfile::block::Block;
 use std::hash::Hash;
+use std::any::type_name;
+
+use super::LoqErr;
 
 /// Запись идентификатора в блок
 pub trait BlockWriter {
-    type ERR;
-    fn block_write( &self, options: &mut BlockOptions, data: &mut Vec<u8> ) -> Result<(),Self::ERR>;
+    fn block_write( &self, options: &mut BlockOptions, data: &mut Vec<u8> ) -> Result<(),LogIdReadWriteErr>;
 }
 
 /// Чтение индентификатора из блока
@@ -17,8 +20,7 @@ pub trait BlockReader
 where
     Self: Sized
 {
-    type ERR;
-    fn block_read( block: &Block ) -> Result<Self, Self::ERR>;
+    fn block_read( block: &Block ) -> Result<Self, LogIdReadWriteErr>;
 }
 
 /// Идентификатор лог файла
@@ -33,6 +35,32 @@ pub trait LogQueueFileId : Eq + std::fmt::Display + Clone + Copy + Debug + Block
 
     /// Генерация нового идентификатора
     fn new( prev:Option<Self::ID> ) -> Self;
+
+    // Чтение идентификатора из лог файла
+    // fn read<FILE,BUFF>( filename:&FILE, log:&LogFile<BUFF> ) -> Result<Self,LoqErr<FILE,Self>> 
+    // where
+    //     FILE: Clone + Debug,
+    //     BUFF: FlatBuff,
+    // {
+    //     let id_type = type_name::<Self>().to_string();
+
+    //     let block = 
+    //         log.get_block(BlockId::new(0))
+    //         .map_err(|err| LoqErr::CantReadLogId { 
+    //             file: filename.clone(), 
+    //             error: err, 
+    //             log_id_type: id_type.clone() 
+    //         })?;
+
+    //     let id = Self::block_read(&block)
+    //     .map_err(|err| LoqErr::CantParseLogId { 
+    //         file: filename.clone(), 
+    //         error: err, 
+    //         log_id_type: id_type.clone() 
+    //     })?;
+        
+    //     Ok(id)
+    // }
 }
 
 ///  Идентификатор лог файла - число
@@ -75,9 +103,7 @@ impl LogQueueFileId for LogQueueFileNumID {
 }
 
 impl BlockWriter for LogQueueFileNumID {
-    type ERR = LogIdReadWriteErr;
-
-    fn block_write( &self, options: &mut BlockOptions, _data: &mut Vec<u8> ) -> Result<(),Self::ERR> {
+    fn block_write( &self, options: &mut BlockOptions, _data: &mut Vec<u8> ) -> Result<(),LogIdReadWriteErr> {
         let value : Option<String32> = options.get(LOG_FILE_ID_KEY);
         if value.is_some() {
             return Err(LogIdReadWriteErr::ValueAlreadyDefined(value.unwrap()));
@@ -104,9 +130,7 @@ impl BlockWriter for LogQueueFileNumID {
 }
 
 impl BlockReader for LogQueueFileNumID {
-    type ERR = LogIdReadWriteErr;
-
-    fn block_read( block: &Block ) -> Result<Self, Self::ERR> {
+    fn block_read( block: &Block ) -> Result<Self, LogIdReadWriteErr> {
         let type_of_value : Option<String32> = block.head.block_options.get(LOG_FILE_ID_TYPE_KEY);
         if type_of_value.is_none() { return Err(LogIdReadWriteErr::TypeValueNotFound); };
         if type_of_value.clone().unwrap().value() != LOG_FILE_NUM_TYPE { 
@@ -206,9 +230,7 @@ impl From<ParseIntError> for LogIdReadWriteErr {
 }
 
 impl BlockWriter for LogQueueFileUUID {
-    type ERR = LogIdReadWriteErr;
-
-    fn block_write( &self, options: &mut BlockOptions, _data: &mut Vec<u8> ) -> Result<(),Self::ERR> {
+    fn block_write( &self, options: &mut BlockOptions, _data: &mut Vec<u8> ) -> Result<(),LogIdReadWriteErr> {
         let value : Option<String32> = options.get(LOG_FILE_ID_KEY);
         if value.is_some() {
             return Err(LogIdReadWriteErr::ValueAlreadyDefined(value.unwrap()));
@@ -235,9 +257,7 @@ impl BlockWriter for LogQueueFileUUID {
 }
 
 impl BlockReader for LogQueueFileUUID {
-    type ERR = LogIdReadWriteErr;
-
-    fn block_read( block: &Block ) -> Result<Self, Self::ERR> {
+    fn block_read( block: &Block ) -> Result<Self, LogIdReadWriteErr> {
         let type_of_value : Option<String32> = block.head.block_options.get(LOG_FILE_ID_TYPE_KEY);
         if type_of_value.is_none() { return Err(LogIdReadWriteErr::TypeValueNotFound); };
         if type_of_value.clone().unwrap().value() != LOG_FILE_UUID_TYPE { 

@@ -185,14 +185,12 @@ pub mod test {
         }
     }
     impl BlockWriter for IdTest {
-        type ERR = String;
-        fn block_write( &self, _options: &mut BlockOptions, _data: &mut Vec<u8> ) -> Result<(),Self::ERR> {
+        fn block_write( &self, _options: &mut BlockOptions, _data: &mut Vec<u8> ) -> Result<(),LogIdReadWriteErr> {
             Ok(())
         }
     }
     impl BlockReader for IdTest {
-        type ERR = String;
-        fn block_read( _block: &crate::logfile::block::Block ) -> Result<Self, Self::ERR> {
+        fn block_read( _block: &crate::logfile::block::Block ) -> Result<Self, LogIdReadWriteErr> {
             todo!()
         }
     }
