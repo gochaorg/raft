@@ -358,34 +358,34 @@ mod test {
         let oldnew_id_matched1 = oldnew_id_matched.clone();
 
         struct FindFilesStub(Vec<IdTest>);
-        impl FindFiles<IdTest,LoqErr<IdTest,IdTest>> for FindFilesStub {
+        impl FindFiles<IdTest,IdTest> for FindFilesStub {
             fn find_files( &self ) -> Result<Vec<IdTest>,LoqErr<IdTest,IdTest>> {
                 Ok(self.0.clone())
             }
         }
 
         struct OpenFileStub;
-        impl OpenLogFile<IdTest,IdTest,LoqErr<IdTest,IdTest>> for OpenFileStub {
+        impl OpenLogFile<IdTest,IdTest,IdTest> for OpenFileStub {
             fn open_log_file( &self, file:IdTest ) -> Result<IdTest, LoqErr<IdTest,IdTest>> {
                 Ok(file.clone())
             }
         }
 
         struct ValidateStub(OrderedLogs<(IdTest,IdTest)>);
-        impl ValidateLogFiles<(IdTest,IdTest),LoqErr<IdTest,IdTest>> for ValidateStub {
+        impl ValidateLogFiles<IdTest,IdTest,IdTest> for ValidateStub {
             fn validate( &self, _log_files: &Vec<(IdTest,IdTest)> ) -> Result<OrderedLogs<(IdTest,IdTest)>,LoqErr<IdTest,IdTest>> {
                 Ok( self.0.clone() )
             }
         }
 
         struct InitStub(IdTest);
-        impl InitializeFirstLog<(IdTest,IdTest),LoqErr<IdTest,IdTest>> for InitStub {
+        impl InitializeFirstLog<IdTest,IdTest,IdTest> for InitStub {
             fn initialize_first_log( &self ) -> Result<(IdTest,IdTest), LoqErr<IdTest,IdTest>> {
                 Ok((self.0.clone(), self.0.clone()))
             }
         }
 
-        let open_conf = LogFileQueueConf {
+        let open_conf: LogFileQueueConf<IdTest, IdTest, IdTest, OpenFileStub, FindFilesStub, ValidateStub, InitStub> = LogFileQueueConf {
             find_files: FindFilesStub(vec![id0.clone(), id1.clone(), id2.clone(), id3.clone()]),
             open_log_file: OpenFileStub,
             validate: ValidateStub(OrderedLogs {
@@ -539,14 +539,14 @@ mod full_test {
         let log_file_new = Arc::new(RwLock::new(log_file_new));
 
         struct OpenLogFileStub;
-        impl OpenLogFile<PathBuf,LogFile<FileBuff>,LoqErr<PathBuf,LogQueueFileNumID>> for OpenLogFileStub {
+        impl OpenLogFile<PathBuf,LogFile<FileBuff>,LogQueueFileNumID> for OpenLogFileStub {
             fn open_log_file( &self, file:PathBuf ) -> Result<LogFile<FileBuff>, LoqErr<PathBuf,LogQueueFileNumID>> {
                 open_file(file)
             }
         }
 
         struct ValidateStub;
-        impl ValidateLogFiles<(PathBuf,LogFile<FileBuff>),LoqErr<PathBuf,LogQueueFileNumID>> for ValidateStub {
+        impl ValidateLogFiles<PathBuf,LogFile<FileBuff>,LogQueueFileNumID> for ValidateStub {
             fn validate( &self, log_files: &Vec<(PathBuf,LogFile<FileBuff>)> ) -> Result<crate::logqueue::OrderedLogs<(PathBuf,LogFile<FileBuff>)>,LoqErr<PathBuf,LogQueueFileNumID>> {
                 validate_sequence::<PathBuf,LogFile<FileBuff>,LogQueueFileNumID>(log_files)
             }
@@ -567,7 +567,7 @@ mod full_test {
         struct InitStub<'a,F>( Arc<RwLock<NewFileGenerator<'a,F>>> )
         where F: Fn(PathBuf) -> Result<File,std::io::Error>;
 
-        impl<'a,F> InitializeFirstLog<(PathBuf,LogFile<FileBuff>),LoqErr<PathBuf,LogQueueFileNumID>> for InitStub<'a,F> 
+        impl<'a,F> InitializeFirstLog<PathBuf,LogFile<FileBuff>,LogQueueFileNumID> for InitStub<'a,F> 
         where F: Fn(PathBuf) -> Result<File,std::io::Error>
         {
             fn initialize_first_log( &self ) -> Result<(PathBuf,LogFile<FileBuff>), LoqErr<PathBuf,LogQueueFileNumID>> {
@@ -587,7 +587,7 @@ mod full_test {
         LogFileQueueConf<
             LogFile<FileBuff>, 
             PathBuf, 
-            LoqErr<PathBuf,LogQueueFileNumID>,
+            LogQueueFileNumID,
             _, _, _, _>
          = LogFileQueueConf {
             find_files: fs_log_find,
