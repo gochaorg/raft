@@ -63,10 +63,6 @@ pub use log_id::*;
 mod log_seq_verifier;
 pub use log_seq_verifier::*;
 
-/// Переключение лог файла
-mod log_switch;
-pub use log_switch::*;
-
 /// Очередь лог файлов
 mod log_queue;
 pub use log_queue::*;

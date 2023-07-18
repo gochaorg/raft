@@ -4,26 +4,9 @@ use std::collections::HashMap;
 use core::fmt::Debug;
 use std::marker::PhantomData;
 
-#[allow(unused)]
-use crate::logfile::{LogFile, FlatBuff, LogErr};
+use crate::logfile::{LogFile, FlatBuff};
 
-#[allow(unused)]
-use crate::logfile::block::{BlockId, BlockOptions};
-
-#[allow(unused)]
-use super::find_logs::FsLogFind;
 use super::{log_id::*, LoqErr, FindFiles, OpenLogFile, ValidateLogFiles};
-use super::log_switch::{
-    LogSwitching,
-    LogQueueState
-};
-use super::logs_open::{
-    LogQueueOpenConf,
-    LogQueueOpenned as LogOpened,
-};
-
-#[allow(unused)]
-use super::log_api::*;
 
 /// Очередь логов
 pub trait LogFileQueue<LogId,FILE,LOG>
@@ -400,7 +383,7 @@ mod full_test {
 
     #[allow(unused)]
     use crate::logqueue::{log_id::*, LogFileQueueConf, LoqErr, validate_sequence, SeqValidateOp, IdOf, 
-        LogQueueConf, LogSwitcher, OldNewId, LogFileQueue, OpenLogFile, ValidateLogFiles, InitializeFirstLog, LogWriting, LogNavigateLast
+        LogQueueConf, LogFileQueue, OpenLogFile, ValidateLogFiles, InitializeFirstLog, LogWriting, LogNavigateLast
     };
     use crate::logqueue::find_logs::FsLogFind;
 
@@ -479,26 +462,6 @@ mod full_test {
         impl IdOf<PathBuf, LogFile<FileBuff>, LogQueueFileNumID> for (PathBuf, LogFile<FileBuff>) {
             fn id_of(a:&(PathBuf,LogFile<FileBuff>)) -> Result<LogQueueFileNumID,LoqErr<PathBuf,LogQueueFileNumID>> {
                 id_of(a)
-            }
-        }
-
-        #[derive(Clone)]
-        struct InitStub<'a,F>( Arc<RwLock<NewFileGenerator<'a,F>>> )
-        where F: Fn(PathBuf) -> Result<File,std::io::Error>;
-
-        impl<'a,F> InitializeFirstLog<PathBuf,LogFile<FileBuff>,LogQueueFileNumID> for InitStub<'a,F> 
-        where F: Fn(PathBuf) -> Result<File,std::io::Error>
-        {
-            fn initialize_first_log( &self ) -> Result<(PathBuf,LogFile<FileBuff>), LoqErr<PathBuf,LogQueueFileNumID>> {
-                let mut generator = self.0.write().unwrap();
-                let new_file = generator.generate().unwrap();
-                let path = new_file.path.clone();
-                let mut log = open_file(new_file.path.clone())?;
-
-                let id = LogQueueFileNumID::new(None);
-                id.write(&path, &mut log)?;
-
-                Ok((path,log))
             }
         }
 

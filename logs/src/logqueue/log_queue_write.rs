@@ -1,10 +1,6 @@
 use std::fmt::Debug;
-
-#[allow(unused)]
-use crate::{logfile::{block::BlockOptions, LogFile, FlatBuff, LogErr}, bbuff::absbuff::FileBuff, logqueue::LogWriteErr};
-
-#[allow(unused)]
-use super::{LogWriting, RecID, LogFileQueue, LogQueueFileId, LoqErr, LogFileQueueImpl, LogQueueFileNumID, LogSwitching, PreparedRecord};
+use crate::logfile::{block::BlockOptions, LogFile, FlatBuff};
+use super::{LogWriting, RecID, LogFileQueue, LogQueueFileId, LoqErr, PreparedRecord};
 
 impl<FILE,BUFF,LogId> LogWriting<RecID<LogId>> 
 for & dyn LogFileQueue<LogId,FILE,LogFile<BUFF>>
