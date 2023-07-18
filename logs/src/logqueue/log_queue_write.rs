@@ -28,7 +28,8 @@ where
                     error: err 
                 }
             )?;
-        let id = self.log_id_of(&(file,log))?;
+
+        let id = LogId::read(&file, &log)?;
         Ok( RecID { log_file_id:id, block_id: b_id } )
     }
 }

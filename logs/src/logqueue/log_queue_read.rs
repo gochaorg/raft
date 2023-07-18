@@ -95,8 +95,7 @@ where
             return Ok(None)
         }
 
-        let lfile = (file_name,tail);
-        let log_id = self.log_id_of(&lfile)?;
+        let log_id = LogId::read(&file_name, &tail)?;
         
         Ok(Some(RecID {
             log_file_id: log_id,
