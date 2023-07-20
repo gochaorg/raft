@@ -61,6 +61,7 @@ impl PathValue for PlainValue {
 }
 
 /// Время в имени файла
+/// DateFormat - формат времени
 pub struct CurrentDateTimeValue( pub DateFormat );
 impl PathValue for CurrentDateTimeValue {
     fn generate( &mut self ) -> String {
@@ -172,6 +173,19 @@ impl<'a> PathTemplateParser<'a> {
     }
 
     /// Парсинг шаблона
+    /// 
+    /// Пример шаблона
+    /// 
+    /// ```
+    /// "${root}/${time:local:yyyy-mm-ddThh-mi-ss}-${rnd:5}.binlog"
+    /// ```
+    /// 
+    /// - `${....}` - некие переменные которые могут содержать значения
+    /// - синтаксис шаблона описан в структуре [TemplateParser]
+    /// - `${root}` - это внешняя переменная и должна быть определена явно [with_variable()]
+    /// - `${time:...}` - встроенная переменаая, задает текущую дату, формат даты описан в [DateFormat]
+    /// - `${rnd:5}` - случайны набор из 5 букв, число 5 - указывает на кол-во букв и может быть заменено на другое число
+    /// - `${env:...}` - в качестве значения - потенциально опасно
     pub fn parse<'r>(&self, source: &str) -> Result<PathTemplate<'r>, String> {
         let p_tmpl = RefCell::new(Vec::<Rc<Mutex<dyn PathValue>>>::new());
 

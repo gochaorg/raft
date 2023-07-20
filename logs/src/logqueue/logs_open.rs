@@ -1,5 +1,10 @@
+use std::fs::OpenOptions;
+use std::sync::{Arc, RwLock};
+use std::time::Duration;
 use std::{path::PathBuf, fmt::Debug};
 use crate::{logfile::LogFile, bbuff::absbuff::FileBuff};
+use super::new_file::NewFileGenerator;
+use super::path_tmpl::PathTemplateParser;
 use super::{log_seq_verifier::OrderedLogs, find_logs::FsLogFind, LoqErr, LogQueueFileNumID, validate_sequence, SeqValidateOp, IdOf};
 use super::log_id::*;
 
@@ -30,6 +35,7 @@ where
     fn open_log_file( &self, file:FILE ) -> Result<LOG, LoqErr<FILE,LogId>>;
 }
 
+/// Вспомогательная структура для открытия логов
 #[derive(Clone,Debug)]
 pub struct LogQueueFileNumIDOpen;
 
@@ -61,6 +67,7 @@ where
     fn validate( &self, log_files: &Vec<(FILE,LOG)> ) -> Result<OrderedLogs<(FILE,LOG)>,LoqErr<FILE,LogId>>;
 }
 
+/// Вспомогательная структура для валидации логов
 #[derive(Clone,Debug)]
 pub struct ValidateStub;
 impl<FILE> ValidateLogFiles<FILE,LogFile<FileBuff>,LogQueueFileNumID> for ValidateStub 
@@ -90,3 +97,62 @@ where
         Ok(LogQueueFileNumID::read(filename, log)?)
     }
 }
+
+/// Создает функцию генерации нового файла
+/// 
+/// Аргументы
+/// ====================
+/// - `root` - переменная указыавющая на корневой каталог логов
+/// - `template` - шаблон
+/// 
+/// Пример шаблона
+/// ----------------------
+/// 
+/// ```
+/// "${root}/${time:local:yyyy-mm-ddThh-mi-ss}-${rnd:5}.binlog"
+/// ```
+/// 
+/// - `${....}` - некие переменные которые могут содержать значения
+/// - `${root}` - это внешняя переменная
+/// - `${time:...}` - встроенная переменаая, задает текущую дату, формат даты описан в [DateFormat]
+/// - `${rnd:5}` - случайны набор из 5 букв, число 5 - указывает на кол-во букв и может быть заменено на другое число
+/// - `${env:...}` - в качестве значения - потенциально опасно
+pub fn path_template<LogId: Clone + Debug>( root:&str, template:&str ) 
+    -> Result<impl  FnMut() -> Result<PathBuf,LoqErr<PathBuf,LogId>> + Clone, LoqErr<PathBuf,LogId>>
+{
+    let path_tmpl = PathTemplateParser::default()
+        .with_variable("root", root)
+        .parse(template)
+        .map_err(|err| 
+            LoqErr::<PathBuf,LogId>::CantParsePathTemplate { 
+                error: err, 
+                template: template.to_string(), 
+                root: root.to_string() })?;
+
+    let log_file_new = 
+        NewFileGenerator {
+            open: |path| OpenOptions::new().create(true).read(true).write(true).open(path),
+            path_template: path_tmpl,
+            max_duration: Some(Duration::from_secs(5)),
+            max_attemps: Some(5),
+            throttling: Some(Duration::from_millis(100))
+        };
+    let log_file_new: Arc<RwLock<NewFileGenerator<'_, _>>> = Arc::new(RwLock::new(log_file_new));
+
+    Ok( move || {
+        let mut generator = 
+            log_file_new.write().map_err(|err| 
+                LoqErr::<PathBuf,LogId>::CantCaptureWriteLock { error: err.to_string() }
+            )?;
+
+        let new_file = generator.generate()
+            .map_err(|e| 
+                LoqErr::<PathBuf,LogId>::CantGenerateNewFile { 
+                    error: e, 
+                }
+            )?;
+        let path = new_file.path.clone();
+        Ok(path)
+    } )
+}
+

@@ -2,26 +2,85 @@ use either::Either;
 
 use crate::{Parser, CharsCount};
 
+/// Шаблон - содержит список элементов шаблона [TemplateItem]
 #[derive(Debug,Clone)]
 pub struct Template {
+    /// Элементы шаблона
     pub values: Vec<TemplateItem>
 }
 
+/// Элемент шаблона
 #[derive(Debug,Clone)]
 pub enum TemplateItem {
+    /// Обычный текст
     PlainText(String),
+
+    /// Некий код который надо интерпретировать
     Code(String)
 }
 
+/// Парсер шаблона
+/// 
+/// Синтаксис
+/// ============
+/// 
+/// ```
+/// // Шаблон
+/// template ::= code 
+///            | id      // правило регулируется флагом self.id
+///            | escape 
+///            | plain
+/// 
+/// // некий код
+/// code ::= '${' inner '}'
+/// 
+/// // любые символы с учетом сбалансированных фигруных скобок
+/// inner
+/// 
+/// // некий идентификатор (например переменная)
+/// id ::= '$' id_start { id_cont }
+/// 
+/// id_start ::= буквы
+///            | цифры // регулируется self.num_first
+///            | '_'   // регулируется self.underscore_first
+///            | '-'   // регулируется self.dash_first
+///            | '.'   // регулируется self.dot_first
+/// 
+/// id_cont ::= буквы
+///           | цифры
+///           | '_'    // регулируется self.underscore
+///           | '-'    // регулируется self.dash
+///           | '.'    // регулируется self.dot
+/// 
+/// // экранирование
+/// escape ::= '\\' any_char // одиночная обратная касая черта
+/// ```
 pub struct TemplateParser {
+    /// Пустая строка интерпретируется как шаблон с 0 элементами, иначе None, а не шаблон
     pub empty: bool,
+
+    /// дозволено ссылаться на id в шаблоне    
     pub id: bool,
+
+    /// использование '-' в шаблоне id
     pub dash: bool,
+
+    /// использование '.' в шаблоне id
     pub dot: bool,
+
+    /// использование '_' в шаблоне id
     pub underscore: bool,
+
+    /// использование цифр в качестве первого символа в шаблоне id
     pub num_first: bool,
+
+    /// использование '_' в качестве первого символа в шаблоне id
     pub underscore_first: bool,
+
+    /// использование '.' в качестве первого символа в шаблоне id
     pub dot_first: bool,
+
+    /// использование '-' в качестве первого символа в шаблоне id
     pub dash_first: bool,
 }
 
@@ -196,16 +255,6 @@ fn to_string_test() {
     );
     println!("{str}");
 }
-
-// pub struct TemplateMapper<'a, F, A> 
-// where
-//     F: FnMut(&str) -> A,
-//     A: Sized + Clone
-// {
-//     template: &'a Template,
-//     code_mapper: F
-// }
-// pub struct Te
 
 impl Template {
     pub fn map<F1, A, F2, B>( &self, mut code_map:F1, mut text_map:F2 ) -> Vec<Either<A,B>> 

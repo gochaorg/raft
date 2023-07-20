@@ -7,7 +7,9 @@ use crate::{DateTimeItem, DateValue, DateTimeZone};
 /// 
 /// Общий синтаксис таков
 /// 
-///     [ time_zone ] { qouted | non-quoted | variable }
+/// ```
+/// [ time_zone ] { qouted | non-quoted | variable }
+/// ```
 /// 
 /// time_zone - указывает временную зону, возможно три формата
 /// - `utc:` - зона UTC

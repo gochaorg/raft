@@ -256,14 +256,6 @@ where
     }
 }
 
-pub trait NewFile<FILE,LogId> 
-where
-    FILE: Clone + Debug,
-    LogId: Clone + Debug,
-{
-    fn new_file( &mut self ) -> Result<FILE,LoqErr<FILE,LogId>>;
-}
-
 /// Конфигурация логов
 pub struct LogQueueConf<
     LogId, FILE, BUFF,
@@ -388,7 +380,7 @@ mod full_test {
 
     use crate::bbuff::absbuff::FileBuff;
     use crate::logfile::LogFile;
-    use crate::logqueue::{LogQueueFileNumIDOpen, ValidateStub};
+    use crate::logqueue::{LogQueueFileNumIDOpen, ValidateStub, path_template};
     use crate::logqueue::new_file::NewFileGenerator;
     use crate::logqueue::path_tmpl::PathTemplateParser;
 
@@ -410,51 +402,16 @@ mod full_test {
                 "*.binlog", 
                 true ).unwrap();
 
-        let path_tmpl = PathTemplateParser::default()
-            .with_variable("root", prepared.log_dir_root.to_str().unwrap())
-            .parse("${root}/${time:local:yyyy-mm-ddThh-mi-ss}-${rnd:5}.binlog").unwrap();
-
-        let log_file_new = 
-            NewFileGenerator {
-                open: |path| OpenOptions::new().create(true).read(true).write(true).open(path),
-                path_template: path_tmpl,
-                max_duration: Some(Duration::from_secs(5)),
-                max_attemps: Some(5),
-                throttling: Some(Duration::from_millis(100))
-            };
-        let log_file_new: Arc<RwLock<NewFileGenerator<'_, _>>> = Arc::new(RwLock::new(log_file_new));
-
-        // fn path_template(log_dir_root:PathBuf, template:&str) -> Arc<RwLock<NewFileGenerator<'_,_>>> {
-        //     let path_tmpl = PathTemplateParser::default()
-        //     .with_variable("root", log_dir_root.to_str().unwrap())
-        //     .parse("${root}/${time:local:yyyy-mm-ddThh-mi-ss}-${rnd:5}.binlog").unwrap();
-
-        //     let log_file_new = 
-        //         NewFileGenerator {
-        //             open: |path| OpenOptions::new().create(true).read(true).write(true).open(path),
-        //             path_template: path_tmpl,
-        //             max_duration: Some(Duration::from_secs(5)),
-        //             max_attemps: Some(5),
-        //             throttling: Some(Duration::from_millis(100))
-        //         };
-
-        //     let log_file_new: Arc<RwLock<NewFileGenerator<'_, _>>> = Arc::new(RwLock::new(log_file_new));
-
-        //     log_file_new
-        // }
-
         let log_queue_conf: LogQueueConf<LogQueueFileNumID, PathBuf, FileBuff, _, _, _, _> = LogQueueConf {
             find_files: fs_log_find,
             open_log_file: LogQueueFileNumIDOpen,
             validate: ValidateStub,
-            new_file: move || {
-                let mut generator = log_file_new.write().unwrap();
-                let new_file = generator.generate().unwrap();
-                let path = new_file.path.clone();
-                Ok(path)
-            },
+            new_file: path_template(
+                prepared.log_dir_root.to_str().unwrap(), 
+                "${root}/${time:local:yyyy-mm-ddThh-mi-ss}-${rnd:5}.binlog"
+            ).unwrap(),
             _p: PhantomData.clone(),
-        };    
+        };
 
         let log_queue = log_queue_conf.open().unwrap();
         println!("log_queue openned");

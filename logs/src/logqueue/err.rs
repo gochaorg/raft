@@ -4,6 +4,7 @@ use std::{path::PathBuf, fmt::Debug};
 #[allow(unused)]
 use crate::{logfile::{LogErr, LogFile, block::BlockId}, bbuff::absbuff::{ABuffError, FileBuff}};
 
+use super::new_file::NewFileGeneratorErr;
 #[allow(unused)]
 use super::{LogIdReadWriteErr, LogQueueFileNumID, LogWriteErr};
 
@@ -34,6 +35,23 @@ where
         log_id_type: String,
     },
 
+    /// Ошибка парсинга шаблона имени файла
+    CantParsePathTemplate {
+        error: String,
+        template: String,
+        root: String,
+    },
+
+    /// Ошибка генерации 
+    CantGenerateNewFile {
+        error: NewFileGeneratorErr,
+    },
+
+    CantCaptureWriteLock {
+        error: String,
+    },
+
+    /// Ошибка открытия файлового лог файла 
     OpenFileBuff {
         file: FILE,
         error: ABuffError,
