@@ -1,5 +1,5 @@
 use super::{log_id::*, LoqErr};
-use std::{fmt::Debug, collections::{HashSet, HashMap}};
+use std::{fmt::Debug, collections::HashMap};
 
 /// Извлечение и лог файла - идентификатора
 pub trait IdOf<FILE,LOG,ID> 
