@@ -378,35 +378,15 @@ mod full_test {
 
     use crate::bbuff::absbuff::FileBuff;
     use crate::logfile::LogFile;
+    use crate::logqueue::{ValidateLogFiles, LogQueueFileNumIDOpen, ValidateStub};
     use crate::logqueue::new_file::NewFileGenerator;
     use crate::logqueue::path_tmpl::PathTemplateParser;
 
     #[allow(unused)]
-    use crate::logqueue::{log_id::*, LogFileQueueConf, LoqErr, validate_sequence, SeqValidateOp, IdOf, 
-        LogQueueConf, LogFileQueue, OpenLogFile, ValidateLogFiles, InitializeFirstLog, LogWriting, LogNavigateLast
+    use crate::logqueue::{log_id::*, LoqErr, validate_sequence, SeqValidateOp, IdOf, 
+        LogQueueConf, LogFileQueue, LogWriting, LogNavigateLast
     };
     use crate::logqueue::find_logs::FsLogFind;
-
-    fn open_file( path:PathBuf ) -> Result<LogFile<FileBuff>,LoqErr<PathBuf,LogQueueFileNumID>> {
-        let buff = 
-        FileBuff::open_read_write(path.clone()).map_err(|err| LoqErr::OpenFileBuff { 
-            file: path.clone(), 
-            error: err
-        })?;
-
-        let log = LogFile::new(buff)
-        .map_err(|err| LoqErr::OpenLog { 
-            file: path.clone(), 
-            error: err
-        })?;
-
-        Ok(log)
-    }
-
-    fn id_of( a:&(PathBuf,LogFile<FileBuff>) ) -> Result<LogQueueFileNumID,LoqErr<PathBuf,LogQueueFileNumID>> {
-        let (filename,log) = a;
-        Ok(LogQueueFileNumID::read(filename, log)?)
-    }
 
     #[test]
     fn do_test() {
@@ -437,37 +417,9 @@ mod full_test {
             };
         let log_file_new = Arc::new(RwLock::new(log_file_new));
 
-        #[derive(Clone,Debug)]
-        struct OpenLogFileStub;
-        impl OpenLogFile<PathBuf,LogFile<FileBuff>,LogQueueFileNumID> for OpenLogFileStub {
-            fn open_log_file( &self, file:PathBuf ) -> Result<LogFile<FileBuff>, LoqErr<PathBuf,LogQueueFileNumID>> {
-                open_file(file)
-            }
-        }
-
-        #[derive(Clone,Debug)]
-        struct ValidateStub;
-        impl ValidateLogFiles<PathBuf,LogFile<FileBuff>,LogQueueFileNumID> for ValidateStub {
-            fn validate( &self, log_files: &Vec<(PathBuf,LogFile<FileBuff>)> ) -> Result<crate::logqueue::OrderedLogs<(PathBuf,LogFile<FileBuff>)>,LoqErr<PathBuf,LogQueueFileNumID>> {
-                validate_sequence::<PathBuf,LogFile<FileBuff>,LogQueueFileNumID>(log_files)
-            }
-        }
-
-        impl SeqValidateOp<PathBuf, LogFile<FileBuff>, LogQueueFileNumID> for (PathBuf, LogFile<FileBuff>) {
-            fn items_count(a:&(PathBuf,LogFile<FileBuff>)) -> Result<u32,LoqErr<PathBuf,LogQueueFileNumID>> {
-                a.1.count().map_err(|e| LoqErr::LogCountFail { file: a.0.clone(), error: e })
-            }
-        }
-
-        impl IdOf<PathBuf, LogFile<FileBuff>, LogQueueFileNumID> for (PathBuf, LogFile<FileBuff>) {
-            fn id_of(a:&(PathBuf,LogFile<FileBuff>)) -> Result<LogQueueFileNumID,LoqErr<PathBuf,LogQueueFileNumID>> {
-                id_of(a)
-            }
-        }
-
         let log_queue_conf: LogQueueConf<LogQueueFileNumID, PathBuf, FileBuff, _, _, _, _> = LogQueueConf {
             find_files: fs_log_find,
-            open_log_file: OpenLogFileStub,
+            open_log_file: LogQueueFileNumIDOpen,
             validate: ValidateStub,
             new_file: move || {
                 let mut generator = log_file_new.write().unwrap();
