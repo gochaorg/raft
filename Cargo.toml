@@ -4,7 +4,8 @@ members = [
     "lookup",
     "logs-tools",
     "parse",
-    "date-format"
+    "date-format",
+    "log-http-service",
 ]
 
 # [package]
