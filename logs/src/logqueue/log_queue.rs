@@ -201,8 +201,10 @@ where
         let new_log_id = self.current_log_id_read(|id| LogId::new(Some(id.id())))?;
         new_log_id.write(&file_name, &mut log_file)?;
         self.invalidate_cache();
-        self.files.push( self.tail.clone() );
+
         self.tail = (file_name,log_file);
+        self.files.push( self.tail.clone() );
+
         (*self.current_log_id.borrow_mut()) = Some(new_log_id);
         Ok(())
     }
@@ -252,6 +254,14 @@ where
     fn tail( &self ) -> (FILE,LogFile<BUFF>) {
         self.tail.clone()
     }
+}
+
+pub trait NewFile<FILE,LogId> 
+where
+    FILE: Clone + Debug,
+    LogId: Clone + Debug,
+{
+    fn new_file( &mut self ) -> Result<FILE,LoqErr<FILE,LogId>>;
 }
 
 /// Конфигурация логов
@@ -378,7 +388,7 @@ mod full_test {
 
     use crate::bbuff::absbuff::FileBuff;
     use crate::logfile::LogFile;
-    use crate::logqueue::{ValidateLogFiles, LogQueueFileNumIDOpen, ValidateStub};
+    use crate::logqueue::{LogQueueFileNumIDOpen, ValidateStub};
     use crate::logqueue::new_file::NewFileGenerator;
     use crate::logqueue::path_tmpl::PathTemplateParser;
 
@@ -400,12 +410,9 @@ mod full_test {
                 "*.binlog", 
                 true ).unwrap();
 
-        let path_tmpl_parser = PathTemplateParser::default();
-        let path_tmpl = path_tmpl_parser.parse(
-            &format!("{root}/{name}",
-            root = prepared.log_dir_root.to_str().unwrap(),
-            name = "${time:local:yyyy-mm-ddThh-mi-ss}-${rnd:5}.binlog"
-        )).unwrap();
+        let path_tmpl = PathTemplateParser::default()
+            .with_variable("root", prepared.log_dir_root.to_str().unwrap())
+            .parse("${root}/${time:local:yyyy-mm-ddThh-mi-ss}-${rnd:5}.binlog").unwrap();
 
         let log_file_new = 
             NewFileGenerator {
@@ -415,7 +422,26 @@ mod full_test {
                 max_attemps: Some(5),
                 throttling: Some(Duration::from_millis(100))
             };
-        let log_file_new = Arc::new(RwLock::new(log_file_new));
+        let log_file_new: Arc<RwLock<NewFileGenerator<'_, _>>> = Arc::new(RwLock::new(log_file_new));
+
+        // fn path_template(log_dir_root:PathBuf, template:&str) -> Arc<RwLock<NewFileGenerator<'_,_>>> {
+        //     let path_tmpl = PathTemplateParser::default()
+        //     .with_variable("root", log_dir_root.to_str().unwrap())
+        //     .parse("${root}/${time:local:yyyy-mm-ddThh-mi-ss}-${rnd:5}.binlog").unwrap();
+
+        //     let log_file_new = 
+        //         NewFileGenerator {
+        //             open: |path| OpenOptions::new().create(true).read(true).write(true).open(path),
+        //             path_template: path_tmpl,
+        //             max_duration: Some(Duration::from_secs(5)),
+        //             max_attemps: Some(5),
+        //             throttling: Some(Duration::from_millis(100))
+        //         };
+
+        //     let log_file_new: Arc<RwLock<NewFileGenerator<'_, _>>> = Arc::new(RwLock::new(log_file_new));
+
+        //     log_file_new
+        // }
 
         let log_queue_conf: LogQueueConf<LogQueueFileNumID, PathBuf, FileBuff, _, _, _, _> = LogQueueConf {
             find_files: fs_log_find,
@@ -439,8 +465,26 @@ mod full_test {
         let rec = log_queue.write(20).unwrap();
         println!("log_queue writed, rec id = {:?}",rec);
 
+        println!("before switch");
+        let log_files0 = log_queue.files();
+        for (filename,_log) in &log_files0 {
+            println!("log file {filename:?}");
+
+            let parent = filename.parent().unwrap();
+            assert!( parent.to_str().unwrap() == prepared.log_dir_root.to_str().unwrap() );
+        }
+        assert!(&log_files0.len()==&1);
+
         log_queue.switch().unwrap();
         println!("log_queue switched");
+
+        let log_files1 = log_queue.files();
+        for (filename,log) in &log_files1 {
+            println!("log file {filename:?}");
+        }
+        assert!(&log_files1.len()==&2);
+        assert!(&log_files0[0].0.to_str().unwrap() == &log_files1[0].0.to_str().unwrap() );
+        assert!(&log_files1[0].0.to_str().unwrap() != &log_files1[1].0.to_str().unwrap() );
 
         let rec1 = log_queue.write(30).unwrap();
         println!("log_queue writed, rec id = {:?}",rec1);

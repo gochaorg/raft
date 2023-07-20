@@ -152,6 +152,26 @@ impl<'a> Debug for PathTemplateParser<'a> {
 
 #[allow(dead_code)]
 impl<'a> PathTemplateParser<'a> {
+    /// Добавляет переменную в шаблон
+    pub fn set_variable<K,V>( &mut self, name:K, value:V )
+    where
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.variables.insert(name.into(), Rc::new(Mutex::new(PlainValue(value.into()))));
+    }
+
+    /// Добавляет переменную в шаблон
+    pub fn with_variable<K,V>( mut self, name:K, value:V ) -> Self
+    where
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.variables.insert(name.into(), Rc::new(Mutex::new(PlainValue(value.into()))));
+        self
+    }
+
+    /// Парсинг шаблона
     pub fn parse<'r>(&self, source: &str) -> Result<PathTemplate<'r>, String> {
         let p_tmpl = RefCell::new(Vec::<Rc<Mutex<dyn PathValue>>>::new());
 
