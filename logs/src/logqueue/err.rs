@@ -47,6 +47,7 @@ where
         error: NewFileGeneratorErr,
     },
 
+    /// Ошибка блокировки
     CantCaptureWriteLock {
         error: String,
     },
@@ -57,15 +58,18 @@ where
         error: ABuffError,
     },
 
+    /// Ошибка открытия лог файла
     OpenLog {
         file: FILE,
         error: LogErr,
     },
 
+    /// При открытии лог файлов, обнаружены две "головы" - скорей всего присуствубт лишние лог файлы
     OpenTwoHeads {
         heads: Vec<(FILE,LogId)>
     },
 
+    /// Не найдена голова - косяк с лог файлами, появилась цикличная ссылка
     OpenNoHeads,
 
     /// Нельзя записть id файла, т.к. файл уже содержит данные
@@ -73,13 +77,13 @@ where
         file: FILE,
     },
 
-    // дублирование id
+    /// дублирование id в лог файлах
     OpenLogDuplicateId {
         id: LogId,
         files: Vec<FILE>
     },
 
-    // В списке лог файлов, пропущен необходимй лог файл
+    /// В списке лог файлов, пропущен необходимй лог файл
     OpenLogNotFound {
         prev_file: FILE,
         prev_id: LogId,
@@ -87,30 +91,36 @@ where
         next_id: LogId,
     },
 
+    /// Ошибка записи log id в файл
     LogIdWrite {
         file: FILE,
         error: LogIdReadWriteErr
     },
 
+    /// Ошибка записи log id в файл
     LogIdWrite2 {
         file: FILE,
         error: LogErr,
     },
 
+    /// Ошибка записи данных в лог
     LogDataWrite {
         file: FILE,
         error: LogErr
     },
 
+    /// Ощибка подсчета кол-ва элементов в лог файле
     LogCountFail {
         file: FILE,
         error: LogErr
     },
 
+    /// Не найден лог файл с указанным id
     LogIdNotMatched {
         log_id: LogId
     },
 
+    /// Ошибка чтения лог файла
     LogGetBlock {
         file: FILE,
         error: LogErr,

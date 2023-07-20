@@ -122,7 +122,11 @@ where
 /// Возможные ошибки
 #[derive(Clone, Debug)]
 pub enum LogErr {
+    /// Некая общая ошибка
     Generic(String),
+
+    /// Не возможно получить блокировку
+    CantLock(String),
     FlatBuff(ABuffError),
     Block(BlockErr),
     LogIsEmpty,
@@ -142,13 +146,13 @@ impl From<BlockErr> for LogErr {
 
 impl<A> From<PoisonError<RwLockReadGuard<'_, A>>> for LogErr {
     fn from(value: PoisonError<RwLockReadGuard<'_, A>>) -> Self {
-        LogErr::Generic(format!("can't lock at {}", value.to_string()))
+        LogErr::CantLock(format!("can't lock at {}", value.to_string()))
     }
 }
 
 impl<A> From<PoisonError<RwLockWriteGuard<'_, A>>> for LogErr {
     fn from(value: PoisonError<RwLockWriteGuard<'_, A>>) -> Self {
-        LogErr::Generic(format!("can't lock at {}", value.to_string()))
+        LogErr::CantLock(format!("can't lock at {}", value.to_string()))
     }
 }
 
