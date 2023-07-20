@@ -15,9 +15,9 @@ date-format = { path="../date-format" }
 rand = "0.8.5"
 once_cell = "1.18.0"
 
-[dependencies.uuid]
-features = [
-    "v4",                # Lets you generate random UUIDs
-    "fast-rng",          # Use a faster (but still sufficiently random) RNG
-    # "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
-]
+# [dependencies.uuid]
+# features = [
+#     "v4",                # Lets you generate random UUIDs
+#     "fast-rng",          # Use a faster (but still sufficiently random) RNG
+#     # "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+# ]

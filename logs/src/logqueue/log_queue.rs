@@ -354,8 +354,6 @@ mod full_test {
     use std::marker::PhantomData;
     use std::path::PathBuf;
     use std::env::*;
-    use std::sync::{Arc, RwLock};
-    use std::time::Duration;
 
     struct Prepared {
         log_dir_root: PathBuf,
@@ -381,13 +379,8 @@ mod full_test {
     use crate::bbuff::absbuff::FileBuff;
     use crate::logfile::LogFile;
     use crate::logqueue::{LogQueueFileNumIDOpen, ValidateStub, path_template};
-    use crate::logqueue::new_file::NewFileGenerator;
-    use crate::logqueue::path_tmpl::PathTemplateParser;
 
-    #[allow(unused)]
-    use crate::logqueue::{log_id::*, LoqErr, validate_sequence, SeqValidateOp, IdOf, 
-        LogQueueConf, LogFileQueue, LogWriting, LogNavigateLast
-    };
+    use crate::logqueue::{log_id::*, LogQueueConf, LogFileQueue, LogWriting, LogNavigateLast };
     use crate::logqueue::find_logs::FsLogFind;
 
     #[test]
@@ -436,7 +429,7 @@ mod full_test {
         println!("log_queue switched");
 
         let log_files1 = log_queue.files();
-        for (filename,log) in &log_files1 {
+        for (filename,_log) in &log_files1 {
             println!("log file {filename:?}");
         }
         assert!(&log_files1.len()==&2);

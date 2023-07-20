@@ -1,4 +1,4 @@
-use std::{ cell::{Cell, RefCell} };
+use std::cell::{Cell, RefCell};
 use parse::Parser;
 
 use crate::{DateTimeItem, DateValue, DateTimeZone};
@@ -1278,7 +1278,7 @@ impl Parser<DateFormat> for DateFormatParser {
 #[test]
 fn parse_test() {
     use crate::*;
-    use chrono::{Local};
+    use chrono::Local;
     
     let (df,_) = DateFormatParser::default().parse("utc:yyyy:mm").unwrap();
     println!("{df:?}");

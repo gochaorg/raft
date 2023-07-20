@@ -1,5 +1,5 @@
 use super::{log_id::*, LoqErr};
-use std::fmt::Debug;
+use std::{fmt::Debug, collections::{HashSet, HashMap}};
 
 /// Извлечение и лог файла - идентификатора
 pub trait IdOf<FILE,LOG,ID> 
@@ -62,7 +62,7 @@ where
     ID: LogQueueFileId,
 {
     // Выделение id файлов
-    let files_with_id = files.iter().fold( 
+    let mut files_with_id = files.iter().fold( 
         Ok::<Vec<((FILE,LOG),ID)>,LoqErr<FILE,ID>>(vec![]), |res,itm| {
             res.and_then(|mut res| {
                 let count = <(FILE,LOG)>::items_count(itm)?;
@@ -111,8 +111,10 @@ where
         }
 
         if heads.is_empty() {
+            // головы не найдено
             return Err( LoqErr::OpenNoHeads );
         } else if heads.len()>1 {
+            // головы найдено 2 или больше
             return Err( LoqErr::OpenTwoHeads { heads:  
                 head_files.iter().map( |((file,_log),id)| (file.clone(), id.clone())).collect() 
             });
@@ -123,47 +125,62 @@ where
         }
     }
 
-    let (head,mut head_id) = head_files.iter().map(|(a,b)|(a.clone(),b.clone())).next().unwrap();
-
-    let mut ordered_files = vec![(head)];
-    let mut files_with_id: Vec<&((FILE,LOG),ID)> = files_with_id.iter().filter(|(_,id)| *id != head_id).collect();
-
-    while ! files_with_id.is_empty() {
-        match files_with_id.iter().find(|(_,id)| id.previous().map(|id| id == head_id.id()).unwrap_or(false) ) {
-            Some((found,found_id)) => {
-                head_id = found_id.clone();
-                files_with_id = files_with_id.iter().filter(|(_,id)| id.id() != head_id.id() ).map(|x| x.clone()).collect();
-                ordered_files.push(found.clone());
-            }
-            None => {
-                break;
-            }
+    // id должны быть уникальны
+    let empty_id_list = Vec::<FILE>::new(); 
+    let ids_map = files_with_id.iter()
+        .fold( 
+            HashMap::<ID,Vec<FILE>>::new(), 
+            |mut acc,it| {
+        let mut lst = acc.get(&it.1).unwrap_or(&empty_id_list).clone();
+        lst.push(it.0.0.clone());
+        acc.insert(it.1, lst);
+        acc
+    });
+    for (id, file_list) in ids_map {
+        if file_list.len()>1 {
+            return Err(LoqErr::OpenLogDuplicateId { id: id, files: file_list });
         }
     }
 
-    let ordered_files: Vec<(FILE,LOG)> = ordered_files.iter().map(|a|a.clone()).collect();
-    if !files_with_id.is_empty() {
-        return Err(LoqErr::OpenLogNotFound { 
-            id:   head_id.clone(), 
-            logs: head_files.iter().map( |((file,_log),id)| (file.clone(), id.clone())).collect() 
-        });
-    }
+    // сверяем последовательность id
+    // сортируем
+    files_with_id.sort_by(|a,b| a.1.cmp(&b.1));
 
-    let last = ordered_files.last().map(|i| i.clone()).unwrap();
-    Ok(OrderedLogs{files: ordered_files, tail:last})
+    let tail = files_with_id.iter().zip( head_files.iter().skip(1) )
+        .map( |((prev_file,prev_id),(next_file,next_id))| {
+            let matched = next_id.previous().map(|prev_id_value| prev_id_value == prev_id.id()).unwrap_or(false);
+            (matched, prev_file, prev_id, next_file, next_id)
+        }).fold( Ok(files_with_id.last().unwrap().clone()), |acc,(matched,prev_file,prev_id,next_file,next_id)| {
+            acc.and_then(|tail| {
+                if matched {
+                    Ok(tail)
+                } else {
+                    Err( LoqErr::OpenLogNotFound { 
+                        prev_file: prev_file.0.clone(), 
+                        prev_id: prev_id.clone(), 
+                        next_file: next_file.0.clone(), 
+                        next_id: next_id.clone() 
+                    })
+                }
+            })
+        })?;
+
+    Ok( OrderedLogs {
+        files: files_with_id.iter().map(|(file,_id)| (file.clone())).collect(), 
+        tail: tail.0
+    })
 }
 
 #[cfg(test)]
 pub mod test {
-    use uuid::Uuid;
     use crate::{logfile::block::BlockOptions, logqueue::LoqErr};
 
     use super::*;
 
     #[derive(Debug,Clone,PartialEq,Hash)]
     pub struct IdTest {
-        id: Uuid,
-        prev: Option<Uuid>
+        id: u128,
+        prev: Option<u128>
     }
     impl std::fmt::Display for IdTest {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -173,17 +190,38 @@ pub mod test {
     impl Eq for IdTest {}
     impl Copy for IdTest {}
     impl LogQueueFileId for IdTest {
-        type ID = Uuid;
+        type ID = u128;
         fn id( &self ) -> Self::ID {            
             self.id
         }
         fn new( prev:Option<Self::ID> ) -> Self {
-            Self { id: Uuid::new_v4(), prev: prev }
+            Self { 
+                id: match prev {
+                    Some(n) => n + 1u128,
+                    None => 0u128
+                },
+                prev: prev 
+            }
         }
         fn previous( &self ) -> Option<Self::ID> {            
             self.prev
         }
     }
+    impl Ord for IdTest {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            self.id.cmp(&other.id)
+        }
+    }
+    impl PartialOrd for IdTest {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            match self.id.partial_cmp(&other.id) {
+                Some(core::cmp::Ordering::Equal) => {}
+                ord => return ord,
+            }
+            self.prev.partial_cmp(&other.prev)
+        }
+    }
+
     impl BlockWriter for IdTest {
         fn block_write( &self, _options: &mut BlockOptions, _data: &mut Vec<u8> ) -> Result<(),LogIdReadWriteErr> {
             Ok(())
@@ -200,7 +238,6 @@ pub mod test {
             Ok(1u32)
         }
     }
-
     impl IdOf<IdTest,IdTest,IdTest> for (IdTest,IdTest) {
         fn id_of(a:&(IdTest,IdTest)) -> Result<IdTest,LoqErr<IdTest,IdTest>> {
             Ok(a.0.clone())
@@ -209,6 +246,9 @@ pub mod test {
 
     #[test]
     fn valid_seq() {
+        println!("valid_seq");
+        println!("=================");
+
         let id0 = IdTest::new(None);
         let id1 = IdTest::new(Some(id0.id()));
         let id2 = IdTest::new(Some(id1.id()));
@@ -238,6 +278,9 @@ pub mod test {
 
     #[test]
     fn two_heads() {
+        println!("two_heads");
+        println!("=================");
+
         let id0 = IdTest::new(None);
         let id1 = IdTest::new(None);
         let id2 = IdTest::new(Some(id1.id()));
@@ -270,6 +313,9 @@ pub mod test {
 
     #[test]
     fn two_refs() {
+        println!("two_refs");
+        println!("=================");
+
         let id0 = IdTest::new(None);
         let id1 = IdTest::new(Some(id0.id()));
         let id2 = IdTest::new(Some(id0.id()));
@@ -281,6 +327,11 @@ pub mod test {
             (id0.clone(),id0.clone()), 
             (id1.clone(),id1.clone())
         ];
+
+        for (id,_) in &logs {
+            println!("log {id:?}")
+        }
+
         match validate_sequence::<IdTest,IdTest,IdTest>(&logs) {
             Ok(seq) => {
                 println!("ok");
@@ -293,7 +344,9 @@ pub mod test {
             Err(err) => {
                 println!("err {err:?}");
                 match err {
-                    LoqErr::OpenLogNotFound { id:_, logs:_ } => {},
+                    LoqErr::OpenLogDuplicateId { id, files:_ } => {
+                        assert!(id == id1)
+                    },
                     _ => { assert!(false); }
                 }
                 assert!(true);
@@ -303,6 +356,9 @@ pub mod test {
 
     #[test]
     fn partial_queue() {
+        println!("partial_queue");
+        println!("=================");
+
         let id0 = IdTest::new(None);
         let id1 = IdTest::new(Some(id0.id()));
         let id2 = IdTest::new(Some(id1.id()));

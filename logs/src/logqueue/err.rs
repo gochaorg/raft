@@ -73,9 +73,18 @@ where
         file: FILE,
     },
 
-    OpenLogNotFound {
+    // дублирование id
+    OpenLogDuplicateId {
         id: LogId,
-        logs: Vec<(FILE,LogId)>
+        files: Vec<FILE>
+    },
+
+    // В списке лог файлов, пропущен необходимй лог файл
+    OpenLogNotFound {
+        prev_file: FILE,
+        prev_id: LogId,
+        next_file: FILE,
+        next_id: LogId,
     },
 
     LogIdWrite {

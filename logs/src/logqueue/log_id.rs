@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 use std::num::ParseIntError;
 use std::str::FromStr;
-use uuid::Uuid;
 use crate::logfile::{LogFile, FlatBuff};
 use crate::logfile::block::{String32, BlockErr, BlockId, BlockOptions};
 use crate::logfile::block::Block;
@@ -24,7 +23,7 @@ where
 }
 
 /// Идентификатор лог файла
-pub trait LogQueueFileId : Eq + std::fmt::Display + Clone + Copy + Debug + BlockReader + BlockWriter + Hash {
+pub trait LogQueueFileId : Eq + std::fmt::Display + Clone + Copy + Debug + BlockReader + BlockWriter + Hash + Ord {
     type ID: Eq + Clone;
 
     /// Получение идентификатора
@@ -135,6 +134,22 @@ impl LogQueueFileId for LogQueueFileNumID {
     }
 }
 
+impl Ord for LogQueueFileNumID {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.id.cmp(&other.id)
+    }
+}
+
+impl PartialOrd for LogQueueFileNumID {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self.id.partial_cmp(&other.id) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.previous.partial_cmp(&other.previous)
+    }
+}
+
 impl BlockWriter for LogQueueFileNumID {
     fn block_write( &self, options: &mut BlockOptions, _data: &mut Vec<u8> ) -> Result<(),LogIdReadWriteErr> {
         let value : Option<String32> = options.get(LOG_FILE_ID_KEY);
@@ -189,46 +204,9 @@ impl BlockReader for LogQueueFileNumID {
     }
 }
 
-/// Идентификатор лог файла - UUID
-#[derive(Debug,Clone,PartialEq,Hash)]
-pub struct LogQueueFileUUID {
-    pub uuid: Uuid,
-    pub previous: Option<Uuid>,
-}
-
-impl std::fmt::Display for LogQueueFileUUID {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f,"LogQueueFileUUID({})", match self.previous {
-            Some(prev) => format!("{}, prev={}", self.uuid, prev),
-            None => format!("{}", self.uuid)
-        })
-    }
-}
-
-impl Eq for LogQueueFileUUID {}
-
-impl Copy for LogQueueFileUUID {}
-
-impl LogQueueFileId for LogQueueFileUUID {
-    type ID = Uuid;
-    fn id( &self ) -> Self::ID {
-        self.uuid.clone()
-    }
-    fn new( prev:Option<Self::ID> ) -> Self {
-        Self {
-            uuid: Uuid::new_v4(),
-            previous: prev
-        }
-    }
-    fn previous( &self ) -> Option<Self::ID> {
-        self.previous.clone()
-    }
-}
-
 pub const LOG_FILE_ID_KEY: &str =       "log_file_id";
 pub const LOG_FILE_ID_PREV_KEY: &str =  "log_file_id_prev";
 pub const LOG_FILE_ID_TYPE_KEY: &str =  "log_file_id_type";
-pub const LOG_FILE_UUID_TYPE: &str =    "LogQueueFileUUID";
 pub const LOG_FILE_NUM_TYPE: &str =     "LogQueueFileNumID";
 
 /// Ошибки чтения / записи идентификатора
@@ -250,72 +228,11 @@ impl From<BlockErr> for LogIdReadWriteErr {
     }
 }
 
-impl From<uuid::Error> for LogIdReadWriteErr {
-    fn from(value: uuid::Error) -> Self {
-        LogIdReadWriteErr::IdParseError(value.to_string())
-    }
-}
-
 impl From<ParseIntError> for LogIdReadWriteErr {
     fn from(value: ParseIntError) -> Self {
         LogIdReadWriteErr::IdParseError(value.to_string())
     }
 }
-
-impl BlockWriter for LogQueueFileUUID {
-    fn block_write( &self, options: &mut BlockOptions, _data: &mut Vec<u8> ) -> Result<(),LogIdReadWriteErr> {
-        let value : Option<String32> = options.get(LOG_FILE_ID_KEY);
-        if value.is_some() {
-            return Err(LogIdReadWriteErr::ValueAlreadyDefined(value.unwrap()));
-        }
-
-        let type_of_value : Option<String32> = options.get(LOG_FILE_ID_TYPE_KEY);
-        if type_of_value.is_some() {
-            return Err(LogIdReadWriteErr::TypeValueAlreadyDefined(type_of_value.unwrap()));
-        }
-
-        let prev : Option<String32> = options.get(LOG_FILE_ID_PREV_KEY);
-        if prev.is_some() {
-            return Err(LogIdReadWriteErr::PrevValueAlreadyDefined(prev.unwrap()));
-        }
-        
-        options.set(LOG_FILE_ID_TYPE_KEY, LOG_FILE_UUID_TYPE)?;
-        options.set(LOG_FILE_ID_KEY, self.uuid.to_string())?;
-        if self.previous.is_some() {
-            options.set(LOG_FILE_ID_PREV_KEY, self.previous.unwrap().to_string())?;
-        }
-
-        Ok(())
-    }
-}
-
-impl BlockReader for LogQueueFileUUID {
-    fn block_read( block: &Block ) -> Result<Self, LogIdReadWriteErr> {
-        let type_of_value : Option<String32> = block.head.block_options.get(LOG_FILE_ID_TYPE_KEY);
-        if type_of_value.is_none() { return Err(LogIdReadWriteErr::TypeValueNotFound); };
-        if type_of_value.clone().unwrap().value() != LOG_FILE_UUID_TYPE { 
-            return Err(LogIdReadWriteErr::TypeValueNotMatched {
-                expect: String32::try_from(LOG_FILE_UUID_TYPE).unwrap(),
-                actual: type_of_value.unwrap().clone()
-            }); 
-        };
-
-        let value : Option<String32> = block.head.block_options.get(LOG_FILE_ID_KEY);
-        if value.is_none() {
-            return Err(LogIdReadWriteErr::ValueNotFound);
-        }
-        let value = Uuid::from_str(value.unwrap().value())?;
-
-        let prev : Option<String32> = block.head.block_options.get(LOG_FILE_ID_PREV_KEY);
-        if prev.is_none() {
-            Ok(LogQueueFileUUID { uuid: value, previous: None })
-        } else {
-            let prev = Uuid::from_str(prev.unwrap().value())?;
-            Ok(LogQueueFileUUID { uuid: value, previous: Some(prev) })
-        }
-    }
-}
-
 
 /// Указатель на запись в log queue
 #[derive(Clone,Debug,PartialEq,Eq)]

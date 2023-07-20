@@ -1,6 +1,6 @@
-use std::{time::{Duration, Instant}, path::{PathBuf}, fs::File, rc::Rc, sync::Mutex};
+use std::{time::{Duration, Instant}, path::PathBuf, fs::File, rc::Rc, sync::Mutex};
 
-use super::path_tmpl::{PathTemplate};
+use super::path_tmpl::PathTemplate;
 
 /// Генерация файла с уникальным именем
 #[derive(Clone)]
