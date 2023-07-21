@@ -309,7 +309,7 @@ fn parse_template_test() {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    //use super::*;
 
     #[test]
     fn it_works() {

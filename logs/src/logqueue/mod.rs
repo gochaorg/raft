@@ -45,9 +45,6 @@ pub use log_api::*;
 /// Поиск лог файлов
 pub mod find_logs;
 
-/// Шаблон пути
-pub mod path_tmpl;
-
 /// Генерация нового файла
 pub mod new_file;
 

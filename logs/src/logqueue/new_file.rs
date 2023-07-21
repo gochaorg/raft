@@ -1,6 +1,6 @@
 use std::{time::{Duration, Instant}, path::PathBuf, fs::File, rc::Rc, sync::Mutex};
 
-use super::path_tmpl::PathTemplate;
+use path_template::PathTemplate;
 
 /// Генерация файла с уникальным именем
 #[derive(Clone)]
@@ -99,7 +99,7 @@ where
 
 #[test]
 fn new_file_test() {
-    use crate::logqueue::path_tmpl::PathTemplateParser;
+    use path_template::PathTemplateParser;
     use std::path::*;
     use std::fs::*;
 

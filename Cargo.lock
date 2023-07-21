@@ -912,6 +912,7 @@ dependencies = [
  "date-format",
  "once_cell",
  "parse",
+ "path_template",
  "rand",
  "random-access-disk",
  "sha2",

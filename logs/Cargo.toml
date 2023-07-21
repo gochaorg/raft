@@ -12,6 +12,7 @@ sha2 = "0.10.6"
 parse = { path="../parse" }
 chrono = "0.4.26"
 date-format = { path="../date-format" }
+path_template = { path="../path_template" }
 rand = "0.8.5"
 once_cell = "1.18.0"
 

@@ -4,7 +4,7 @@ use std::time::Duration;
 use std::{path::PathBuf, fmt::Debug};
 use crate::{logfile::LogFile, bbuff::absbuff::FileBuff};
 use super::new_file::NewFileGenerator;
-use super::path_tmpl::PathTemplateParser;
+use path_template::PathTemplateParser;
 use super::{log_seq_verifier::OrderedLogs, find_logs::FsLogFind, LoqErr, LogQueueFileNumID, validate_sequence, SeqValidateOp, IdOf};
 use super::log_id::*;
 
