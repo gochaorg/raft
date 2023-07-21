@@ -1,3 +1,6 @@
+/// Конфигурация
+pub mod config;
+
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 
 #[get("/")]
