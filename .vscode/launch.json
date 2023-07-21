@@ -1,0 +1,177 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'logs'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=logs"
+                ],
+                "filter": {
+                    "name": "logs",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'date-format'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=date-format"
+                ],
+                "filter": {
+                    "name": "date-format",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'parse'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=parse"
+                ],
+                "filter": {
+                    "name": "parse",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'path_template'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=path_template"
+                ],
+                "filter": {
+                    "name": "path_template",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'lookup'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=lookup"
+                ],
+                "filter": {
+                    "name": "lookup",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'logs-tools'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=logs-tools",
+                    "--package=logs-tools"
+                ],
+                "filter": {
+                    "name": "logs-tools",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'logs-tools'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=logs-tools",
+                    "--package=logs-tools"
+                ],
+                "filter": {
+                    "name": "logs-tools",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'log-http-service'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=log-http-service",
+                    "--package=log-http-service"
+                ],
+                "filter": {
+                    "name": "log-http-service",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}/log-http-service"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'log-http-service'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=log-http-service",
+                    "--package=log-http-service"
+                ],
+                "filter": {
+                    "name": "log-http-service",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}/log-http-service"
+        }
+    ]
+}
