@@ -1,20 +1,27 @@
 /// Конфигурация
-pub mod config;
-pub mod state;
+mod config;
 
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, http::header::{self, ContentType}, HttpRequest, guard};
+/// Состояние
+mod state;
+
+/// Rest api для работы с очередью
+mod queue_api;
+
+use actix_web::{get, post, web, App, Result, HttpResponse, HttpServer, Responder, http::header::{self, ContentType}, HttpRequest, guard};
 use config::AppConfig;
+use logs::{logqueue::{find_logs::FsLogFind, LogQueueConf, LogQueueFileNumID, LogQueueFileNumIDOpen, ValidateStub, LogFileQueue}, bbuff::absbuff::FileBuff, logfile::LogFile};
+use logs::logqueue::path_template2;
 use path_template::PathTemplateParser;
-use serde::__private::de::Content;
-use std::{io::prelude::*, fs::File};
-use std::io;
+use serde::Serialize;
+use std::{io::prelude::*, fs::File, marker::PhantomData};
 use std::{env, path::PathBuf, sync::{Arc, Mutex}};
 use mime;
 
 use crate::state::AppState;
 
+/// Переадресут на index.html
 #[get("/")]
-async fn hello( state: web::Data<AppState> ) -> impl Responder {
+async fn hello<'a>( state: web::Data<AppState> ) -> impl Responder {
     let static_files = state.static_files.lock().unwrap();
     let default = || HttpResponse::Ok().body("Hello world!");
 
@@ -28,7 +35,8 @@ async fn hello( state: web::Data<AppState> ) -> impl Responder {
     }).unwrap_or(default())
 }
 
-async fn index( req: HttpRequest, state: web::Data<AppState> ) -> impl Responder {
+/// Чтение статического ресурса (html/css/js/png/jpg)
+async fn index<'a>( req: HttpRequest, state: web::Data<AppState> ) -> impl Responder {
     println!("uri path {}",req.uri().path());
 
     if req.uri().path().contains("../") || req.uri().path().contains("/..") {
@@ -106,35 +114,87 @@ async fn index( req: HttpRequest, state: web::Data<AppState> ) -> impl Responder
     }
 }
 
+/// Очередь
+static mut QUEUE_GLOBAL: Option<Arc<Mutex<dyn LogFileQueue<LogQueueFileNumID,PathBuf,LogFile<FileBuff>>  >>> = None;
+
+/// Работа с очередю
+/// 
+/// Аргументы
+/// 
+/// - `work` - функция получающая ссылку на очередь
+pub fn queue<F,R>( work:F ) -> R 
+where
+    F: Fn( Arc<Mutex<dyn LogFileQueue<LogQueueFileNumID,PathBuf,LogFile<FileBuff>>>> ) -> R
+{
+    let q = unsafe{ QUEUE_GLOBAL.clone().unwrap() };
+    work(q)
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let app_conf = AppConfig::find_or_default();
     let app_conf = Arc::new(app_conf);
 
     println!("starting server on {}:{}", &app_conf.web_server.host, app_conf.web_server.port);
+    let conf_t = app_conf.clone();
 
-    let conf = app_conf.clone();
+    fn template_vars<'a>( tp: PathTemplateParser<'a>, conf:Arc<AppConfig> ) -> PathTemplateParser<'a> {
+        tp.with_variable("exe.dir", env::current_exe().map(|f| f.parent().unwrap().to_str().unwrap().to_string() ).unwrap() )
+          .with_variable("work.dir", conf.work_dir.to_string())
+    }
+
+    let template_parser = move || {
+        template_vars(PathTemplateParser::default(),conf_t.clone())
+    };
+
+    // static files ..........
+    println!("configure static files");
+    let static_files_opt = app_conf.web_server.static_files.clone().map(|tmpl|{
+        PathBuf::from( template_parser().parse(&tmpl).unwrap().generate() )
+    });
+    let static_files_opt = Arc::new(Mutex::new(static_files_opt));
+
+    // queue ..........
+    println!("openning queue");
+    let fs_log_find = FsLogFind::new( 
+        &template_parser().parse(&app_conf.queue.find.root).unwrap().generate(), 
+        "*.binlog", 
+        true ).unwrap();
+
+    let log_queue_conf: LogQueueConf<LogQueueFileNumID, PathBuf, FileBuff, _, _, _, _> = {
+        let conf = app_conf.clone();
+        LogQueueConf {
+            find_files: fs_log_find,
+            open_log_file: LogQueueFileNumIDOpen,
+            validate: ValidateStub,
+            new_file: path_template2( &app_conf.queue.new_file.template, move |tp| template_vars(tp, conf.clone())).unwrap(),
+            _p: PhantomData.clone(),
+        }
+    };    
+
+    let queue = log_queue_conf.open().unwrap();
+    let queue: Arc<Mutex<dyn LogFileQueue<LogQueueFileNumID,PathBuf,LogFile<FileBuff>>  >> = Arc::new(Mutex::new(queue));
+
+    unsafe {
+        QUEUE_GLOBAL = Some(queue);
+    }
+
+    println!("queue openned");
+
+    // configure atix ...........
     HttpServer::new(move || {
-        let template_parser = PathTemplateParser::default()
-        .with_variable("exe.dir", env::current_exe().map(|f| f.parent().unwrap().to_str().unwrap().to_string() ).unwrap() )
-        .with_variable("work.dir", conf.work_dir.to_string());
-
-        let static_files_opt = conf.web_server.static_files.clone().map(|tmpl|{
-            PathBuf::from( template_parser.parse(&tmpl).unwrap().generate() )
-        });
-        let static_files_opt = Arc::new(Mutex::new(static_files_opt));
-
         let app = App::new();
         let app = app.app_data(web::Data::new(AppState {
-            static_files: static_files_opt
+            static_files: static_files_opt.clone(),
         }));
 
         let app = app
             .service(web::resource("/{name}.{ext:html|css|js|png|jpg}").route(web::route().guard(guard::Get()).to(index)));
         let app = app.service(hello);
+        let app = app.service(web::scope("/queue").configure(queue_api::queue_api_route));
         app
     })
-    .bind((app_conf.web_server.host.clone(), app_conf.web_server.port))?
+    .bind((app_conf.clone().web_server.host.clone(), app_conf.web_server.port))?
     .run()
     .await
 }

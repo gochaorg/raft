@@ -157,3 +157,13 @@ fn test_store_restore() {
         println!("{key} = {value}")
     }
 }
+
+impl From<BlockOptions> for HashMap<String,String> {
+    fn from(value: BlockOptions) -> Self {
+        let mut map = HashMap::<String,String>::new();
+        for (k,v) in value.entries() {
+            map.insert(k.to_string(), v.to_string());
+        }
+        map
+    }
+}

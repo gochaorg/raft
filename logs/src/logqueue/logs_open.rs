@@ -4,7 +4,7 @@ use std::time::Duration;
 use std::{path::PathBuf, fmt::Debug};
 use crate::{logfile::LogFile, bbuff::absbuff::FileBuff};
 use super::new_file::NewFileGenerator;
-use path_template::PathTemplateParser;
+use path_template::{PathTemplateParser, PathTemplate};
 use super::{log_seq_verifier::OrderedLogs, find_logs::FsLogFind, LoqErr, LogQueueFileNumID, validate_sequence, SeqValidateOp, IdOf};
 use super::log_id::*;
 
@@ -126,8 +126,46 @@ pub fn path_template<LogId: Clone + Debug>( root:&str, template:&str )
         .map_err(|err| 
             LoqErr::<PathBuf,LogId>::CantParsePathTemplate { 
                 error: err, 
-                template: template.to_string(), 
-                root: root.to_string() })?;
+                template: template.to_string() })?;
+
+    let log_file_new = 
+        NewFileGenerator {
+            open: |path| OpenOptions::new().create(true).read(true).write(true).open(path),
+            path_template: path_tmpl,
+            max_duration: Some(Duration::from_secs(5)),
+            max_attemps: Some(5),
+            throttling: Some(Duration::from_millis(100))
+        };
+    let log_file_new: Arc<RwLock<NewFileGenerator<'_, _>>> = Arc::new(RwLock::new(log_file_new));
+
+    Ok( move || {
+        let mut generator = 
+            log_file_new.write().map_err(|err| 
+                LoqErr::<PathBuf,LogId>::CantCaptureWriteLock { error: err.to_string() }
+            )?;
+
+        let new_file = generator.generate()
+            .map_err(|e| 
+                LoqErr::<PathBuf,LogId>::CantGenerateNewFile { 
+                    error: e, 
+                }
+            )?;
+        let path = new_file.path.clone();
+        Ok(path)
+    } )
+}
+
+pub fn path_template2<LogId: Clone + Debug,F>( template:&str, template_vars:F ) 
+    -> Result<impl  FnMut() -> Result<PathBuf,LoqErr<PathBuf,LogId>> + Clone, LoqErr<PathBuf,LogId>>
+where
+    F: for <'a> Fn(PathTemplateParser<'a>) -> PathTemplateParser<'a>
+{
+    let path_tmpl = template_vars(PathTemplateParser::default())
+        .parse(template)
+        .map_err(|err| 
+            LoqErr::<PathBuf,LogId>::CantParsePathTemplate { 
+                error: err, 
+                template: template.to_string() })?;
 
     let log_file_new = 
         NewFileGenerator {

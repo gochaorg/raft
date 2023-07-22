@@ -32,8 +32,10 @@ where
 
 impl From<i32> for PreparedRecord {
     fn from(value: i32) -> Self {
+        let mut data = Vec::<u8>::new();
+        data.extend_from_slice(&value.to_le_bytes());
         PreparedRecord { 
-            data: Box::new(value.to_le_bytes()), 
+            data: data, 
             options: BlockOptions::default()
         }
     }

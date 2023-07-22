@@ -1,6 +1,8 @@
-use std::{path::PathBuf, sync::{Mutex, Arc}};
+use std::{path::PathBuf, sync::{Mutex, Arc, RwLock}};
 
-#[derive(Debug,Clone)]
+use logs::{logqueue::{LogFileQueue, LogQueueFileNumID}, logfile::LogFile, bbuff::absbuff::FileBuff};
+
+#[derive(Clone)]
 pub struct AppState {
-    pub static_files: Arc<Mutex<Option<PathBuf>>>
+    pub static_files: Arc<Mutex<Option<PathBuf>>>,
 }

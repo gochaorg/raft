@@ -1,4 +1,4 @@
-use crate::logfile::{block::BlockOptions, LogErr};
+use crate::logfile::{block::{BlockOptions, BlockId, FileOffset, BlockHeadSize, BlockDataSize, BlockTailSize}, LogErr};
 use core::fmt::Debug;
 use super::LoqErr;
 
@@ -14,10 +14,10 @@ pub trait LogNavigationNear {
     type LogId: Clone + Debug;
 
     /// Получение id следующей записи
-    fn next_record( &self, record_id: Self::RecordId ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;
+    fn next_record( self, record_id: Self::RecordId ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;
 
     /// Получение id предыдущей записи
-    fn previous_record( &self, record_id: Self::RecordId ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;    
+    fn previous_record( self, record_id: Self::RecordId ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;    
 }
 
 /// Навигация в конец
@@ -32,8 +32,39 @@ pub trait LogNavigateLast {
     fn last_record( self ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;
 }
 
+/// Информация о записи
+pub struct RecordInfo<FILE,LogId> 
+where
+    FILE: Clone+Debug,
+    LogId: Clone+Debug,
+{
+    /// Лог файл
+    pub log_file: FILE,
+
+    /// Идентификатор лог файла
+    pub log_id: LogId,
+
+    /// Идентификатор блока
+    pub block_id: BlockId,
+
+    /// Опции блока
+    pub block_options: BlockOptions,
+
+    /// Смещение в файле
+    pub position: FileOffset,
+
+    /// Размер заголовка
+    pub head_size: BlockHeadSize,
+
+    /// Размер данных после заголовка
+    pub data_size: BlockDataSize,
+
+    /// Размер хвоста после данных
+    pub tail_size: BlockTailSize,
+}
+
 /// Чтение отдельных записей
-pub trait LogReading<Record,RecordOptions> {
+pub trait LogReading {
     /// Идентификатор записи
     type RecordId: Sized;
 
@@ -41,17 +72,17 @@ pub trait LogReading<Record,RecordOptions> {
     type LogId: Clone + Debug;
 
     /// Чтение записи и ее опций
-    fn read_record( &self, record_id: Self::RecordId ) -> 
-        Result<(Record,RecordOptions), LoqErr<Self::FILE,Self::LogId>>;
+    fn read( self, record_id: Self::RecordId ) -> 
+        Result<PreparedRecord, LoqErr<Self::FILE,Self::LogId>>;
 
     /// Чтение опций записи
-    fn read_options( &self, record_id: Self::RecordId ) -> 
-        Result<RecordOptions, LoqErr<Self::FILE,Self::LogId>>;
+    fn info( self, record_id: Self::RecordId ) -> 
+        Result<RecordInfo<Self::FILE,Self::LogId>, LoqErr<Self::FILE,Self::LogId>>;
 }
 
 /// Подготовленные данные для записи
 pub struct PreparedRecord {
-    pub data: Box<[u8]>,
+    pub data: Vec<u8>,
     pub options: BlockOptions,
 }
 

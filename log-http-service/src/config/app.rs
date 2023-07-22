@@ -1,13 +1,15 @@
 use serde::{Deserialize, Serialize};
 use std::{env, path::PathBuf, fs};
 
-use super::WebServer;
+use super::{WebServer, QueueConfig};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     #[serde(skip)]
     pub work_dir: String,
-    pub web_server: WebServer
+
+    pub web_server: WebServer,
+    pub queue: QueueConfig
 }
 
 impl Default for AppConfig {
@@ -15,6 +17,7 @@ impl Default for AppConfig {
         AppConfig {  
             work_dir: ".".to_string(),
             web_server: WebServer::default(),
+            queue: QueueConfig::default(),
         }
     }
 }

@@ -39,7 +39,6 @@ where
     CantParsePathTemplate {
         error: String,
         template: String,
-        root: String,
     },
 
     /// Ошибка генерации 
@@ -125,5 +124,5 @@ where
         file: FILE,
         error: LogErr,
         block_id: BlockId,
-    }
+    },
 }

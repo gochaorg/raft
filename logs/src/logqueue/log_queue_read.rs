@@ -4,6 +4,7 @@ use std::{fmt::Debug, path::PathBuf};
 #[allow(unused)]
 use crate::logfile::{LogFile, FlatBuff, LogErr, block::{BlockId, BlockOptions}};
 
+use super::{PreparedRecord, RecordInfo};
 #[allow(unused)]
 use super::{LogNavigationNear, log_id::{RecID, LogQueueFileId}, log_queue::LogFileQueue, LogNavigateLast, LogReading, LoqErr};
 
@@ -19,7 +20,7 @@ where
     type FILE = FILE;
     type LogId = LogId;
 
-    fn next_record( &self, record_id: RecID<LogId> ) -> 
+    fn next_record( self, record_id: RecID<LogId> ) -> 
     Result<Option<RecID<LogId>>,LoqErr<Self::FILE,Self::LogId>> {
         let res = 
         self.find_log(record_id.log_file_id.clone())?.and_then(|(_file,log)| {
@@ -42,7 +43,7 @@ where
         Ok(res)
     }
 
-    fn previous_record( &self, record_id: RecID<LogId> ) -> 
+    fn previous_record( self, record_id: RecID<LogId> ) -> 
     Result<Option<RecID<LogId>>,LoqErr<Self::FILE,Self::LogId>> {
         let result =
         if record_id.block_id.value() == 0 {
@@ -104,7 +105,7 @@ where
     }
 }
 
-impl <LogId,FILE,BUFF> LogReading<Box<Vec<u8>>, BlockOptions>
+impl <LogId,FILE,BUFF> LogReading
 for & dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>
 where
     LogId: LogQueueFileId,
@@ -115,8 +116,9 @@ where
     type FILE = FILE;
     type LogId = LogId;
 
-    fn read_record( &self, record_id: RecID<LogId> ) -> 
-    Result<(Box<Vec<u8>>,BlockOptions), LoqErr<Self::FILE,Self::LogId>> {
+    fn read( self, record_id: RecID<LogId> ) -> 
+        Result<PreparedRecord, LoqErr<Self::FILE,Self::LogId>> 
+    {
         match self.find_log(record_id.log_file_id.clone())? {
             None => {
                 return Err(
@@ -131,13 +133,16 @@ where
                         block_id: record_id.block_id
                     })?;
                 let opts = res.head.block_options.clone();
-                Ok((res.data, opts))
+
+                let rec = PreparedRecord { data: res.data.as_ref().clone(), options: opts };
+                Ok(rec)
             }
         }
     }
 
-    fn read_options( &self, record_id: RecID<LogId> ) -> 
-    Result<BlockOptions, LoqErr<Self::FILE,Self::LogId>> {
+    fn info( self, record_id: RecID<LogId> ) -> 
+        Result<RecordInfo<Self::FILE,Self::LogId>, LoqErr<Self::FILE,Self::LogId>> 
+    {
         match self.find_log(record_id.log_file_id.clone())? {
             None => {
                 return Err( 
@@ -146,12 +151,23 @@ where
             },
             Some( (file_name,log) ) => {
                 let res = log.get_block_header_read(record_id.block_id.clone())
+
                 .map_err(|err| LoqErr::LogGetBlock { 
                     file: file_name.clone(), 
                     error: err,
                     block_id: record_id.block_id
                 })?;
-                Ok(res.head.block_options)
+
+                Ok( RecordInfo { 
+                    log_file: file_name.clone(), 
+                    log_id: record_id.log_file_id.clone(), 
+                    block_id: record_id.block_id.clone(), 
+                    block_options: res.head.block_options, 
+                    position: res.position, 
+                    head_size: res.head_size, 
+                    data_size: res.data_size, 
+                    tail_size: res.tail_size 
+                })
             }
         }
     }
