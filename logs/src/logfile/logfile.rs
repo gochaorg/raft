@@ -602,7 +602,7 @@ where
     }
 
     /// Получение блока по id
-    pub fn get_block(&self, block_id: BlockId) -> Result<Block,LogErr> {
+    pub fn read_block(&self, block_id: BlockId) -> Result<Block,LogErr> {
         let mut ptr = Arc::new(RwLock::new(self.clone())).pointer_to_end()?;
         ptr = ptr.jump(block_id)?;
         
@@ -612,7 +612,7 @@ where
     }
 
     /// Чтение заголовка блока по id
-    pub fn get_block_header_read(&self, block_id: BlockId) -> Result<BlockHeadRead, LogErr> {
+    pub fn read_block_header(&self, block_id: BlockId) -> Result<BlockHeadRead, LogErr> {
         let mut ptr = Arc::new(RwLock::new(self.clone())).pointer_to_end()?;
         ptr = ptr.jump(block_id)?;
         
@@ -621,7 +621,7 @@ where
     }
 
     /// Добавление данных в лог
-    pub fn append_data(&mut self, block_opt: &BlockOptions, data: &[u8]) -> Result<BlockId, LogErr> {
+    pub fn write_block(&mut self, block_opt: &BlockOptions, data: &[u8]) -> Result<BlockId, LogErr> {
         {
             let mut metric = self.counters.write()?;
             metric.inc("append_data");
@@ -651,6 +651,17 @@ where
 
         Ok(block.head.block_id)
     }
+
+    /// Чтение байтов из файла
+    /// 
+    /// Аргументы
+    /// - `pos` позиция в файле
+    /// - `data_consumer` - куда записать данные
+    /// 
+    /// Результат - кол-во прочитанных данных
+    pub fn read_raw_bytes(&self, pos:u64, data_consumer: &mut [u8]) -> Result<u64, LogErr> {
+        self.buff.read_from(pos, data_consumer).map_err(|e| LogErr::FlatBuff(e))
+    }
 }
 
 #[test]
@@ -662,13 +673,13 @@ fn test_append_data() {
 
     let opts = BlockOptions::default();
     let data = vec![0u8, 1u8];
-    let bid0 = log.append_data(&opts, &data).unwrap();
+    let bid0 = log.write_block(&opts, &data).unwrap();
     println!("bid0 = {}",bid0);
 
-    let bid1 = log.append_data(&opts, &data).unwrap();
+    let bid1 = log.write_block(&opts, &data).unwrap();
     println!("bid1 = {}",bid1);
 
-    let bid2 = log.append_data(&opts, &data).unwrap();
+    let bid2 = log.write_block(&opts, &data).unwrap();
     println!("bid2 = {}",bid2);
     assert!(bid2.value() > bid1.value());
     assert!(bid1.value() > bid0.value());
@@ -866,7 +877,7 @@ fn test_pointer() {
         let mut log = log.write().unwrap();
 
         for n in 0u8..130 {
-            log.append_data(&BlockOptions::default(), &[n, n + 1, n + 2])
+            log.write_block(&BlockOptions::default(), &[n, n + 1, n + 2])
                 .unwrap();
         }
     }

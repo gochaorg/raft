@@ -126,7 +126,7 @@ where
                 )
             },
             Some( (file_name,log) ) => {
-                let res = log.get_block(record_id.block_id.clone())
+                let res = log.read_block(record_id.block_id.clone())
                     .map_err(|err| LoqErr::LogGetBlock { 
                         file: file_name.clone(), 
                         error: err,
@@ -150,7 +150,7 @@ where
                 )
             },
             Some( (file_name,log) ) => {
-                let res = log.get_block_header_read(record_id.block_id.clone())
+                let res = log.read_block_header(record_id.block_id.clone())
 
                 .map_err(|err| LoqErr::LogGetBlock { 
                     file: file_name.clone(), 

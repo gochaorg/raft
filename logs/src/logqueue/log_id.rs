@@ -46,7 +46,7 @@ pub trait LogQueueFileId : Eq + std::fmt::Display + Clone + Copy + Debug + Block
         let id_type = type_name::<Self>().to_string();
 
         let block = 
-            log.get_block(BlockId::new(0))
+            log.read_block(BlockId::new(0))
             .map_err(|err| LoqErr::CantReadLogId { 
                 file: filename.clone(), 
                 error: err, 
@@ -84,7 +84,7 @@ pub trait LogQueueFileId : Eq + std::fmt::Display + Clone + Copy + Debug + Block
             return Err(LoqErr::LogNotEmpty { file: filename.clone() });
         }
 
-        log.append_data(&options, &data)
+        log.write_block(&options, &data)
             .map_err(|err|
             LoqErr::LogIdWrite2 { 
                 file: filename.clone(), 

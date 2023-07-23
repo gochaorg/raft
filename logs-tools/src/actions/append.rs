@@ -114,7 +114,7 @@ where
     // append log
     let data_bytes = data.entry_data()?;
     tracker.track("log append", || {
-        log.append_data(&block_opt, &data_bytes[..])
+        log.write_block(&block_opt, &data_bytes[..])
     })?;
 
     Ok(AppendFileTiming {

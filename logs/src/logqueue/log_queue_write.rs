@@ -17,7 +17,7 @@ where
     {
         let prepared : PreparedRecord = record.into();
         let (file, mut log) = self.tail();
-        let b_id = log.append_data(&prepared.options, &prepared.data)
+        let b_id = log.write_block(&prepared.options, &prepared.data)
             .map_err(|err| 
                 LoqErr::LogDataWrite { 
                     file: file.clone(),
