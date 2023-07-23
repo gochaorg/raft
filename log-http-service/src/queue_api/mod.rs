@@ -18,6 +18,7 @@ pub fn queue_api_route( cfg: &mut web::ServiceConfig ) {
      .service(plain_api::insert_plain)
      .service(plain_api::read_plain)
      .service(raw_api::read_block)
+     .service(raw_api::write_block)
      .service(log_switch_api::log_switch);
  }
  

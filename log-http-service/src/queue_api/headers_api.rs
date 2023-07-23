@@ -8,6 +8,15 @@ use actix_web::Result;
 use logs::logqueue::*;
 use serde::Serialize;
 
+// trait ShouldSkip { fn should_skip(&self) -> bool; }
+
+// impl<T> ShouldSkip for T {
+//     fn should_skip(&self) { false }
+// }
+
+// impl<T> ShouldSkip for Option<T> {
+//     fn should_skip(&self) { self.is_none() }
+// }
 
 /// Просмотр заголовков последних n записей
 #[get("/headers/last/{count}")]
@@ -33,6 +42,9 @@ pub async fn lasn_n_headers( path: web::Path<u32> ) -> Result<impl Responder> {
                 head_size: u32,
                 data_size: u32,
                 tail_size: u16,
+
+                #[serde(skip_serializing_if="Option::is_none")]
+                preview: Option<String>,
             },
             Fail(String)
         }
@@ -40,6 +52,8 @@ pub async fn lasn_n_headers( path: web::Path<u32> ) -> Result<impl Responder> {
         #[derive(Serialize)]
         struct Result {
             values: Vec<Item>,
+
+            #[serde(skip_serializing_if="Option::is_none")]
             navigate_error: Option<String>,
         }
 
@@ -56,6 +70,24 @@ pub async fn lasn_n_headers( path: web::Path<u32> ) -> Result<impl Responder> {
                     cnt -= 1;
                     match q.info(rid.clone()) {
                         Ok(opts) => {
+                            let enc = opts.block_options.get("mime").and_then(
+                                |mime| {
+                                    if mime.value().starts_with("text/") {
+                                        opts.block_options.get("encoding").and_then(|enc_name| {
+                                            encoding::all::encodings().into_iter()
+                                            .find(|enc| enc.name() == enc_name.value() )
+                                        })
+                                    } else {
+                                        None
+                                    }
+                                }
+                            ).cloned();
+
+                            let preview  =enc.and_then( |enc| q.read(rid.clone()).ok()
+                                .map(|rec| enc.decode(&rec.data, encoding::DecoderTrap::Replace)
+                                ))
+                                .and_then(|res| res.ok());
+
                             res.push(
                                 Item { 
                                     rid: rid.clone().into(), 
@@ -67,7 +99,8 @@ pub async fn lasn_n_headers( path: web::Path<u32> ) -> Result<impl Responder> {
                                         head_size: opts.head_size.0,
                                         position: opts.position.value().to_string(),
                                         data_size: opts.data_size.0,
-                                        tail_size: opts.tail_size.0
+                                        tail_size: opts.tail_size.0,
+                                        preview: preview
                                     } 
                                 });
                         },

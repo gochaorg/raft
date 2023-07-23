@@ -24,6 +24,13 @@ const READ_BUFF_SIZE: usize = 1024 * 8;
 
 impl Block {
     /// Чтение блока из массива байт
+    /// 
+    /// Аргументы
+    /// - `position` позиция в файле
+    /// - `file` файл
+    /// 
+    /// Результат
+    /// - позиция возможного следующего блока в файле
     pub fn read_from<Source>(position: u64, file: &Source) -> Result<(Self, u64), BlockErr>
     where
         Source: ReadBytesFrom,
