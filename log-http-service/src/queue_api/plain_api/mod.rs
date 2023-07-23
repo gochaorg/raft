@@ -1,2 +1,5 @@
-pub mod insert_api;
-pub mod read_api;
+mod insert_api;
+pub use insert_api::*;
+
+mod read_api;
+pub use read_api::*;
