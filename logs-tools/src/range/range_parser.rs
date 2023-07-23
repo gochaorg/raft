@@ -179,7 +179,6 @@ impl MultipleParse {
         }
     }
 
-    #[allow(dead_code)]
     pub fn parser( self ) -> Rc<dyn Parser<Multiple>> {
         Rc::new( self )
     }
