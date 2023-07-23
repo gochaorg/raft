@@ -15,7 +15,9 @@ where
     FILE: Clone + Debug 
 {
     /// Переключение лога
-    fn switch( &mut self ) -> Result<(),LoqErr<FILE,LogId>>;
+    /// 
+    /// Возвращает идентификатор нового лог файла
+    fn switch( &mut self ) -> Result<(FILE,LogId),LoqErr<FILE,LogId>>;
 
     /// Поиск лог файла по его ID
     /// 
@@ -195,18 +197,18 @@ where
     FNewFile: FnMut() -> Result<FILE,LoqErr<FILE,LogId>> + Clone,
     FOpen: OpenLogFile<FILE,LogFile<BUFF>,LogId>
 {
-    fn switch( &mut self ) -> Result<(),LoqErr<FILE,LogId>> {
+    fn switch( &mut self ) -> Result<(FILE,LogId),LoqErr<FILE,LogId>> {
         let file_name = (self.new_file)()?;
         let mut log_file = self.open_file.open_log_file(file_name.clone())?;
         let new_log_id = self.current_log_id_read(|id| LogId::new(Some(id.id())))?;
         new_log_id.write(&file_name, &mut log_file)?;
         self.invalidate_cache();
 
-        self.tail = (file_name,log_file);
+        self.tail = (file_name.clone(),log_file);
         self.files.push( self.tail.clone() );
 
         (*self.current_log_id.borrow_mut()) = Some(new_log_id);
-        Ok(())
+        Ok((file_name.clone(),new_log_id))
     }
 
     fn find_log( &self, id:LogId ) -> Result<Option<(FILE,LogFile<BUFF>)>,LoqErr<FILE,LogId>> {
