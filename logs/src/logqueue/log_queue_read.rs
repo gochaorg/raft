@@ -171,5 +171,27 @@ where
             }
         }
     }
+
+    fn read_raw_bytes( self, log_id: Self::LogId, pos: crate::logfile::block::FileOffset, data_consumer:&mut [u8] ) ->
+        Result<u64, LoqErr<Self::FILE, Self::LogId>> 
+    {
+        match self.find_log(log_id.clone())? {
+            None => {
+                return Err( 
+                    LoqErr::LogIdNotMatched { log_id: log_id.clone() }
+                )
+            },
+            Some( (file_name,log) ) => {
+                log.read_raw_bytes(pos.value(), data_consumer)
+                    .map_err(|e| LoqErr::LogRawRead { 
+                        file: file_name.clone(), 
+                        log_id: log_id.clone(),
+                        pos: pos, 
+                        data_size: data_consumer.len(), 
+                        error: e
+                    })
+            }
+        }
+    }    
 }
 

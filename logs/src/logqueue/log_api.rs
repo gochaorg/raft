@@ -72,12 +72,29 @@ pub trait LogReading {
     type LogId: Clone + Debug;
 
     /// Чтение записи и ее опций
+    /// 
+    /// Аргументы
+    /// - `record_id` идентификатор записи
+    /// 
+    /// Результат - запись
     fn read( self, record_id: Self::RecordId ) -> 
         Result<PreparedRecord, LoqErr<Self::FILE,Self::LogId>>;
 
     /// Чтение опций записи
     fn info( self, record_id: Self::RecordId ) -> 
         Result<RecordInfo<Self::FILE,Self::LogId>, LoqErr<Self::FILE,Self::LogId>>;
+
+    /// Чтение байтов лог файла
+    /// 
+    /// Аргументы
+    /// - `log_id` - идентификатор лог файла
+    /// - `pos` - позиция в лог файле
+    /// - `data_consumer` - куда записывать данные
+    /// 
+    /// Результат
+    /// - Кол-во прочитанных байтов
+    fn read_raw_bytes( self, log_id: Self::LogId, pos: FileOffset, data_consumer:&mut [u8] ) ->
+        Result<u64, LoqErr<Self::FILE, Self::LogId>>;
 }
 
 /// Подготовленные данные для записи

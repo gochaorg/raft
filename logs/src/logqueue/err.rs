@@ -1,6 +1,7 @@
 #[allow(unused)]
 use std::{path::PathBuf, fmt::Debug};
 
+use crate::logfile::block::FileOffset;
 #[allow(unused)]
 use crate::{logfile::{LogErr, LogFile, block::BlockId}, bbuff::absbuff::{ABuffError, FileBuff}};
 
@@ -125,4 +126,13 @@ where
         error: LogErr,
         block_id: BlockId,
     },
+
+    /// Ошибка чтения сырого набора байтов
+    LogRawRead {
+        file: FILE,
+        log_id: LogId,
+        pos: FileOffset,
+        data_size: usize,
+        error: LogErr,
+    }
 }
