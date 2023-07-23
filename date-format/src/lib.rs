@@ -10,7 +10,7 @@ pub use format::*;
 
 #[test]
 fn instant_test() {
-    use chrono::{Local};
+    use chrono::Local;
     let df = DateFormat::parse("str");
     let dt = Local::now();
     dt.format(df);

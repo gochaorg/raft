@@ -6,13 +6,11 @@ use parse::{TemplateParser, Parser, NumberParser};
 use rand::{rngs::ThreadRng, RngCore};
 
 /// Шаблон генерируемого файла
-#[allow(dead_code)]
 #[derive(Clone)]
 pub struct PathTemplate<'a> {
     generators: Vec<Rc<Mutex<dyn PathValue + 'a>>>
 }
 
-#[allow(dead_code)]
 impl<'a> PathTemplate<'a> {
     /// Генерация имени файла
     pub fn generate( &mut self ) -> String {
@@ -151,7 +149,6 @@ impl<'a> Debug for PathTemplateParser<'a> {
     }
 }
 
-#[allow(dead_code)]
 impl<'a> PathTemplateParser<'a> {
     /// Добавляет переменную в шаблон
     pub fn set_variable<K,V>( &mut self, name:K, value:V )

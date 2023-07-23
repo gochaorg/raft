@@ -7,7 +7,7 @@ use futures::{future::ok, stream::once};
 use crate::queue;
 
 #[derive(Deserialize,Clone)]
-struct RawBodyOpts {
+pub struct RawBodyOpts {
     /// Заголовки содержат опции блока
     opt2head: Option<bool>,
 

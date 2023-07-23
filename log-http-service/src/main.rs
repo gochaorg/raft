@@ -7,12 +7,11 @@ mod state;
 /// Rest api для работы с очередью
 mod queue_api;
 
-use actix_web::{get, post, web, App, Result, HttpResponse, HttpServer, Responder, http::header::{self, ContentType}, HttpRequest, guard};
+use actix_web::{get, web, App, HttpResponse, HttpServer, Responder, http::header::{self, ContentType}, HttpRequest, guard};
 use config::AppConfig;
 use logs::{logqueue::{find_logs::FsLogFind, LogQueueConf, LogQueueFileNumID, LogQueueFileNumIDOpen, ValidateStub, LogFileQueue}, bbuff::absbuff::FileBuff, logfile::LogFile};
 use logs::logqueue::path_template2;
 use path_template::PathTemplateParser;
-use serde::Serialize;
 use std::{io::prelude::*, fs::File, marker::PhantomData};
 use std::{env, path::PathBuf, sync::{Arc, Mutex}};
 use mime;

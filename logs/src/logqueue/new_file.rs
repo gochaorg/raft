@@ -34,7 +34,6 @@ pub struct NewFile {
     pub file: Rc<Mutex<File>>
 }
 
-#[allow(dead_code)]
 #[derive(Clone,Debug)]
 pub enum NewFileGeneratorErr {
     /// Превышено максимальное кол-во попыток
@@ -48,7 +47,6 @@ pub enum NewFileGeneratorErr {
     }
 }
 
-#[allow(dead_code)]
 impl<'a,F> NewFileGenerator<'a,F>
 where
     F: Fn(PathBuf) -> Result<File,std::io::Error>

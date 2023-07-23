@@ -3,7 +3,6 @@ use parse::{WildcardParser, Parser, Wildcard};
 use crate::fs::DirTraverse;
 
 /// Описывает где искать логи
-#[allow(dead_code)]
 #[derive(Debug,Clone)]
 pub struct FsLogFind {
     /// Шаблон искомого файла
@@ -47,7 +46,6 @@ impl IntoIterator for FsLogFind {
 }
 
 impl FsLogFind {    
-    #[allow(dead_code)]
     pub fn new( root:&str, wildcard:&str, recursive:bool ) -> Result<Self, String> {
         match WildcardParser::new().parse(wildcard) {
             Some((wc,_)) => {

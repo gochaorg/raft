@@ -53,7 +53,6 @@ where
 /// Результат
 /// ============
 /// Список логов упорядоченных по времени создания
-#[allow(dead_code)]
 pub fn validate_sequence<FILE,LOG,ID>( files: &Vec<(FILE,LOG)> ) -> 
     Result<OrderedLogs<(FILE,LOG)>,LoqErr<FILE,ID>>
 where
