@@ -5,12 +5,23 @@ use super::{FileOffset, Limit, TAIL_SIZE};
 /// Ошибка при операциях с блоком лога
 #[derive(Debug, Clone)]
 pub enum BlockErr {
-    Generic(String),
     IO {
         message: String,
         os_error: Option<i32>,
     },
     AbsBuff(ABuffError),
+    BlockHeaderToSmall {
+        actual: u64,
+        min_size: u64,
+    },
+    BlockDataTruncated {
+        expect_data_size: u64,
+        reads_data_size: u64,
+    },
+    BlockHeadReadFail {
+        head_data: Vec<u8>,
+        error: String,
+    },
     PositionToSmall {
         min_position: FileOffset,
         actual: FileOffset,
@@ -40,16 +51,6 @@ impl From<std::io::Error> for BlockErr {
         }
     }
 }
-impl From<String> for BlockErr {
-    fn from(value: String) -> Self {
-        Self::generic(value)
-    }
-}
-impl From<&str> for BlockErr {
-    fn from(value: &str) -> Self {
-        Self::generic(value.to_string())
-    }
-}
 impl From<ABuffError> for BlockErr {
     fn from(value: ABuffError) -> Self {
         Self::AbsBuff(value.clone())
@@ -57,9 +58,6 @@ impl From<ABuffError> for BlockErr {
 }
 
 impl BlockErr {
-    pub fn generic<A: Into<String>>(message: A) -> Self {
-        Self::Generic(message.into())
-    }
     pub fn tail_position_to_small<A: Into<FileOffset>, B: Into<FileOffset>>(
         min_pos: A,
         actual_pos: B,

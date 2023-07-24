@@ -122,11 +122,28 @@ where
 /// Возможные ошибки
 #[derive(Clone, Debug)]
 pub enum LogErr {
-    /// Некая общая ошибка
-    Generic(String),
+    /// Предыдущий блок не найден
+    PreviousBlockNotExists(BlockId),
+
+    /// Следующий блок не найден
+    NextBlockNotExists(BlockId),
+
+    /// Прыжок вперед запрещен
+    JumpForwardNotAllowed {
+        from:BlockId,
+        to:BlockId
+    },
+
+    /// Прыжок за пределы последнего блока
+    JumpOutsideLast {
+        last:BlockId,
+        to:BlockId
+    },
 
     /// Не возможно получить блокировку
     CantLock(String),
+
+    /// Ошибка работы с файл-буфером
     FlatBuff(ABuffError),
     Block(BlockErr),
     LogIsEmpty,
@@ -752,7 +769,7 @@ where
                 log_file: self.log_file.clone(),
                 current_block: b,
             }),
-            None => Err(LogErr::Generic(format!("can' move back"))),
+            None => Err(LogErr::PreviousBlockNotExists(self.current_head().head.block_id.clone())),
         }
     }
 
@@ -764,7 +781,7 @@ where
                 log_file: self.log_file.clone(),
                 current_block: b,
             }),
-            None => Err(LogErr::Generic(format!("can' move forward"))),
+            None => Err(LogErr::NextBlockNotExists(self.current_head().head.block_id.clone())),
         }
     }
 
@@ -782,7 +799,10 @@ where
 
         // Указываем прыжок в перед ?
         if self.current_head().head.block_id.value() < block_id.value() {
-            return Err(LogErr::Generic(format!("can' jump forward")));
+            return Err(LogErr::JumpForwardNotAllowed { 
+                from: self.current_head().head.block_id.clone(), 
+                to: block_id.clone()
+            });
         }
 
         let back_refs = self.current_head().head.back_refs.refs.clone();
@@ -857,10 +877,10 @@ where
         {
             let last_ptr = self.clone().log_file.pointer_to_end()?;
             if last_ptr.current_head().head.block_id < block_id {
-                return Err(LogErr::Generic(format!(
-                    "can't jump outside, last block id = {}, jump to={block_id}",
-                    last_ptr.current_head().head.block_id
-                )));
+                return Err(LogErr::JumpOutsideLast { 
+                    last: last_ptr.current_head().head.block_id, 
+                    to: block_id
+                });
             }
 
             return last_ptr.jump_back(block_id);

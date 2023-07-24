@@ -240,7 +240,9 @@ impl BlockHead {
             buff1[i] = buff[i]
         }
 
-        let res = Self::from_bytes(Box::new(buff1))?;
+        let res = Self::from_bytes(Box::new(buff1.clone()))
+            .map_err(|e| BlockErr::BlockHeadReadFail { head_data: buff1.clone(), error: e })?;
+        
         let (bh, head_size, data_size, tail_size) = res;
         Ok(BlockHeadRead {
             position: FileOffset::from(position),

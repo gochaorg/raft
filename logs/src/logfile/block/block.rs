@@ -39,11 +39,12 @@ impl Block {
 
         let reads = file.read_from(position, &mut head_preview)?;
         if reads < (HEAD_MIN_SIZE as u64) {
-            return Err(BlockErr::from("readed to small header"));
+            return Err( BlockErr::BlockHeaderToSmall { actual: reads, min_size: HEAD_MIN_SIZE as u64 });
         }
 
         let (bh, head_size, data_size, tail_size) =
-            BlockHead::from_bytes(Box::new(head_preview.to_vec()))?;
+            BlockHead::from_bytes(Box::new(head_preview.to_vec())).map_err(|e| BlockErr::BlockHeadReadFail { head_data: head_preview.to_vec(), error: e })?;
+
         let mut buff: [u8; READ_BUFF_SIZE] = [0; READ_BUFF_SIZE];
         let mut left_bytes = data_size.0 as u64;
         LIMIT_USIZE.check(left_bytes, "read_from")?;
@@ -57,7 +58,7 @@ impl Block {
         while left_bytes > 0 {
             let readed = file.read_from(file_pos, &mut buff)?;
             if readed == 0 {
-                return Err(BlockErr::from("data block truncated"));
+                return Err(BlockErr::BlockDataTruncated { expect_data_size: data_size.0 as u64, reads_data_size: data_size.0 as u64 - left_bytes });
             }
 
             for i in 0..(readed.min(left_bytes as u64)) {
