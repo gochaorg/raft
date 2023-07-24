@@ -4,7 +4,7 @@ use logs::logqueue::*;
 use serde::Deserialize;
 use futures::{future::ok, stream::once};
 
-use crate::queue;
+use crate::{queue, queue_api::ApiErr};
 
 #[derive(Deserialize,Clone)]
 pub struct RawBodyOpts {
@@ -17,7 +17,7 @@ pub struct RawBodyOpts {
 
 /// Получение тела записи
 #[get("/record/{log:[0-9]+}/{block:[0-9]+}/plain")]
-pub async fn read_plain(path: web::Path<(String,u32)>, query:web::Query<RawBodyOpts>) -> HttpResponse {
+pub async fn read_plain(path: web::Path<(String,u32)>, query:web::Query<RawBodyOpts>) -> Result<HttpResponse,ApiErr> {
     let raw_opt = query.into_inner();
 
     let (log_id, block_id) = path.into_inner();
@@ -30,8 +30,8 @@ pub async fn read_plain(path: web::Path<(String,u32)>, query:web::Query<RawBodyO
     let prefix = raw_opt.clone().opt_prefix.unwrap_or("".to_string());
 
     queue(move |q| {
-        let q = q.lock().unwrap();
-        let rec = q.read(rec_id.clone()).unwrap();
+        let q = q.lock()?;
+        let rec = q.read(rec_id.clone())?;
 
         let bytes = web::Bytes::from(rec.data);
         let body = once(ok::<_,Error>(bytes));
@@ -69,7 +69,7 @@ pub async fn read_plain(path: web::Path<(String,u32)>, query:web::Query<RawBodyO
             response
         };
 
-        response.streaming(body)
+        Ok(response.streaming(body))
     })
 }
 

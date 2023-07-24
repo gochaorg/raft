@@ -9,6 +9,9 @@ mod log_switch_api;
 mod plain_api;
 mod raw_api;
 
+mod err_api;
+pub use err_api::*;
+
 /// настройка ручек
 pub fn queue_api_route( cfg: &mut web::ServiceConfig ) {
     cfg

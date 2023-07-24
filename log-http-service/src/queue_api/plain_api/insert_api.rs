@@ -9,7 +9,7 @@ use encoding::all::UTF_8;
 use encoding::{Encoding, EncoderTrap};
 
 use crate::queue;
-use crate::queue_api::ID;
+use crate::queue_api::{ID, ApiErr};
 
 struct PlainText {
     content: String,
@@ -35,10 +35,10 @@ impl From<PlainText> for PreparedRecord {
 
 /// Добавление plain записи
 #[post("/insert/plain")]
-pub async fn insert_plain(req_body: String) -> Result<impl Responder> {
+pub async fn insert_plain(req_body: String) -> Result<impl Responder,ApiErr> {
     queue(|q|{
-        let q = q.lock().unwrap();
-        let rid = q.write( PlainText { content: req_body.clone(), time: Utc::now() } ).unwrap();
+        let q = q.lock()?;
+        let rid = q.write( PlainText { content: req_body.clone(), time: Utc::now() } )?;
         let id: ID = rid.into();
         Ok( web::Json(id) )
     })

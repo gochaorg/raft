@@ -1,5 +1,5 @@
 use crate::queue;
-use crate::queue_api::ID;
+use crate::queue_api::{ID, ApiErr};
 
 use std::collections::HashMap;
 
@@ -20,10 +20,10 @@ use serde::Serialize;
 
 /// Просмотр заголовков последних n записей
 #[get("/headers/last/{count}")]
-pub async fn lasn_n_headers( path: web::Path<u32> ) -> Result<impl Responder> {
+pub async fn lasn_n_headers( path: web::Path<u32> ) -> Result<impl Responder,ApiErr> {
     let cnt: u32 = path.into_inner();
     queue(|q| {
-        let q = q.lock().unwrap();
+        let q = q.lock()?;
 
         #[derive(Serialize)]
         struct Item {

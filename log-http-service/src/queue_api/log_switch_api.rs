@@ -4,13 +4,14 @@ use logs::logqueue::*;
 use serde::Serialize;
 
 use crate::queue;
+use crate::queue_api::ApiErr;
 
 /// Переключение лог файла
 #[post("/tail/switch")]
-pub async fn log_switch() -> Result<impl Responder> {
+pub async fn log_switch() -> Result<impl Responder,ApiErr> {
     queue(|q|{
-        let mut q = q.lock().unwrap();
-        let res = q.switch().unwrap();
+        let mut q = q.lock()?;
+        let res = q.switch()?;
 
         #[derive(Serialize)]
         struct Res {
