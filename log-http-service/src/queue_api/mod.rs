@@ -8,6 +8,7 @@ mod headers_api;
 mod log_switch_api;
 mod plain_api;
 mod raw_api;
+mod ver_api;
 
 mod err_api;
 pub use err_api::*;
@@ -22,6 +23,7 @@ pub fn queue_api_route( cfg: &mut web::ServiceConfig ) {
      .service(plain_api::read_plain)
      .service(raw_api::read_block)
      .service(raw_api::write_block)
+     .service(ver_api::get_version)
      .service(log_switch_api::log_switch);
  }
  

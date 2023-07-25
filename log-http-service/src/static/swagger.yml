@@ -1,0 +1,40 @@
+openapi: '3.0.2'
+info:
+  title: Queue Api
+  version: '1.0'
+servers:
+  - url: http://localhost:8080/queue
+
+paths:
+  /log/files:    
+    get:
+      description: Получение списка лог файлов
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: 
+                $ref: '#/components/schemas/LogFiles'
+
+components:
+  schemas:
+    LogFiles:
+      type: object
+      properties:
+        files:
+          type: array
+          items:
+            type: object
+            properties:
+              log_file:
+                type: string
+                description: Имя лог файла
+              items_count:
+                type: integer
+                description: Кол-во записей в файле
+            required:
+              - "log_file"
+      additionalProperties: false
+      required:
+        - files

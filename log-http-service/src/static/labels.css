@@ -1,0 +1,23 @@
+#ver .debug::before {
+    content: 'debug: '
+}
+
+#ver .name::before {
+    content: 'name: '
+}
+
+#ver .ver::before {
+    content: 'version: '
+}
+
+.curId::before {
+    content: 'queue rid: ';
+}
+
+.curId .logId::before {
+    content: 'log-id: ';
+}
+
+.curId .blockId::before {
+    content: 'block-id: ';
+}
