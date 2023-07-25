@@ -61,6 +61,21 @@
                     </div>
                 </div>
             </div>
+
+            <div class="log-files">
+                <div class="controls">
+                    <button class="refresh" @click="getLogFiles">refresh</button>
+                    <button class="switch" @click="switchTail">switch</button>
+                </div>
+                <div class="log-files-items">
+                    <div class="log-file-info" v-for="lfile in logFiles">
+                        <div class="logId">{{lfile.log_id}}</div>
+                        <div class="fileName">{{lfile.log_file}}</div>
+                        <div class="items_count">{{lfile.items_count}}</div>
+                        <div class="bytes_count">{{lfile.bytes_count}}</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </body>
 </html>

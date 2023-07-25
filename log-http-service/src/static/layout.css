@@ -134,3 +134,57 @@ body {
 .logId {
     color: #b33000;
 }
+
+.log-files .controls::before {
+    display: block;
+}
+
+.log-files .controls {
+    margin-top: 3mm;
+    margin-bottom: 1mm;
+}
+
+.log-files {
+    padding-left: 2mm;
+    padding-right: 2mm;
+}
+
+.log-files .log-file-info {
+    display: flex;
+    gap: 3mm;
+}
+
+.log-files .logId {
+/*     width: 13mm; */
+    flex-shrink: 2;
+}
+
+.log-files .fileName {
+/*     min-width: 100mm; */
+/*     max-width: 80%; */
+    flex-grow: 4;
+}
+
+.log-files .items_count,
+.log-files .bytes_count {
+/*     flex-grow: 1; */
+}
+
+.log-files .items_count::before,
+.log-files .bytes_count::before {
+    font-size: 0.7em;
+}
+
+.log-files .items_count {
+    width: 30mm;
+    text-align: right;
+}
+
+.log-files .bytes_count {
+    width: 30mm;
+    text-align: right;
+}
+
+.log-files .controls button {
+    margin-right: 1mm;
+}

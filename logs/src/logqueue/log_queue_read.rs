@@ -84,7 +84,7 @@ where
     type LogId = LogId;
 
     fn last_record( self ) -> Result<Option<RecID<LogId>>,LoqErr<Self::FILE,Self::LogId>> {
-        let (file_name,tail) = self.tail();
+        let (_id,file_name,tail) = self.tail();
         let file_name0 = file_name.clone();
         let cnt = tail.count()
             .map_err(|err| LoqErr::LogCountFail { 

@@ -117,10 +117,29 @@ class QueueApi {
 
     /** 
      * fetch log files info 
+     * @returns promise with
      * 
+     * @example
+     * 
+     *     {
+     *       "files": [
+     *         {
+     *           "log_id": "0",
+     *           "log_file": "/2023-07-21T18-29-39-a9p29.binlog",
+     *           "items_count": 8,
+     *           "bytes_count": 1138
+     *         },
+     *         {
+     *           "log_id": "1",
+     *           "log_file": "/2023-07-26T03-06-37-qadnb.binlog",
+     *           "items_count": 1,
+     *           "bytes_count": 118
+     *         }
+     *       ]
+     *     }
      */
     files() {
-        return fetch(this.base + 'log/files').then(res => {
+        return fetch(this.base + '/log/files').then(res => {
             if( res.ok ){
                 return res.json()
             }else{
@@ -129,14 +148,18 @@ class QueueApi {
         })
     }
 
+    /**
+     * switch log
+     * @returns 
+     * {
+     *   "log_file": "/app_data/queue/2023-07-26T03-06-37-qadnb.binlog",
+     *   "log_id": "1"
+     * }
+     */
     switchTail() {
-        return fetch(this.base + '/insert/plain', {
+        return fetch(this.base + '/tail/switch', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain'
-            },
             cache: 'no-cache',
-            body: text
         }).then(res => {
             if( res.ok ){
                 return res.json()

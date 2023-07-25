@@ -49,10 +49,10 @@ where
     fn current_log_id( &self ) -> Result<LogId, LoqErr<FILE,LogId>>;
 
     /// Чтение лог файлов
-    fn files( &self ) -> Vec<(FILE,LOG)>;
+    fn files( &self ) -> Vec<(LogId,FILE,LOG)>;
 
     /// Работа с актуальным лог файлом
-    fn tail( &self ) -> (FILE,LOG);
+    fn tail( &self ) -> (LogId,FILE,LOG);
 
 }
 
@@ -66,10 +66,10 @@ where
     FOpen: OpenLogFile<FILE,LogFile<BUFF>,LogId>
 {
     /// Список файлов
-    files: Vec<(FILE,LogFile<BUFF>)>,
+    files: Vec<(LogId,FILE,LogFile<BUFF>)>,
 
     /// Актуальный лог
-    tail: (FILE,LogFile<BUFF>),
+    tail: (LogId,FILE,LogFile<BUFF>),
 
     /// Генерация нового пустого файла
     new_file: FNewFile,
@@ -104,8 +104,8 @@ where
     /// - `switching` - переключение лог файла
     /// - `id_of` - получение идентификатора лог файла
     pub fn new(
-        files: Vec<(FILE,LogFile<BUFF>)>,
-        tail: (FILE,LogFile<BUFF>),
+        files: Vec<(LogId,FILE,LogFile<BUFF>)>,
+        tail: (LogId,FILE,LogFile<BUFF>),
         new_file: FNewFile,
         open_file: FOpen,
     ) -> Self {
@@ -142,8 +142,8 @@ where
         if cache_opt.is_none() {
             let mut cache : HashMap<LogId,(FILE,LogFile<BUFF>)> = HashMap::new();
             for file_log in &self.files {
-                let found_id = LogId::read(&file_log.0, &file_log.1)?;
-                cache.insert(found_id, file_log.clone());
+                let found_id = LogId::read(&file_log.1, &file_log.2)?;
+                cache.insert(found_id, (file_log.1.clone(), file_log.2.clone()));
             }
             *cache_opt = Some(cache);
         }
@@ -163,7 +163,7 @@ where
         if cache_opt.is_none() {
             let mut cache: Vec<LogId> = Vec::new();
             for file_log in &self.files {
-                let id = LogId::read(&file_log.0, &file_log.1)?;
+                let id = LogId::read(&file_log.1, &file_log.2)?;
                 cache.push(id);
             }
             *cache_opt = Some(cache);
@@ -181,7 +181,7 @@ where
     {
         let mut cache_opt = self.current_log_id.borrow_mut();
         if cache_opt.is_none() {            
-            let id = LogId::read(&self.tail.0, &self.tail.1)?;
+            let id = LogId::read(&self.tail.1, &self.tail.2)?;
             *cache_opt = Some(id);
         }
         Ok(consume(cache_opt.unwrap()))
@@ -204,7 +204,7 @@ where
         new_log_id.write(&file_name, &mut log_file)?;
         self.invalidate_cache();
 
-        self.tail = (file_name.clone(),log_file);
+        self.tail = (new_log_id.clone(),file_name.clone(),log_file);
         self.files.push( self.tail.clone() );
 
         (*self.current_log_id.borrow_mut()) = Some(new_log_id);
@@ -249,11 +249,11 @@ where
         })
     }
 
-    fn files( &self ) -> Vec<(FILE,LogFile<BUFF>)> {
+    fn files( &self ) -> Vec<(LogId,FILE,LogFile<BUFF>)> {
         self.files.clone()
     }
 
-    fn tail( &self ) -> (FILE,LogFile<BUFF>) {
+    fn tail( &self ) -> (LogId,FILE,LogFile<BUFF>) {        
         self.tail.clone()
     }
 }
@@ -311,6 +311,7 @@ where
                 res.and_then(|mut res| {
                     let log_file = 
                         self.open_log_file.open_log_file(file.clone())?;
+
                     res.push((file.clone(),log_file));
                     Ok(res)
                 })
@@ -321,8 +322,8 @@ where
 
             let queue = 
             LogFileQueueImpl::new(
-                not_validated_open_files, 
-                validated_order.tail, 
+                validated_order.files.iter().map(|(id,(file,log))|(id.clone(), file.clone(), log.clone())).collect(), 
+                (validated_order.tail.0, validated_order.tail.1.0, validated_order.tail.1.1), 
                 self.new_file.clone(), 
                 self.open_log_file.clone()
             );
@@ -337,8 +338,8 @@ where
 
             let queue = 
             LogFileQueueImpl::new(
-                vec![(file_name.clone(), log_file.clone())], 
-                (file_name,log_file), 
+                vec![(id.clone(), file_name.clone(), log_file.clone())], 
+                (id.clone(), file_name, log_file), 
                 self.new_file.clone(), 
                 self.open_log_file.clone()
             );
@@ -419,8 +420,8 @@ mod full_test {
 
         println!("before switch");
         let log_files0 = log_queue.files();
-        for (filename,_log) in &log_files0 {
-            println!("log file {filename:?}");
+        for (logid,filename,_log) in &log_files0 {
+            println!("log file id:{logid:?} name:{filename:?}");
 
             let parent = filename.parent().unwrap();
             assert!( parent.to_str().unwrap() == prepared.log_dir_root.to_str().unwrap() );
@@ -431,12 +432,12 @@ mod full_test {
         println!("log_queue switched");
 
         let log_files1 = log_queue.files();
-        for (filename,_log) in &log_files1 {
-            println!("log file {filename:?}");
+        for (lid,filename,_log) in &log_files1 {
+            println!("log file id:{lid:?} name:{filename:?}");
         }
         assert!(&log_files1.len()==&2);
-        assert!(&log_files0[0].0.to_str().unwrap() == &log_files1[0].0.to_str().unwrap() );
-        assert!(&log_files1[0].0.to_str().unwrap() != &log_files1[1].0.to_str().unwrap() );
+        assert!(&log_files0[0].1.to_str().unwrap() == &log_files1[0].1.to_str().unwrap() );
+        assert!(&log_files1[0].1.to_str().unwrap() != &log_files1[1].1.to_str().unwrap() );
 
         let rec1 = log_queue.write(30).unwrap();
         println!("log_queue writed, rec id = {:?}",rec1);

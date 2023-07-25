@@ -20,6 +20,7 @@ const app = createApp({
             logId: '',
             blockId: '',
         }),
+        logFiles: ref([]),
       }
     },
     methods: {
@@ -59,6 +60,21 @@ const app = createApp({
                 this.insertPlainId.blockId = d.block_id
                 this.getLastN()
             })
+        },
+        getLogFiles() {
+            queueApi.files().then(d => {
+                this.logFiles.splice(0)
+                d.files.forEach(lfile => {
+                    this.logFiles.push(lfile)
+                })
+            })
+        },
+        switchTail() {
+            queueApi.switchTail().then(d => {
+                console.log(d)
+                this.getLogFiles()
+                this.getLastN()
+            })
         }
     }    
   }).mount('#app')
@@ -67,4 +83,5 @@ window.addEventListener('load', (e)=>{
     app.getVersion()
     app.getCurrentId()
     app.getLastN()
+    app.getLogFiles()
 });

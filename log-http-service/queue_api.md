@@ -28,11 +28,13 @@ GET http://localhost:8080/queue/log/files
 {
   "files": [
     {
+      "log_id": "0",
       "log_file": "/home/user/code/rust/raft/log-http-service/app_data/queue/2023-07-21T18-29-39-a9p29.binlog",
       "items_count": 8,
       "bytes_count": 1138
     },
     {
+      "log_id": "1",
       "log_file": "/home/user/code/rust/raft/log-http-service/app_data/queue/2023-07-26T03-06-37-qadnb.binlog",
       "items_count": 1,
       "bytes_count": 118

@@ -23,15 +23,16 @@ where
 
 /// Упорядоченный лог файлы
 #[derive(Debug,Clone)]
-pub struct OrderedLogs<ITEM> 
+pub struct OrderedLogs<LogId,ITEM> 
 where 
-    ITEM:Clone,    
+    ITEM:Clone,
+    LogId:Clone,
 {
     /// Последний лог файл в очереди
-    pub tail: ITEM,
+    pub tail: (LogId,ITEM),
 
     /// Упорядоченная очередь лог файлов
-    pub files: Vec<ITEM>
+    pub files: Vec<(LogId,ITEM)>
 }
 
 /// Валидация очереди логов
@@ -54,7 +55,7 @@ where
 /// ============
 /// Список логов упорядоченных по времени создания
 pub fn validate_sequence<FILE,LOG,ID>( files: &Vec<(FILE,LOG)> ) -> 
-    Result<OrderedLogs<(FILE,LOG)>,LoqErr<FILE,ID>>
+    Result<OrderedLogs<ID,(FILE,LOG)>,LoqErr<FILE,ID>>
 where
     FILE: Clone+Debug,
     (FILE,LOG): Clone + SeqValidateOp<FILE,LOG,ID>,
@@ -165,8 +166,8 @@ where
         })?;
 
     Ok( OrderedLogs {
-        files: files_with_id.iter().map(|(file,_id)| (file.clone())).collect(), 
-        tail: tail.0
+        files: files_with_id.iter().map(|(file,_id)| (_id.clone(), file.clone())).collect(), 
+        tail: (tail.1, tail.0)
     })
 }
 
@@ -266,7 +267,7 @@ pub mod test {
                 for itm in seq.files {
                     println!(" {itm:?}")
                 }
-                assert_eq!(seq.tail, (id3,id3));
+                assert_eq!(seq.tail, (id3,(id3,id3)));
             }
             Err(err) => {
                 println!("err {err:?}");

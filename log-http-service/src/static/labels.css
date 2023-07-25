@@ -37,3 +37,7 @@
 .insert-plain .inserted-id::before {
     content: ' inserted record id: '
 }
+
+.log-files .controls::before {
+    content: 'Log files'
+}

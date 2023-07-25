@@ -64,7 +64,7 @@ where
     LogId: Clone + Debug,
     LOG: Clone,
 {
-    fn validate( &self, log_files: &Vec<(FILE,LOG)> ) -> Result<OrderedLogs<(FILE,LOG)>,LoqErr<FILE,LogId>>;
+    fn validate( &self, log_files: &Vec<(FILE,LOG)> ) -> Result<OrderedLogs<LogId,(FILE,LOG)>,LoqErr<FILE,LogId>>;
 }
 
 /// Вспомогательная структура для валидации логов
@@ -74,7 +74,7 @@ impl<FILE> ValidateLogFiles<FILE,LogFile<FileBuff>,LogQueueFileNumID> for Valida
 where
     FILE: Clone+Debug
 {
-    fn validate( &self, log_files: &Vec<(FILE,LogFile<FileBuff>)> ) -> Result<crate::logqueue::OrderedLogs<(FILE,LogFile<FileBuff>)>,LoqErr<FILE,LogQueueFileNumID>> {
+    fn validate( &self, log_files: &Vec<(FILE,LogFile<FileBuff>)> ) -> Result<crate::logqueue::OrderedLogs<LogQueueFileNumID,(FILE,LogFile<FileBuff>)>,LoqErr<FILE,LogQueueFileNumID>> {
         validate_sequence::<FILE,LogFile<FileBuff>,LogQueueFileNumID>(log_files)
     }
 }
