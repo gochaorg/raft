@@ -96,10 +96,40 @@ class QueueApi {
 
     /** 
      * insert plain text at end of log 
-     * 
      * @returns promise with { log_id: string, block_id: string }
     */
     insertPlain(text) {
+        return fetch(this.base + '/insert/plain', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain'
+            },
+            cache: 'no-cache',
+            body: text
+        }).then(res => {
+            if( res.ok ){
+                return res.json()
+            }else{
+                return Promise.reject("not succ executred")
+            }
+        })
+    }
+
+    /** 
+     * fetch log files info 
+     * 
+     */
+    files() {
+        return fetch(this.base + 'log/files').then(res => {
+            if( res.ok ){
+                return res.json()
+            }else{
+                return Promise.reject("not succ executred")
+            }
+        })
+    }
+
+    switchTail() {
         return fetch(this.base + '/insert/plain', {
             method: 'POST',
             headers: {

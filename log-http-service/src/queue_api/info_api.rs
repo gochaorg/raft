@@ -16,6 +16,9 @@ pub async fn get_queue_files() -> Result<impl Responder,ApiErr> {
 
         #[serde(skip_serializing_if="Option::is_none")]
         items_count: Option<u32>,
+
+        #[serde(skip_serializing_if="Option::is_none")]
+        bytes_count: Option<u64>,
     }
 
     #[derive(Serialize)]
@@ -27,11 +30,18 @@ pub async fn get_queue_files() -> Result<impl Responder,ApiErr> {
         let q = q.lock()?;
         Ok(web::Json(Res {
             files: q.files().iter().map(|(f,l)|
-                LogFileInfo { log_file: f.to_str().unwrap().to_string(), items_count:
-                    match l.count() {
-                        Ok(v) => Some(v),
-                        Err(_) => None
-                    }
+                LogFileInfo { 
+                    log_file: f.to_str().unwrap().to_string(), 
+                    items_count:
+                        match l.count() {
+                            Ok(v) => Some(v),
+                            Err(_) => None
+                        },
+                    bytes_count:
+                        match l.bytes_count() {
+                            Ok(v) => Some(v),
+                            Err(_) => None
+                        }
                 }
             ).collect()
         }))

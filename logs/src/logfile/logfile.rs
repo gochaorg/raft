@@ -679,6 +679,12 @@ where
     pub fn read_raw_bytes(&self, pos:u64, data_consumer: &mut [u8]) -> Result<u64, LogErr> {
         self.buff.read_from(pos, data_consumer).map_err(|e| LogErr::FlatBuff(e))
     }
+
+    /// Возвращает размер лог файла в байтах
+    pub fn bytes_count(&self) -> Result<u64,LogErr> {
+        let size = self.buff.bytes_count()?;
+        Ok(size)
+    }
 }
 
 #[test]

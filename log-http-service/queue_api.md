@@ -7,6 +7,7 @@
 - Чтение содержимого записи
 - Чтение raw данных записи
 - Запись raw данных записи
+- Переключение лог файла
 
 Получить список файлов
 ==================================
@@ -23,14 +24,22 @@ GET http://localhost:8080/queue/log/files
     content-type: application/json
     date: Sat, 22 Jul 2023 21:26:29 GMT
 
+```json
+{
+  "files": [
     {
-        "files": [
-            {
-            "name": "/home/user/code/rust/raft/log-http-service/app_data/queue/2023-07-21T18-29-39-a9p29.binlog",
-            "items_count": 4
-            }
-        ]
+      "log_file": "/home/user/code/rust/raft/log-http-service/app_data/queue/2023-07-21T18-29-39-a9p29.binlog",
+      "items_count": 8,
+      "bytes_count": 1138
+    },
+    {
+      "log_file": "/home/user/code/rust/raft/log-http-service/app_data/queue/2023-07-26T03-06-37-qadnb.binlog",
+      "items_count": 1,
+      "bytes_count": 118
     }
+  ]
+}
+```
 
 Получение rid текущей очереди
 ==================================
@@ -228,3 +237,23 @@ GET http://localhost:8080/queue/record/0/4/plain?opt2head=true&opt_prefix=bl_ HT
     < 
     * Connection #0 to host localhost left intact
     {"log_id":"0","block_id":"5"}
+
+Переключение лог файла
+==================================
+
+```http
+POST http://localhost:8080/queue/tail/switch HTTP/1.1
+```
+
+HTTP/1.1 200 OK
+content-length: 118
+connection: close
+content-type: application/json
+date: Tue, 25 Jul 2023 22:06:37 GMT
+
+```json
+{
+  "log_file": "/home/user/code/rust/raft/log-http-service/app_data/queue/2023-07-26T03-06-37-qadnb.binlog",
+  "log_id": "1"
+}
+```
