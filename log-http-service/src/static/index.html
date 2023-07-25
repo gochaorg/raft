@@ -11,15 +11,55 @@
     </head>
     <body>
         <div id="app">
-            <div id="ver">
-                <div class="debug">{{version.debug}}</div>
-                <div class="name">{{version.name}}</div>
-                <div class="ver">{{version.ver}}</div>
+            <div class="header">
+                <div id="ver">
+                    {{version.ver}}
+                    <div class="detail">
+                        <hr/>
+                        <div class="debug">{{version.debug}}</div>
+                        <div class="name">{{version.name}}</div>
+                        <div class="ver">{{version.ver}}</div>
+                    </div>
+                </div>
+
+                <div class="curId" @click="getCurrentId">
+                    <div class="logId">{{currentId.logId}}</div>
+                    <div class="blockId">{{currentId.blockId}}</div>
+                </div>
             </div>
 
-            <div class="curId">
-                <div class="logId">{{currentId.logId}}</div>
-                <div class="blockId">{{currentId.blockId}}</div>
+            <div class="insert-plain">
+                <textarea class="plain-text-data" v-model="insertPlainText"></textarea> <br/>
+                <button class="post" @click="postPlainText">append plain text</button>
+                <span class="inserted-id" v-if="insertPlainId.logId != ''">
+                    <span class="logId">{{insertPlainId.logId}}</span><span class="blockId">{{insertPlainId.blockId}}</span>
+                </span>
+            </div>
+
+            <div class="lastHeadersN-fetch">
+                <div class="controls">
+                    <input class="count" v-model.number="lastHeadersNcount" type="text" />
+                    <button class="fetch" @click="getLastN">fetch</button>
+                </div>
+                <div class="lastHeadersN">
+                    <div class="log-header" v-for="header in lastHeadersN">
+                        <div class="rid">
+                            <span class="logId">{{header.rid.log_id}}</span>
+                            <span class="blockId">{{header.rid.block_id}}</span>
+                        </div>
+                        <div v-if="header.result.Succ">
+                            <div class="file">{{header.result.Succ.log_file}}</div>
+                            <div class="options">
+                                <div class="option" v-for="(value, name) in header.result.Succ.options">
+                                    <span class="name">{{name}}</span> = <span class="value">{{value}}</span>
+                                </div>
+                            </div>
+                            <div class="preview" v-if="header.result.Succ.preview">
+                                {{header.result.Succ.preview}}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </body>

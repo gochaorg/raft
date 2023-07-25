@@ -1,17 +1,136 @@
 #ver {
-    position: fixed;
+    position: absolute;
     right: 0;
-    font-family: sans-serif;
     font-size: 0.7em;
     margin-right: 2mm;
-    background-color: #ddd;
-    padding-left: 2mm;
-    padding-top: 1mm;
-    padding-bottom: 1mm;
+    background-color: #b4b4b4;
+    color: #fff;
+    padding-left: 1mm;
     padding-right: 1mm;
 }
 
 #ver div::before {
     display: inline-block;
     width: 12mm;
+}
+
+#ver .detail {
+    display: none;
+}
+
+#ver:hover .detail {
+    display: block;
+}
+
+body {
+    margin: 0;
+    font-family: sans-serif;
+}
+
+#app .header {
+    background-color: #eee;
+    position: relative;
+    padding-top:1mm;
+    padding-bottom:1mm;
+    padding-left: 2mm;
+
+    margin-bottom: 2mm;
+}
+
+#app .header .curId {
+    font-size: 0.7em;    
+    cursor: pointer;
+}
+
+#app .header .curId .logId,
+#app .header .curId .blockId {
+    display: inline-block;
+    margin-left: 1mm;
+}
+
+
+#app .header .curId::before,
+#app .header .curId .logId::before,
+#app .header .curId .blockId::before {
+    color: #838383;
+}
+
+.header:hover {
+    position: relative;
+}
+
+.header:hover .curId::after {
+    position: absolute;
+    display: block;
+    background-color: #ffe961;
+    padding: 1mm;
+}
+
+.lastHeadersN {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3mm;
+}
+
+.lastHeadersN .log-header {
+    width: 70mm;
+    background-color: #eee;
+    padding: 1mm;
+}
+
+.lastHeadersN .file {
+    font-size: 0.7em;    
+}
+
+.lastHeadersN .option {
+    font-size: 0.7em;    
+}
+
+.lastHeadersN .options {
+    margin-top: 2mm; 
+}
+
+.lastHeadersN-fetch {
+    margin-left: 2mm;
+    margin-right: 2mm;
+}
+
+.lastHeadersN-fetch .controls {
+    margin-top: 3mm;
+    margin-bottom: 1mm;
+}
+
+.lastHeadersN-fetch .controls input {
+    width: 30mm;
+    margin-right: 2mm;
+}
+
+.insert-plain {
+    margin-left: 2mm;
+    margin-right: 2mm;
+    margin-bottom: 2mm;
+}
+
+.insert-plain textarea {
+    min-width: 30%;
+    min-height: 30mm;
+    width: auto;
+}
+
+.insert-plain::before {
+    display: block;
+    margin-bottom: 1mm;
+    margin-top: 3mm;
+}
+
+.insert-plain .inserted-id::before {
+    font-size: 0.7em;
+}
+
+.blockId {
+    color: #0021ff;
+}
+
+.logId {
+    color: #b33000;
 }

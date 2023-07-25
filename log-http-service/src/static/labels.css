@@ -21,3 +21,19 @@
 .curId .blockId::before {
     content: 'block-id: ';
 }
+
+.header:hover .curId::after {
+    content: 'refresh'
+}
+
+.lastHeadersN-fetch .controls::before {
+    content: 'last N headers: '
+}
+
+.insert-plain::before {
+    content: 'Append plain'
+}
+
+.insert-plain .inserted-id::before {
+    content: ' inserted record id: '
+}

@@ -36,8 +36,6 @@ async fn hello<'a>( state: web::Data<AppState> ) -> impl Responder {
 
 /// Чтение статического ресурса (html/css/js/png/jpg)
 async fn index<'a>( req: HttpRequest, state: web::Data<AppState> ) -> impl Responder {
-    println!("uri path {}",req.uri().path());
-
     if req.uri().path().contains("../") || req.uri().path().contains("/..") {
         return HttpResponse::Forbidden().body("can't read this resource");
     }
