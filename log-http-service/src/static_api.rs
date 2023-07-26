@@ -3,7 +3,7 @@ use std::{path::PathBuf, fs::File};
 use actix_web::{get, web, HttpResponse, Responder, http::header::{self, ContentType}, HttpRequest};
 use crate::state::AppState;
 use std::io::prelude::*;
-use log::{info, debug, error, warn, trace};
+use log::{info, error, warn};
 
 /// Переадресут на index.html
 #[get("/")]
@@ -21,10 +21,6 @@ pub async fn hello<'a>( state: web::Data<AppState> ) -> impl Responder {
             default()
         }
     }).unwrap_or(default())
-}
-
-fn log_request( req: &HttpRequest ) {
-    info!("has got request {uri} from {from:?}",uri=req.uri(), from=req.connection_info().peer_addr())
 }
 
 /// Чтение статического ресурса (html/css/js/png/jpg)
