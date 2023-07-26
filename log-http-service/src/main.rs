@@ -16,7 +16,7 @@ use std::{io::prelude::*, fs::File, marker::PhantomData};
 use std::{env, path::PathBuf, sync::{Arc, Mutex}};
 use mime;
 
-use crate::state::AppState;
+use crate::{state::AppState, config::CmdLineParams};
 
 /// Переадресут на index.html
 #[get("/")]
@@ -129,7 +129,10 @@ where
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let app_conf = AppConfig::find_or_default();
+    let app_conf = 
+        CmdLineParams::from_cmd_line().apply(
+            AppConfig::find_or_default()
+        );
     let app_conf = Arc::new(app_conf);
 
     println!("starting server on {}:{}", &app_conf.web_server.host, app_conf.web_server.port);

@@ -3,12 +3,17 @@ use std::{env, path::PathBuf, fs};
 
 use super::{WebServer, QueueConfig};
 
+/// Настройки приложения
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
+    /// Рабочий каталог
     #[serde(skip)]
     pub work_dir: String,
 
+    /// Настройки веб сервера
     pub web_server: WebServer,
+
+    /// Настройки очереди
     pub queue: QueueConfig
 }
 
