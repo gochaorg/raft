@@ -21,3 +21,5 @@ date-format = { path="../date-format" }
 encoding = "0.2.33"
 futures = "0.3.28"
 #utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
+log = "0.4.19"
+env_logger = "0.10.0"

@@ -149,10 +149,16 @@
                 "filter": {
                     "name": "log-http-service",
                     "kind": "bin"
+                },
+                "env": {
+                    "RUST_LOG" : "debug"
                 }
             },
             "args": [],
-            "cwd": "${workspaceFolder}/log-http-service"
+            "cwd": "${workspaceFolder}/log-http-service",
+            "env": {
+                "RUST_LOG" : "debug"
+            }
         },
         {
             "type": "lldb",
@@ -171,7 +177,7 @@
                 }
             },
             "args": [],
-            "cwd": "${workspaceFolder}/log-http-service"
+            "cwd": "${workspaceFolder}/log-http-service",
         }
     ]
 }

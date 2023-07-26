@@ -6,6 +6,7 @@ use logs::logqueue::*;
 
 use crate::queue;
 use crate::queue_api::{ID, ApiErr};
+use log::{info,debug,error};
 
 /// Получение списка файлов
 #[get("/log/files")]
