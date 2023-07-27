@@ -43,7 +43,7 @@ impl Block {
         }
 
         let (bh, head_size, data_size, tail_size) =
-            BlockHead::from_bytes(Box::new(head_preview.to_vec())).map_err(|e| BlockErr::BlockHeadReadFail { head_data: head_preview.to_vec(), error: e })?;
+            BlockHead::from_bytes(head_preview.to_vec()).map_err(|e| BlockErr::BlockHeadReadFail { head_data: head_preview.to_vec(), error: e })?;
 
         let mut buff: [u8; READ_BUFF_SIZE] = [0; READ_BUFF_SIZE];
         let mut left_bytes = data_size.0 as u64;

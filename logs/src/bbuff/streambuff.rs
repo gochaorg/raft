@@ -17,7 +17,7 @@ struct ResizeScale {
 #[derive(Debug, Clone)]
 pub struct ByteBuff {
     /// Буфер
-    pub buff: Box<Vec<u8>>,
+    pub buff: Vec<u8>,
 
     /// Позиция записи
     pub position: usize,
@@ -58,16 +58,16 @@ impl ByteBuff {
     /// Создание пустого буфера
     pub fn new() -> Self {
         ByteBuff {
-            buff: Box::new(Vec::<u8>::new()),
+            buff: Vec::<u8>::new(),
             position: 0,
             tracker: Tracker::new(),
         }
     }
 
     /// Создание буфера из вектора
-    pub fn from(buff: Box<Vec<u8>>) -> Self {
+    pub fn from(buff: Vec<u8>) -> Self {
         ByteBuff {
-            buff: Box::clone(&buff),
+            buff: buff,
             position: 0,
             tracker: Tracker::new(),
         }

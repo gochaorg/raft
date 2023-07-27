@@ -123,7 +123,7 @@ impl BlockHeadRead {
 
 /// Чтение заголовка
 fn read_block_head(
-    data: Box<Vec<u8>>,
+    data: Vec<u8>,
 ) -> Result<(BlockHead, BlockHeadSize, BlockDataSize, BlockTailSize), String> {
     let mut head_size: u32 = 0;
     let mut data_size: u32 = 0;
@@ -213,7 +213,7 @@ impl BlockHead {
 
     /// Чтение заголовка
     pub fn from_bytes(
-        bytes: Box<Vec<u8>>,
+        bytes: Vec<u8>,
     ) -> Result<(BlockHead, BlockHeadSize, BlockDataSize, BlockTailSize), String> {
         read_block_head(bytes)
     }
@@ -240,7 +240,7 @@ impl BlockHead {
             buff1[i] = buff[i]
         }
 
-        let res = Self::from_bytes(Box::new(buff1.clone()))
+        let res = Self::from_bytes(buff1.clone())
             .map_err(|e| BlockErr::BlockHeadReadFail { head_data: buff1.clone(), error: e })?;
         
         let (bh, head_size, data_size, tail_size) = res;
