@@ -79,7 +79,7 @@ impl Block {
     }
 
     /// Формирование массива байтов представлющих блок
-    fn to_bytes(
+    fn to_bytes0(
         &self,
         bbuf: &mut ByteBuff,
         tracker: &Tracker,
@@ -139,6 +139,13 @@ impl Block {
         (block_head_size, block_data_size, block_tail_size)
     }
 
+    /// Формирвание массива байт
+    // pub fn to_bytes( &self ) -> Vec<u8> {
+    //     let mut bbuf = ByteBuff::new();
+    //     let tracker = Tracker::new();
+    //     self.to_bytes0(&mut bbuf, &tracker);
+    // }
+
     /// Запись блока в массив байтов
     pub fn write_to<Destination>(
         &self,
@@ -155,7 +162,7 @@ impl Block {
         bbuf.reset();
 
         let t0 = Instant::now();
-        let (head_size, data_size, tail_size) = self.to_bytes(&mut bbuf, &sub_track);
+        let (head_size, data_size, tail_size) = self.to_bytes0(&mut bbuf, &sub_track);
 
         let t1 = Instant::now();
         let bytes = &bbuf.buff;

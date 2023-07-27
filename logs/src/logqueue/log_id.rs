@@ -24,7 +24,7 @@ where
 
 /// Идентификатор лог файла
 pub trait LogQueueFileId : Eq + std::fmt::Display + Clone + Copy + Debug + BlockReader + BlockWriter + Hash + Ord {
-    type ID: Eq + Clone;
+    type ID: Eq + Clone + Hash;
 
     /// Получение идентификатора
     fn id( &self ) -> Self::ID;

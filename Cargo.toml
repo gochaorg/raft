@@ -6,7 +6,8 @@ members = [
     "parse",
     "date-format",
     "log-http-service",
-    "path_template",
+    "log-http-client",
+    "path_template",    
 ]
 
 # [package]

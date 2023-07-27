@@ -81,7 +81,7 @@ where
     current_log_id: RefCell<Option<LogId>>,
 
     /// Кеш ид - лог файл
-    log_id_to_log: RefCell<Option<HashMap<LogId,(FILE,LogFile<BUFF>)>>>,
+    log_id_to_log: RefCell<Option<HashMap<LogId::ID,(FILE,LogFile<BUFF>)>>>,
 
     /// Очередность id логов
     log_id_order: RefCell<Option<Vec<LogId>>>,
@@ -136,14 +136,14 @@ where
     fn log_id_map_cache_read<R,F>( &self, default:R, consume:F ) -> Result<R,LoqErr<FILE,LogId>>
     where
         R: Sized,
-        F: for <'a> Fn(&'a HashMap<LogId,(FILE,LogFile<BUFF>)>) -> R,
+        F: for <'a> Fn(&'a HashMap<LogId::ID,(FILE,LogFile<BUFF>)>) -> R,
     {
         let mut cache_opt = self.log_id_to_log.borrow_mut();
         if cache_opt.is_none() {
-            let mut cache : HashMap<LogId,(FILE,LogFile<BUFF>)> = HashMap::new();
+            let mut cache : HashMap<LogId::ID,(FILE,LogFile<BUFF>)> = HashMap::new();
             for file_log in &self.files {
                 let found_id = LogId::read(&file_log.1, &file_log.2)?;
-                cache.insert(found_id, (file_log.1.clone(), file_log.2.clone()));
+                cache.insert(found_id.id().clone(), (file_log.1.clone(), file_log.2.clone()));
             }
             *cache_opt = Some(cache);
         }
@@ -215,7 +215,7 @@ where
         self.log_id_map_cache_read(
             None, 
             |cache| {
-                cache.get(&id).map(|i|i.clone())
+                cache.get(&id.id()).map(|i|i.clone())
             }
         )
     }

@@ -18,8 +18,9 @@ pub async fn read_block( path: web::Path<(String,u32)> ) -> Result<HttpResponse,
     let rec_id = RecID { log_file_id: log_id, block_id: block_id };
 
     queue(|q|{
-        let q = q.lock().unwrap();
-        let b_info = q.info(rec_id.clone()).unwrap();
+        let q = q.lock()?;
+
+        let b_info = q.info(rec_id.clone())?;
         let tot_size = 
             b_info.data_size.0 as u64 + 
             b_info.head_size.0 as u64 +
@@ -30,7 +31,7 @@ pub async fn read_block( path: web::Path<(String,u32)> ) -> Result<HttpResponse,
 
         let offset = b_info.position;
 
-        let reads_size = q.read_raw_bytes(log_id, offset, &mut bytes).unwrap();
+        let reads_size = q.read_raw_bytes(log_id, offset, &mut bytes)?;
         if reads_size != tot_size as u64 {
             Err(ApiErr::RawReadBlockDataTruncated { expected_size: tot_size, actual_size: reads_size })
         }else{
