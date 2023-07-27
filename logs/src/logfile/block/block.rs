@@ -1,8 +1,8 @@
-use std::time::Instant;
+use std::{time::Instant, sync::{RwLock, Arc}};
 
 use crate::{
     bbuff::{
-        absbuff::{ReadBytesFrom, WriteBytesTo},
+        absbuff::{ReadBytesFrom, WriteBytesTo, self},
         streambuff::ByteBuff,
     },
     perf::Tracker,
@@ -23,6 +23,26 @@ pub struct Block {
 const READ_BUFF_SIZE: usize = 1024 * 8;
 
 impl Block {
+    /// Формирвание массива байт
+    pub fn to_bytes( &self ) -> Vec<u8> {
+        let mut bbuf = ByteBuff::new();
+        let tracker = Tracker::new();
+        self.to_bytes0(&mut bbuf, &tracker);
+        bbuf.buff
+    }
+
+    /// Чтение блока из массива байт
+    /// 
+    /// Аргументы
+    /// - `bytes` массив байтов
+    pub fn from_bytes( bytes: &[u8] ) -> Result<Self, BlockErr> {
+        let mut buf = Vec::<u8>::new();
+        buf.extend_from_slice(bytes);
+
+        let buf = absbuff::ByteBuff { data: Arc::new(RwLock::new(buf)), resizeable:false, max_size:None };
+        Self::read_from(0, &buf).map(|(r,_)|r)
+    }
+
     /// Чтение блока из массива байт
     /// 
     /// Аргументы
@@ -138,13 +158,6 @@ impl Block {
 
         (block_head_size, block_data_size, block_tail_size)
     }
-
-    /// Формирвание массива байт
-    // pub fn to_bytes( &self ) -> Vec<u8> {
-    //     let mut bbuf = ByteBuff::new();
-    //     let tracker = Tracker::new();
-    //     self.to_bytes0(&mut bbuf, &tracker);
-    // }
 
     /// Запись блока в массив байтов
     pub fn write_to<Destination>(
