@@ -9,8 +9,9 @@ pub enum ClientError {
     Status{ code:u16, body:String },
     JsonParseError(String),
     RawBytesError(String),
-    ParseRecId(String),
-    ParseBlock(BlockErr)
+    ParseBlockId { from: String, error: String },
+    ParseBlock(BlockErr),
+    ParseLogId { from: String, error: String },
 }
 
 impl From<SendRequestError> for ClientError {
@@ -41,15 +42,63 @@ pub struct QueueApiVersion {
 
 /// Лог файл
 #[derive(Debug,Clone,Deserialize,Serialize)]
-pub struct LogFileInfo {
+pub struct LogFileInfoRaw {
+    /// Идентификатор лог файла - по факту должно быть число u128
     pub log_id: String,
+
+    /// Имя лог файла
     pub log_file: String,
 
+    /// Кол-во записей
     #[serde(default)]
     pub items_count: Option<u32>,
 
+    /// Размер лог файла в байтах
     #[serde(default)]
     pub bytes_count: Option<u64>,
+}
+
+/// Лог файл
+#[derive(Debug,Clone,Deserialize,Serialize)]
+pub struct LogFileInfo {
+    /// Идентификатор лог файла
+    pub log_id: u128,
+
+    /// Имя лог файла
+    pub log_file: String,
+
+    /// Кол-во записей
+    #[serde(default)]
+    pub items_count: Option<u32>,
+
+    /// Размер лог файла в байтах
+    #[serde(default)]
+    pub bytes_count: Option<u64>,
+}
+
+impl TryFrom<LogFileInfoRaw> for LogFileInfo {
+    type Error = ClientError;
+    fn try_from(value: LogFileInfoRaw) -> Result<Self, Self::Error> {
+        let lid = 
+            u128::from_str_radix(&value.log_id, 10)
+            .map_err(|e| ClientError::ParseLogId { 
+                from: value.log_id.clone(), 
+                error: e.to_string()
+            })?;
+
+        Ok(Self { 
+            log_id: lid, 
+            log_file: value.log_file, 
+            items_count: value.items_count, 
+            bytes_count: value.bytes_count 
+        })
+    }
+}
+
+/// Список лог файлов
+#[derive(Debug,Clone,Deserialize,Serialize)]
+pub struct LogFilesRaw {
+    pub files: Vec<LogFileInfoRaw>
 }
 
 /// Список лог файлов
@@ -58,24 +107,49 @@ pub struct LogFiles {
     pub files: Vec<LogFileInfo>
 }
 
+impl TryFrom<LogFilesRaw> for LogFiles {
+    type Error = ClientError;
+    fn try_from(value: LogFilesRaw) -> Result<Self, Self::Error> {
+        let sum : Result<Vec<LogFileInfo>,ClientError> = Ok(vec![]);
+        let files = value.files.iter().fold(
+            sum, 
+            |sum,it| {                
+                sum.and_then(|mut sum| {
+                    sum.push(it.clone().try_into()?);
+                    Ok(sum)
+                })
+            })?;
+        Ok(Self { files: files })
+    }
+}
+
 /// Идентификатор последней записи в логе
 #[derive(Debug,Clone,Deserialize,Serialize)]
-pub struct TailId {
+pub struct TailIdRaw {
+    /// Идентификатор лог файла - по факту должно быть число u128
     pub log_id: String,
+
+    /// Индентификатор блока - по факту должно быть числов u32
     pub block_id: String,
 }
 
 /// Переключение лога
 #[derive(Debug,Clone,Deserialize,Serialize)]
 pub struct TailSwitch {
+    /// Новый лог файл
     pub log_file: String,
+
+    /// Идентификатор лог файла - по факту должно быть число u128
     pub log_id: String,
 }
 
 /// Идентификатор записи
 #[derive(Debug,Clone,PartialEq,Eq,Copy,Deserialize,Serialize)]
 pub struct RecId {
+    /// Идентификатор лог файла
     pub log_id: u128,
+
+    /// Индентификатор блока
     pub block_id: u32,
 }
 
@@ -105,17 +179,20 @@ impl Ord for RecId {
     }
 }
 
-impl TryFrom<TailId> for RecId {
+impl TryFrom<TailIdRaw> for RecId {
     type Error = ClientError;
-    fn try_from(value: TailId) -> Result<Self, Self::Error> {
+    fn try_from(value: TailIdRaw) -> Result<Self, Self::Error> {
         let log_id = u128::from_str_radix(&value.log_id,10)
             .map_err(|e|
-                ClientError::ParseRecId(e.to_string())
+                ClientError::ParseLogId{ from: value.log_id.clone(), error: e.to_string() }
             )?;
-        let block_id = u32::from_str_radix(&value.log_id,10)
+        let block_id = u32::from_str_radix(&value.block_id,10)
         .map_err(|e|
-            ClientError::ParseRecId(e.to_string())
-        )?;
+            ClientError::ParseBlockId {
+                from: value.block_id.clone(),
+                error: e.to_string(),
+            }
+        )?;        
         Ok(Self { log_id: log_id, block_id: block_id })
     }    
 }

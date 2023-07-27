@@ -1,9 +1,5 @@
-use std::sync::{Arc, RwLock};
-
-use actix_web::http::header::ContentType;
-use actix_web::{web, HttpResponse};
+use actix_web::{web, Responder};
 use actix_web::post;
-use logs::bbuff::absbuff::ByteBuff;
 use logs::logfile::block::{BlockId, Block};
 use logs::logqueue::*;
 use crate::queue;
@@ -18,7 +14,7 @@ impl From<WriteBlock> for PreparedRecord {
 }
 
 #[post("/record/{log:[0-9]+}/{block:[0-9]+}/raw")]
-pub async fn write_block( bytes:web::Bytes, path: web::Path<(String,u32)> ) -> Result<HttpResponse,ApiErr> {
+pub async fn write_block( bytes:web::Bytes, path: web::Path<(String,u32)> ) -> Result<impl Responder,ApiErr> {
     let (log_id, block_id) = path.into_inner();
     let log_id = u128::from_str_radix(&log_id,10).unwrap();
     
@@ -27,8 +23,12 @@ pub async fn write_block( bytes:web::Bytes, path: web::Path<(String,u32)> ) -> R
     let _rec_id = RecID { log_file_id: log_id, block_id: block_id };
 
     queue(|q|{
-        let q = q.lock().unwrap();
-        let cur_id = q.last_record().unwrap().unwrap();
+        let q = q.lock()?;
+
+        let cur_id = match q.last_record()? {
+            Some(v) => Ok(v),
+            None => Err(ApiErr::QueueIsEmpy)
+        }?;
 
         if cur_id.block_id!=block_id || cur_id.log_file_id.id()!=log_id.id() {
             return Err(ApiErr::RecIdNotMatch { 
@@ -38,19 +38,11 @@ pub async fn write_block( bytes:web::Bytes, path: web::Path<(String,u32)> ) -> R
         }
 
         let bytes = bytes.to_vec();
-        let bbuff = ByteBuff {
-            data: Arc::new(RwLock::new(bytes)),
-            resizeable: true,
-            max_size: None
-        };
+        let block = Block::from_bytes(&bytes)?;
 
-        let block = Block::read_from(0u64, &bbuff).map(|e|e.0)?;
-
-        let rid = q.write(WriteBlock(block)).unwrap();
+        let rid = q.write(WriteBlock(block))?;
         let rid: ID = rid.into();
 
-        Ok(HttpResponse::Ok()
-            .content_type(ContentType::json())
-            .body(serde_json::to_string(&rid).unwrap()))
+        Ok(web::Json(rid))
     })
 }
