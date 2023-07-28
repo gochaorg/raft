@@ -1,7 +1,7 @@
 #ver {
-    position: absolute;
-    right: 0;
+    float: right;
     font-size: 0.7em;
+    margin-left: 2mm;
     margin-right: 2mm;
     background-color: #b4b4b4;
     color: #fff;
@@ -30,16 +30,48 @@ body {
 #app .header {
     background-color: #eee;
     position: relative;
-    padding-top:1mm;
-    padding-bottom:1mm;
+    padding-top:2mm;
+    padding-bottom:0mm;
     padding-left: 2mm;
 
     margin-bottom: 2mm;
+
+    border-bottom-color: #838f9c;
+    border-bottom-width: 1mm;
+    border-bottom-style: solid;
+
+    cursor: pointer;
 }
+
+#app .header .tab {
+    display: inline-block;
+    padding-left: 2mm;
+    padding-right: 2mm;
+
+    border-top-right-radius: 2mm;
+    border-top-left-radius: 2mm;
+    border-left-style: solid;
+    border-top-style: solid;
+    border-right-style: solid;
+    border-left-color: #afafaf;
+    border-top-color: #afafaf;
+    border-right-color: #afafaf;
+}
+#app .header .tab.active {
+    background-color: #838f9c;
+    color: #fff;
+    border-top-right-radius: 2mm;
+    border-top-left-radius: 2mm;
+    border-left-color: #838f9c;
+    border-top-color: #838f9c;
+    border-right-color: #838f9c;
+}
+
 
 #app .header .curId {
     font-size: 0.7em;    
     cursor: pointer;
+    float: right;
 }
 
 #app .header .curId .logId,
@@ -55,11 +87,11 @@ body {
     color: #838383;
 }
 
-.header:hover {
+.header {
     position: relative;
 }
 
-.header:hover .curId::after {
+.header .curId:hover::after {
     position: absolute;
     display: block;
     background-color: #ffe961;
@@ -187,4 +219,14 @@ body {
 
 .log-files .controls button {
     margin-right: 1mm;
+}
+
+.push-other {
+    padding-left: 2mm;
+    padding-right: 2mm;
+}
+
+.push-other .push-record input {
+    margin-right: 2mm;
+    width: 40mm
 }

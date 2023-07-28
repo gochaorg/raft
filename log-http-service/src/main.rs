@@ -10,6 +10,7 @@ mod queue_api;
 /// Статические ресурсы
 mod static_api;
 
+use actix_cors::Cors;
 use actix_web::{web, App, HttpServer, guard};
 use config::AppConfig;
 use logs::{logqueue::{find_logs::FsLogFind, LogQueueConf, LogQueueFileNumID, LogQueueFileNumIDOpen, ValidateStub, LogFileQueue}, bbuff::absbuff::FileBuff, logfile::LogFile};
@@ -99,10 +100,15 @@ async fn main() -> std::io::Result<()> {
 
     // configure atix ...........
     HttpServer::new(move || {
+        let cors = Cors::default()
+            .allow_any_origin()
+            .allow_any_method()
+            .allow_any_header();
+
         let app = App::new();
         let app = 
             app
-                //.wrap(Logger::default())
+                .wrap(cors)
                 .wrap(Logger::new("%a %r %s, time=%T"));
 
         let app = app.app_data(web::Data::new(AppState {

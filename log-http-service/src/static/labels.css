@@ -22,7 +22,7 @@
     content: 'block-id: ';
 }
 
-.header:hover .curId::after {
+.header .curId:hover::after {
     content: 'refresh'
 }
 

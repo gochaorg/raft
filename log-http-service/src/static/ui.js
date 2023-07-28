@@ -2,8 +2,17 @@ const { createApp, ref } = Vue
 
 const app = createApp({
     setup() {
+      let tabName = localStorage.getItem('tab')
+      if( tabName==null ){ tabName = 'entries' }
+
+      let targetServer = localStorage.getItem('target')
+      if( targetServer==null ){ targetServer = '' }
+
       return {
+        tabName: ref(tabName),
         count: ref(0),
+
+        ////////////////
         version: ref({
             debug: false,
             name: 'no-name',
@@ -20,8 +29,30 @@ const app = createApp({
             logId: '',
             blockId: '',
         }),
+
+        /////////////
         logFiles: ref([]),
+
+        ///////////
+        targetServer: ref(targetServer),
+        push: ref({
+            logId: '',
+            blockId: '',
+            log: [],
+        }),
+        rollUp: ref({
+            plan:[],
+            targetId: {
+                logId: '',
+                blockId: '',
+            },
+            message: ''
+        })
       }
+    },
+    watch: {
+        tabName(cur,old) { localStorage.setItem('tab', cur) },
+        targetServer(cur,old) { localStorage.setItem('target',cur) }
     },
     methods: {
         getVersion() {
@@ -75,6 +106,37 @@ const app = createApp({
                 this.getLogFiles()
                 this.getLastN()
             })
+        },
+        pushOneRecord() {
+            this.push.log.splice(0)
+            let targetQueue= new QueueApi(this.targetServer)
+            queueApi.rawRecord(this.push.logId, this.push.blockId)
+                .then(blob => {
+                    this.push.log.push('blob fetched')
+                    targetQueue.currentId().then(id => {
+                        this.push.log.push('target id fetched')
+                        targetQueue.insertRaw(id.log_id, id.block_id, blob).then((r)=>{
+                            this.push.log.push('blob inserted '+r)
+                            console.log(r)
+                        }).catch(e => {
+                            this.push.log.push('blob not inserted '+e)
+                        })
+                    }).catch( e => {
+                        this.push.log.push('id not fetched '+e)
+                    })
+                }).catch(e => {
+                    this.push.log.push('blob not fetched '+e)
+                })
+        },
+        rollupBuildPlan() {
+            let targetQueue= new QueueApi(this.targetServer)
+            this.rollUp.plan.splice(0)
+            rollUpLogsPlan(queueApi, targetQueue).then( plan => {
+                plan.forEach(r => this.rollUp.plan.push(r))
+            }).catch(e => console.log(e))
+        },
+        rollupExecutePlan(){
+            let targetQueue= new QueueApi(this.targetServer)
         }
     }    
   }).mount('#app')

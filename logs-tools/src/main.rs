@@ -356,6 +356,11 @@ enum Action {
 
         /// Какие блоки выбрать
         selection: ExtractSelection
+    },
+
+    /// Взаимодействие с очередью
+    QAction {
+        baseUrl: String
     }
 }
 
@@ -428,6 +433,9 @@ impl Action {
                         )
                     }
                 }
+            },
+            Action::QAction { baseUrl } => {
+                Err(LogToolErr::NotImplemented("queue operation not implemented".to_string()))
             }
         }
     }
