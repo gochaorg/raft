@@ -1,6 +1,6 @@
 use crate::logfile::{block::{BlockOptions, BlockId, FileOffset, BlockHeadSize, BlockDataSize, BlockTailSize}, LogErr};
 use core::fmt::Debug;
-use super::LoqErr;
+use super::{LoqErr, LogFileQueue};
 
 /// Навигация по смеженным записям
 /// 
@@ -10,7 +10,10 @@ pub trait LogNavigationNear {
     /// Идентификатор записи
     type RecordId: Sized;
 
+    /// Тип файла, имееться виду PathBuf
     type FILE: Clone + Debug;
+
+    /// Тип идентификатора лог файла, имеется ввиду LogQueueFileNumID
     type LogId: Clone + Debug;
 
     /// Получение id следующей записи
@@ -25,7 +28,10 @@ pub trait LogNavigateLast {
     /// Идентификатор записи
     type RecordId: Sized;
 
+    /// Тип файла, имееться виду PathBuf
     type FILE: Clone + Debug;
+
+    /// Тип идентификатора лог файла, имеется ввиду LogQueueFileNumID
     type LogId: Clone + Debug;
 
     /// Получение последней записи в log queue
@@ -68,7 +74,10 @@ pub trait LogReading {
     /// Идентификатор записи
     type RecordId: Sized;
 
+    /// Тип файла, имееться виду PathBuf
     type FILE: Clone + Debug;
+
+    /// Тип идентификатора лог файла, имеется ввиду LogQueueFileNumID
     type LogId: Clone + Debug;
 
     /// Чтение записи и ее опций
@@ -108,9 +117,27 @@ pub struct LogWriteErr(pub LogErr);
 /// Запись в лог
 pub trait LogWriting<RecordId> 
 {
+    /// Тип файла, имееться виду PathBuf
     type FILE: Clone + Debug;
+
+    /// Тип идентификатора лог файла, имеется ввиду LogQueueFileNumID
     type LogId: Clone + Debug;
 
+    /// Запись данных в лог
     fn write<Record>( self, record:Record ) -> Result<RecordId,LoqErr<Self::FILE,Self::LogId>>
     where Record: Into<PreparedRecord>;
 }
+
+/// Общий API лог очереди
+pub trait LogQueue<RecordId,LogId,FILE,LOG> 
+: LogNavigateLast<RecordId = RecordId, FILE = FILE, LogId = LogId>
++ LogWriting<RecordId, FILE = FILE, LogId = LogId>
++ LogReading<RecordId = RecordId, FILE = FILE, LogId = LogId>
++ LogNavigationNear<RecordId = RecordId, FILE = FILE, LogId = LogId>
++ LogFileQueue<LogId, FILE, LOG>
+where
+    RecordId: Sized,
+    LogId: Clone + Debug,
+    FILE: Clone + Debug,
+{}
+

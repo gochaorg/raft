@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 
 use crate::logfile::{LogFile, FlatBuff};
 
-use super::{log_id::*, LoqErr, FindFiles, OpenLogFile, ValidateLogFiles};
+use super::{log_id::*, LoqErr, FindFiles, OpenLogFile, ValidateLogFiles, LogQueue};
 
 /// Очередь логов
 pub trait LogFileQueue<LogId,FILE,LOG>
@@ -87,6 +87,7 @@ where
     log_id_order: RefCell<Option<Vec<LogId>>>,
 }
 
+/// Очередь логов - базовые методы
 impl<LogId,FILE,BUFF,FNewFile,FOpen> LogFileQueueImpl<LogId,FILE,BUFF,FNewFile,FOpen> 
 where
     BUFF: FlatBuff,
@@ -258,6 +259,7 @@ where
     }
 }
 
+//////////////////////////////////////////////////////////////////////
 /// Конфигурация логов
 pub struct LogQueueConf<
     LogId, FILE, BUFF,

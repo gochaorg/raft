@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::num::ParseIntError;
 use std::str::FromStr;
@@ -247,4 +248,26 @@ where
     pub block_id: BlockId,
 }
 
+impl<LogId> PartialOrd for RecID<LogId>
+where
+    LogId: LogQueueFileId
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self.log_file_id.partial_cmp(&other.log_file_id) {
+            Some(Ordering::Equal) => self.block_id.partial_cmp(&other.block_id),
+            res => res
+        }
+    }
+}
 
+impl<LogId> Ord for RecID<LogId>
+where
+    LogId: LogQueueFileId
+{
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.log_file_id.cmp(&other.log_file_id) {
+            Ordering::Equal => self.block_id.cmp(&other.block_id),
+            res => res
+        }
+    }
+}

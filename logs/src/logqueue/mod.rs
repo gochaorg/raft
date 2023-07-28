@@ -75,3 +75,6 @@ pub use log_queue_read::*;
 /// Запись в очередь
 mod log_queue_write;
 pub use log_queue_write::*;
+
+mod log_queue_impl;
+pub use log_queue_impl::*;
