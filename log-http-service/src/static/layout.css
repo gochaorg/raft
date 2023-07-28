@@ -230,3 +230,7 @@ body {
     margin-right: 2mm;
     width: 40mm
 }
+
+.push-other .roll-up > button {
+    margin-right: 2mm;
+}

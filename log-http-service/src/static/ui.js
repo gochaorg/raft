@@ -1,4 +1,4 @@
-const { createApp, ref } = Vue
+const { createApp, ref, reactive } = Vue
 
 const app = createApp({
     setup() {
@@ -41,7 +41,7 @@ const app = createApp({
             log: [],
         }),
         rollUp: ref({
-            plan:[],
+            plan:reactive([]),
             targetId: {
                 logId: '',
                 blockId: '',
@@ -136,7 +136,24 @@ const app = createApp({
             }).catch(e => console.log(e))
         },
         rollupExecutePlan(){
-            let targetQueue= new QueueApi(this.targetServer)
+            let actions = []
+            for(let i=0;i<this.rollUp.plan.length;i++){
+                actions.push(this.rollUp.plan[i])
+            }
+            (async () => {
+                while(actions.length>0){
+                    let act = actions.shift()
+                    try {
+                        let res = await act.execute(act)                    
+                        act.state = 'succ'
+                        act.log.push(res)
+                    } catch(err) {
+                        act.state = 'fail'
+                        act.log.push(err)
+                        break
+                    }
+                }
+            })()
         }
     }    
   }).mount('#app')

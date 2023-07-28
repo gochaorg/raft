@@ -1,5 +1,3 @@
-const { createApp1, ref1 } = Vue
-
 /**
  * API для работы с очередю
  */
@@ -234,32 +232,27 @@ var queueApi = new QueueApi('/queue')
  * ]
  */
 function rollUpLogsPlan( masterQueue, slaveQueue ) {
-    function doSwitch() {
-        let masterQueue = this.master
-        let slaveQueue = this.slave
-        let log = this.log
-        let self = this
+    function doSwitch(self) {
+        let slaveQueue = this.slave        
         
-        // return slaveQueue.switchTail().then(()=>{
-        //     log.push('switched')
-        //     self.state = 'executed'
-        //     return Promise.resolve('switched')
-        // }).catch(e => {
-        //     log.push('can\'t switch: '+e)
-        //     self.state = 'fail'
-        //     return Promise.reject(e)
-        // })
-
-        console.log('doSwitch this:',this)
-        //log.push('switched')
-        self.state = 'executed'
-        return Promise.resolve('switched')
+        return slaveQueue.switchTail().then(()=>{
+            return Promise.resolve('switched')
+        }).catch(e => {
+            return Promise.reject(e)
+        })
     }
 
-    function doLogPush() {
-        console.log('doLogPush this:',this)
-        this.state = 'executed'
-        return Promise.resolve('pushed')
+    function doLogPush(self) {
+        let masterQueue = this.master
+        let slaveQueue = this.slave
+        let target = { log_id: this.log_id, block_id: this.block_id - BigInt(1) }
+        let source = { log_id: this.log_id, block_id: this.block_id }
+        return masterQueue.rawRecord( source.log_id, source.block_id ).then( blob => {
+            self.log.push('blob fetched')
+            return slaveQueue.insertRaw(target.log_id, target.block_id, blob).then(r => {
+                return Promise.resolve('blob inserted')
+            })
+        })
     }
 
     function cmpId( id_a, id_b ){
@@ -347,6 +340,7 @@ function rollUpLogsPlan( masterQueue, slaveQueue ) {
                             let id = srcRecIdArrArr[i][j]
                             step = { 
                                 log:[],
+                                state: 'init',
                                 master: masterQueue,
                                 slave: slaveQueue,
                             }

@@ -105,14 +105,14 @@
                 <div class="roll-up">
                     <h2>Sync & push log entries</h2>
                     {{rollUp.message}}
-                    <button @click="rollupBuildPlan">build sync plan</button>
+                    <button class="build-plan" @click="rollupBuildPlan">build sync plan</button>
+                    <button class="exec-plan" @click="rollupExecutePlan">execute plan</button>
                     <div class="plan" v-for="(a,i) in rollUp.plan">
                         <div v-if="a.action == 'switch'" :class="['plan-step', a.state]">
-                            [{{i}}] switch
-                            <button @click="a.execute()">execute</button>             
+                            [{{i}}] {{a.state}} switch
                         </div>
                         <div v-if="a.action == 'push'" :class="['plan-step', a.state]">
-                            [{{i}}] push log_id: {{a.log_id}} block_id: {{a.block_id}}
+                            [{{i}}] {{a.state}} push log_id: {{a.log_id}} block_id: {{a.block_id}}
                         </div>
                         <div v-for="l in a.log" class="log">{{l}}</div>
                     </div>
