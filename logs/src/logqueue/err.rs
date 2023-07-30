@@ -1,11 +1,12 @@
+use std::sync::{PoisonError, RwLockReadGuard, RwLockWriteGuard};
 #[allow(unused)]
 use std::{path::PathBuf, fmt::Debug};
 
-use crate::logfile::block::FileOffset;
+use crate::logfile::{block::FileOffset, FlatBuff};
 #[allow(unused)]
 use crate::{logfile::{LogErr, LogFile, block::BlockId}, bbuff::absbuff::{ABuffError, FileBuff}};
 
-use super::new_file::NewFileGeneratorErr;
+use super::{new_file::NewFileGeneratorErr, LogFileQueue};
 #[allow(unused)]
 use super::{LogIdReadWriteErr, LogQueueFileNumID, LogWriteErr};
 
@@ -136,3 +137,34 @@ where
         error: LogErr,
     }
 }
+
+impl<FILE,LogId,BUFF> From<PoisonError<RwLockReadGuard<'_, dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>>>> for LoqErr<FILE,LogId>
+where 
+    FILE: Clone + Debug,
+    LogId: Clone + Debug,
+    BUFF: FlatBuff,
+{
+    fn from(value: PoisonError<RwLockReadGuard<'_, dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>>>) -> Self {
+        todo!()
+    }
+}
+
+impl<FILE,LogId,BUFF> From<PoisonError<RwLockWriteGuard<'_, dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>>>> for LoqErr<FILE,LogId>
+where 
+    FILE: Clone + Debug,
+    LogId: Clone + Debug,
+    BUFF: FlatBuff,
+{
+    fn from(value: PoisonError<RwLockWriteGuard<'_, dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>>>) -> Self {
+        todo!()
+    }
+}
+
+// impl<FILE,LogId,BUFF> FromResidual<Result<Infallible, PoisonError<RwLockReadGuard<'_, dyn log_queue::LogFileQueue<LogId, FILE, logfile::logfile::LogFile<BUFF>>>>>> for  LoqErr<FILE,LogId>
+// where 
+//     FILE: Clone + Debug,
+//     LogId: Clone + Debug,
+//     BUFF: FlatBuff,
+// {
+
+// }

@@ -2,8 +2,8 @@ use std::fmt::Debug;
 use crate::logfile::{block::BlockOptions, LogFile, FlatBuff};
 use super::{LogWriting, RecID, LogFileQueue, LogQueueFileId, LoqErr, PreparedRecord};
 
-impl<FILE,BUFF,LogId> LogWriting<RecID<LogId>> 
-for dyn LogFileQueue<LogId,FILE,LogFile<BUFF>>
+impl<'a,FILE,BUFF,LogId> LogWriting<RecID<LogId>> 
+for dyn LogFileQueue<LogId,FILE,LogFile<BUFF>> + 'a
 where 
     FILE: Clone + Debug,
     BUFF: FlatBuff,

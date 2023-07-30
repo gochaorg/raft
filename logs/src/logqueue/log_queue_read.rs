@@ -9,8 +9,8 @@ use super::{PreparedRecord, RecordInfo};
 use super::{LogNavigationNear, log_id::{RecID, LogQueueFileId}, log_queue::LogFileQueue, LogNavigateLast, LogReading, LoqErr};
 
 /// Реализация чтения логов для dyn LogFileQueue
-impl<LogId, FILE, BUFF> LogNavigationNear
-for dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>
+impl<'a, LogId, FILE, BUFF> LogNavigationNear
+for dyn LogFileQueue<LogId, FILE, LogFile<BUFF>> + 'a
 where
     LogId: LogQueueFileId,
     BUFF: FlatBuff,
@@ -72,18 +72,14 @@ where
     }
 }
 
-impl <LogId,FILE,BUFF> LogNavigateLast
-for dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>
+impl <'a,LogId,FILE,BUFF> LogNavigateLast<RecID<LogId>,FILE,LogId>
+for dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>  + 'a
 where
     LogId: LogQueueFileId,
     BUFF: FlatBuff,
     FILE: Clone + Debug,    
 {
-    type RecordId = RecID<LogId>;
-    type FILE = FILE;
-    type LogId = LogId;
-
-    fn last_record( &self ) -> Result<Option<RecID<LogId>>,LoqErr<Self::FILE,Self::LogId>> {
+    fn last_record( &self ) -> Result<Option<RecID<LogId>>,LoqErr<FILE,LogId>> {
         let (_id,file_name,tail) = self.tail();
         let file_name0 = file_name.clone();
         let cnt = tail.count()
@@ -105,8 +101,8 @@ where
     }
 }
 
-impl <LogId,FILE,BUFF> LogReading
-for dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>
+impl <'a,LogId,FILE,BUFF> LogReading
+for dyn LogFileQueue<LogId, FILE, LogFile<BUFF>> + 'a
 where
     LogId: LogQueueFileId,
     FILE: Clone + Debug,

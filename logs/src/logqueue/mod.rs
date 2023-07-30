@@ -78,3 +78,6 @@ pub use log_queue_write::*;
 
 mod log_queue_impl;
 pub use log_queue_impl::*;
+
+mod log_queue_impl2;
+pub use log_queue_impl2::*;

@@ -24,18 +24,22 @@ pub trait LogNavigationNear {
 }
 
 /// Навигация в конец
-pub trait LogNavigateLast {
+pub trait LogNavigateLast<RecordId,FILE,LogId> 
+where
+    FILE: Clone + Debug,
+    LogId: Clone + Debug
+{
     /// Идентификатор записи
-    type RecordId: Sized;
+    // type RecordId: Sized;
 
     /// Тип файла, имееться виду PathBuf
-    type FILE: Clone + Debug;
+    // type FILE: Clone + Debug;
 
     /// Тип идентификатора лог файла, имеется ввиду LogQueueFileNumID
-    type LogId: Clone + Debug;
+    // type LogId: Clone + Debug;
 
     /// Получение последней записи в log queue
-    fn last_record( &self ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;
+    fn last_record( &self ) -> Result<Option<RecordId>,LoqErr<FILE,LogId>>;
 }
 
 /// Информация о записи
@@ -130,7 +134,7 @@ pub trait LogWriting<RecordId>
 
 /// Общий API лог очереди
 pub trait LogQueue<RecordId,LogId,FILE,LOG> 
-: LogNavigateLast<RecordId = RecordId, FILE = FILE, LogId = LogId>
+: LogNavigateLast<RecordId,FILE,LogId>
 + LogWriting<RecordId, FILE = FILE, LogId = LogId>
 + LogReading<RecordId = RecordId, FILE = FILE, LogId = LogId>
 + LogNavigationNear<RecordId = RecordId, FILE = FILE, LogId = LogId>
