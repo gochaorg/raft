@@ -7,6 +7,7 @@ use super::new_file::NewFileGenerator;
 use path_template::PathTemplateParser;
 use super::{log_seq_verifier::OrderedLogs, find_logs::FsLogFind, LoqErr, LogQueueFileNumID, validate_sequence, SeqValidateOp, IdOf};
 use super::{log_id::*, NewLogFile};
+use log::error;
 
 /// Поиск файлов логов
 pub trait FindFiles<FILE,LogId>
@@ -26,7 +27,7 @@ where
     }
 }
 /// Открытие лог файла
-pub trait OpenLogFile<FILE,LOG,LogId> 
+pub trait OpenLogFile<FILE,LOG,LogId> : Clone
 where
     LOG: Clone,
     FILE: Clone+Debug,
@@ -159,8 +160,9 @@ pub fn path_template<LogId: LogQueueFileId>( root:&str, template:&str )
 
         let new_file = generator.generate()
             .map_err(|e| 
-                LoqErr::<PathBuf,LogId>::CantGenerateNewFile { 
-                    error: e, 
+                {
+                    error!("generate new file from {from:?} fail with {err:?}", from=&generator, err=&e);
+                    LoqErr::<PathBuf,LogId>::CantGenerateNewFile { error: e, }
                 }
             )?;
         let path = new_file.path.clone();
@@ -190,7 +192,7 @@ where
         };
     let log_file_new: Arc<RwLock<NewFileGenerator<'_, _>>> = Arc::new(RwLock::new(log_file_new));
 
-    Ok( move || {
+    Ok( move || {        
         let mut generator = 
             log_file_new.write().map_err(|err| 
                 LoqErr::<PathBuf,LogId>::CantCaptureWriteLock { error: err.to_string() }
@@ -198,10 +200,12 @@ where
 
         let new_file = generator.generate()
             .map_err(|e| 
-                LoqErr::<PathBuf,LogId>::CantGenerateNewFile { 
-                    error: e, 
+                {
+                    error!("generate new file from {from:?} fail with {err:?}", from=&generator, err=&e);
+                    LoqErr::<PathBuf,LogId>::CantGenerateNewFile { error: e }
                 }
             )?;
+
         let path = new_file.path.clone();
         Ok(path)
     } )

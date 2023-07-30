@@ -41,8 +41,30 @@ impl<'a> PathTemplate<'a> {
     }
 }
 
+impl<'a> Debug for PathTemplate<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut str = String::new();
+        str.push_str("PathTemplate[");
+        let mut i = -1;
+        for pt in &self.generators {
+            i += 1;
+            if i>0 {str.push_str(", ")};
+            match pt.lock() {
+                Ok(pt) => {
+                    str.push_str(&format!("{:?}",pt));
+                },
+                Err(err) => {
+                    str.push_str(&err.to_string());
+                }
+            }
+        }
+        str.push_str("]");
+        write!(f,"{}",str)
+    }
+}
+
 /// Элемент имени файла
-pub trait PathValue {
+pub trait PathValue: Debug {
     fn generate( &mut self ) -> String;
     fn clone<'a,'r>( &'a self ) -> Rc<Mutex<dyn PathValue + 'r>>;
 }
@@ -57,6 +79,11 @@ impl PathValue for PlainValue {
         Rc::new(Mutex::new(PlainValue(self.0.clone())))
     }
 }
+impl Debug for PlainValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("PlainValue").field(&self.0).finish()
+    }
+}
 
 /// Время в имени файла
 /// DateFormat - формат времени
@@ -68,6 +95,11 @@ impl PathValue for CurrentDateTimeValue {
     }
     fn clone<'a,'r>( &'a self ) -> Rc<Mutex<dyn PathValue + 'r>> {
         Rc::new(Mutex::new(CurrentDateTimeValue(self.0.clone())))
+    }
+}
+impl Debug for CurrentDateTimeValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("CurrentDateTimeValue").field(&self.0).finish()
     }
 }
 
@@ -105,6 +137,17 @@ impl PathValue for RandomValue {
             count: self.count.clone(),
             rnd: self.rnd.clone()
         }))
+    }
+}
+
+impl Debug for RandomValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RandomValue")
+        .field("dic", &self.dic)
+        .field("dic_char_count", &self.dic_char_count)
+        .field("count", &self.count)
+        .field("rnd", &self.rnd)
+        .finish()
     }
 }
 

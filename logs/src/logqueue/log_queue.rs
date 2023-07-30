@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use crate::logfile::{LogFile, FlatBuff};
 use super::{log_id::*, LoqErr, FindFiles, OpenLogFile, ValidateLogFiles};
 
-use log::{info,debug,trace,error};
+use log::info;
 
 /// Очередь логов
 pub trait LogFileQueue<LogId,FILE,LOG>
@@ -280,7 +280,7 @@ where
     FILE: Clone + Debug,
     BUFF: FlatBuff,
     FFind: FindFiles<FILE,LogId>,
-    FOpen: OpenLogFile<FILE,LogFile<BUFF>,LogId> + Clone,
+    FOpen: OpenLogFile<FILE,LogFile<BUFF>,LogId>,
     FValidate: ValidateLogFiles<FILE,LogFile<BUFF>,LogId>,
     FNewFile: NewLogFile<FILE,LogId> + Clone,
 {
@@ -306,7 +306,7 @@ where
     LogId: LogQueueFileId,
     FILE: Clone + Debug,
     BUFF: FlatBuff,
-    FFind: FindFiles<FILE,LogId>,
+    FFind: FindFiles<FILE,LogId> + Debug,
     FOpen: OpenLogFile<FILE,LogFile<BUFF>,LogId> + Clone,
     FValidate: ValidateLogFiles<FILE,LogFile<BUFF>,LogId>,
     FNewFile: NewLogFile<FILE,LogId> + Clone,
@@ -315,10 +315,9 @@ where
     pub fn open( &self ) -> 
     Result<LogFileQueueImpl<LogId,FILE,BUFF,FNewFile,FOpen>,LoqErr<FILE,LogId>> 
     {
-        info!("find log files");
         let found_files = self.find_files.find_files()?;
         if !found_files.is_empty() {
-            info!("found {cnt} files", cnt=&found_files.len());
+            info!("found {cnt} files in {at:?}", cnt=&found_files.len(), at=&self.find_files);
 
             let not_validated_open_files = found_files.iter().fold( 
                 Ok::<Vec::<(FILE,LogFile<BUFF>)>,LoqErr<FILE,LogId>>(Vec::<(FILE,LogFile<BUFF>)>::new()), 
@@ -398,7 +397,7 @@ mod full_test {
 
     use crate::bbuff::absbuff::FileBuff;
     use crate::logfile::LogFile;
-    use crate::logqueue::{LogQueueFileNumIDOpen, ValidateStub, path_template, NewLogFile, LoqErr, NewFileStub};
+    use crate::logqueue::{LogQueueFileNumIDOpen, ValidateStub, path_template};
 
     use crate::logqueue::{log_id::*, LogQueueConf, LogFileQueue, LogWriting, LogNavigateLast };
     use crate::logqueue::find_logs::FsLogFind;

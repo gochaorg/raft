@@ -1,6 +1,6 @@
-use std::{time::{Duration, Instant}, path::PathBuf, fs::File, rc::Rc, sync::Mutex};
-
+use std::{time::{Duration, Instant}, path::PathBuf, fs::{File, create_dir_all}, rc::Rc, sync::Mutex, fmt::Debug};
 use path_template::PathTemplate;
+use log::{info,error};
 
 /// Генерация файла с уникальным именем
 #[derive(Clone)]
@@ -22,6 +22,20 @@ where
 
     /// Задержка перед новой попыткой открытия файла
     pub throttling: Option<Duration>,
+}
+
+impl<'a,F> Debug for NewFileGenerator<'a,F> 
+where
+    F: Fn(PathBuf) -> Result<File,std::io::Error>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NewFileGenerator")
+            .field("template", &self.path_template)
+            .field("max_duration", &self.max_duration)
+            .field("max_attemps", &self.max_attemps)
+            .field("throttling", &self.throttling)
+            .finish()
+    }
 }
 
 /// Новый файл
@@ -71,9 +85,27 @@ where
 
             let path_str = self.path_template.generate();
             let path = PathBuf::from(path_str);
+            match path.parent() {
+                Some(parent) => {
+                    if !parent.is_dir() {
+                        match create_dir_all(path.clone()) {
+                            Ok(_) => {},
+                            Err(e) => {
+                                error!("can't mkdir {dir:?} for new file {nf:?} by template {t:?} error {e}",
+                                    dir = parent,
+                                    nf = &path,
+                                    t = &self.path_template
+                                );
+                            }
+                        }
+                    }
+                },
+                None => {}
+            }
 
             match (self.open)(path.clone()) {
                 Ok(file) => {
+                    info!("generated and open new file {path:?}",path=&path.clone());
                     return Ok(
                         NewFile {
                             path: path.clone(),
@@ -82,6 +114,7 @@ where
                     )
                 }
                 Err(err) => {
+                    error!("can't generated new file {path:?} error {err}", path=path.clone(), err=err.to_string());
                     io_errors.push(err.to_string());
                     match self.throttling {
                         Some(dur) => {

@@ -16,7 +16,7 @@ use parse::*;
 use range::{MultipleParse, Range};
 use std::{
     env,
-    path::{PathBuf},
+    path::PathBuf,
 };
 
 mod actions;
