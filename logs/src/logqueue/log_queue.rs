@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 
 use crate::logfile::{LogFile, FlatBuff};
 
-use super::{log_id::*, LoqErr, FindFiles, OpenLogFile, ValidateLogFiles, LogQueue};
+use super::{log_id::*, LoqErr, FindFiles, OpenLogFile, ValidateLogFiles};
 
 /// Очередь логов
 pub trait LogFileQueue<LogId,FILE,LOG>
@@ -57,6 +57,7 @@ where
 }
 
 /// Очередь логов
+#[derive(Clone)]
 pub struct LogFileQueueImpl<LogId,FILE,BUFF,FNewFile,FOpen> 
 where
     BUFF: FlatBuff,

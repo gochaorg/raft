@@ -5,17 +5,17 @@ use crate::logfile::block::FileOffset;
 use super::super::logfile::LogFile;
 use super::*;
 
-pub struct LogQueueImpl<LogId,FILE,BUFF> 
+pub struct LogQueueImpl<'a,LogId,FILE,BUFF> 
 where
     LogId: Clone + Debug,
     FILE: Clone + Debug,
     BUFF: FlatBuff
 {
-    queue: Box<dyn LogFileQueue<LogId,FILE,LogFile<BUFF>>>
+    pub queue: Box<dyn LogFileQueue<LogId,FILE,LogFile<BUFF>> + 'a>
 }
 
-impl<LogId,FILE,BUFF> LogQueue<RecID<LogId>, LogId, FILE, LogFile<BUFF>>
-for LogQueueImpl<LogId,FILE,BUFF>
+impl<'a,LogId,FILE,BUFF> LogQueue<RecID<LogId>, LogId, FILE, LogFile<BUFF>>
+for LogQueueImpl<'a,LogId,FILE,BUFF>
 where
     LogId: LogQueueFileId,
     FILE: Clone + Debug,
@@ -23,8 +23,8 @@ where
 {    
 }
 
-impl<LogId,FILE,BUFF> LogNavigateLast
-for LogQueueImpl<LogId,FILE,BUFF>
+impl<'a,LogId,FILE,BUFF> LogNavigateLast
+for LogQueueImpl<'a,LogId,FILE,BUFF>
 where
     LogId: LogQueueFileId,
     FILE: Clone + Debug,
@@ -39,8 +39,8 @@ where
     }
 }
 
-impl<LogId,FILE,BUFF> LogFileQueue<LogId,FILE,LogFile<BUFF>>
-for LogQueueImpl<LogId,FILE,BUFF>
+impl<'a,LogId,FILE,BUFF> LogFileQueue<LogId,FILE,LogFile<BUFF>>
+for LogQueueImpl<'a,LogId,FILE,BUFF>
 where
     LogId: LogQueueFileId,
     FILE: Clone + Debug,
@@ -71,8 +71,8 @@ where
     }
 }
 
-impl<LogId,FILE,BUFF> LogNavigationNear
-for LogQueueImpl<LogId,FILE,BUFF>
+impl<'a,LogId,FILE,BUFF> LogNavigationNear
+for LogQueueImpl<'a,LogId,FILE,BUFF>
 where
     LogId: LogQueueFileId,
     FILE: Clone + Debug,
@@ -92,8 +92,8 @@ where
 
 }
 
-impl<LogId,FILE,BUFF> LogReading
-for LogQueueImpl<LogId,FILE,BUFF>
+impl<'a,LogId,FILE,BUFF> LogReading
+for LogQueueImpl<'a,LogId,FILE,BUFF>
 where
     LogId: LogQueueFileId,
     FILE: Clone + Debug,
@@ -119,8 +119,8 @@ where
     }
 }
 
-impl<LogId,FILE,BUFF> LogWriting<RecID<LogId>>
-for LogQueueImpl<LogId,FILE,BUFF>
+impl<'a,LogId,FILE,BUFF> LogWriting<RecID<LogId>>
+for LogQueueImpl<'a,LogId,FILE,BUFF>
 where
     LogId: LogQueueFileId,
     FILE: Clone + Debug,

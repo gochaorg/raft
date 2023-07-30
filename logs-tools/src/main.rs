@@ -359,8 +359,9 @@ enum Action {
     },
 
     /// Взаимодействие с очередью
+    #[allow(dead_code)]
     QAction {
-        baseUrl: String
+        base_url: String
     }
 }
 
@@ -434,7 +435,7 @@ impl Action {
                     }
                 }
             },
-            Action::QAction { baseUrl } => {
+            Action::QAction { base_url } => {
                 Err(LogToolErr::NotImplemented("queue operation not implemented".to_string()))
             }
         }
