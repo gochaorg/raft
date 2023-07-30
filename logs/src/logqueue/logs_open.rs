@@ -6,7 +6,7 @@ use crate::{logfile::LogFile, bbuff::absbuff::FileBuff};
 use super::new_file::NewFileGenerator;
 use path_template::PathTemplateParser;
 use super::{log_seq_verifier::OrderedLogs, find_logs::FsLogFind, LoqErr, LogQueueFileNumID, validate_sequence, SeqValidateOp, IdOf};
-use super::log_id::*;
+use super::{log_id::*, NewLogFile};
 
 /// Поиск файлов логов
 pub trait FindFiles<FILE,LogId>
@@ -98,6 +98,19 @@ where
     }
 }
 
+#[derive(Clone)]
+pub struct NewFileStub<F,LogId: LogQueueFileId>(pub F)
+where F: FnMut() -> Result<PathBuf,LoqErr<PathBuf,LogId>>;
+
+impl<F,LogId> NewLogFile<PathBuf,LogId> for NewFileStub<F,LogId> 
+where F: FnMut() -> Result<PathBuf,LoqErr<PathBuf,LogId>> + Clone,
+LogId: LogQueueFileId
+{
+    fn new_log_file(&mut self) -> Result<PathBuf,crate::logqueue::LoqErr<PathBuf,LogId>> {
+        (self.0)()
+    }
+}
+
 /// Создает функцию генерации нового файла
 /// 
 /// Аргументы
@@ -117,8 +130,8 @@ where
 /// - `${time:...}` - встроенная переменаая, задает текущую дату, формат даты описан в [DateFormat]
 /// - `${rnd:5}` - случайны набор из 5 букв, число 5 - указывает на кол-во букв и может быть заменено на другое число
 /// - `${env:...}` - в качестве значения - потенциально опасно
-pub fn path_template<LogId: Clone + Debug>( root:&str, template:&str ) 
-    -> Result<impl  FnMut() -> Result<PathBuf,LoqErr<PathBuf,LogId>> + Clone, LoqErr<PathBuf,LogId>>
+pub fn path_template<LogId: LogQueueFileId>( root:&str, template:&str ) 
+    -> Result<impl NewLogFile<PathBuf,LogId>, LoqErr<PathBuf,LogId>>
 {
     let path_tmpl = PathTemplateParser::default()
         .with_variable("root", root)
@@ -152,10 +165,10 @@ pub fn path_template<LogId: Clone + Debug>( root:&str, template:&str )
             )?;
         let path = new_file.path.clone();
         Ok(path)
-    } )
+    } ).map(|r| NewFileStub(r))
 }
 
-pub fn path_template2<LogId: Clone + Debug,F>( template:&str, template_vars:F ) 
+fn path_template2impl<LogId: Clone + Debug,F>( template:&str, template_vars:F ) 
     -> Result<impl  FnMut() -> Result<PathBuf,LoqErr<PathBuf,LogId>> + Clone, LoqErr<PathBuf,LogId>>
 where
     F: for <'a> Fn(PathTemplateParser<'a>) -> PathTemplateParser<'a>
@@ -192,5 +205,13 @@ where
         let path = new_file.path.clone();
         Ok(path)
     } )
+}
+
+pub fn path_template2<LogId: LogQueueFileId,F>( template:&str, template_vars:F ) 
+    -> Result<impl NewLogFile<PathBuf,LogId>, LoqErr<PathBuf,LogId>>
+where
+    F: for <'a> Fn(PathTemplateParser<'a>) -> PathTemplateParser<'a>
+{
+    path_template2impl(template, template_vars).map(|r| NewFileStub(r))
 }
 

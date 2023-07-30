@@ -1,12 +1,12 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-
 use core::fmt::Debug;
 use std::marker::PhantomData;
 
 use crate::logfile::{LogFile, FlatBuff};
-
 use super::{log_id::*, LoqErr, FindFiles, OpenLogFile, ValidateLogFiles};
+
+use log::{info,debug,trace,error};
 
 /// Очередь логов
 pub trait LogFileQueue<LogId,FILE,LOG>
@@ -63,7 +63,7 @@ where
     BUFF: FlatBuff,
     FILE: Clone + Debug,
     LogId: LogQueueFileId,
-    FNewFile: FnMut() -> Result<FILE,LoqErr<FILE,LogId>> + Clone,
+    FNewFile: NewLogFile<FILE,LogId> + Clone,
     FOpen: OpenLogFile<FILE,LogFile<BUFF>,LogId>
 {
     /// Список файлов
@@ -94,7 +94,7 @@ where
     BUFF: FlatBuff,
     FILE: Clone + Debug,
     LogId: LogQueueFileId,
-    FNewFile: FnMut() -> Result<FILE,LoqErr<FILE,LogId>> + Clone,
+    FNewFile: NewLogFile<FILE,LogId> + Clone,
     FOpen: OpenLogFile<FILE,LogFile<BUFF>,LogId>
 {
     /// Конструктор
@@ -196,11 +196,11 @@ where
     BUFF: FlatBuff,
     FILE: Clone + Debug,
     LogId: LogQueueFileId,
-    FNewFile: FnMut() -> Result<FILE,LoqErr<FILE,LogId>> + Clone,
+    FNewFile: NewLogFile<FILE,LogId> + Clone,
     FOpen: OpenLogFile<FILE,LogFile<BUFF>,LogId>
 {
     fn switch( &mut self ) -> Result<(FILE,LogId),LoqErr<FILE,LogId>> {
-        let file_name = (self.new_file)()?;
+        let file_name = self.new_file.new_log_file()?;
         let mut log_file = self.open_file.open_log_file(file_name.clone())?;
         let new_log_id = self.current_log_id_read(|id| LogId::new(Some(id.id())))?;
         new_log_id.write(&file_name, &mut log_file)?;
@@ -262,6 +262,15 @@ where
 
 //////////////////////////////////////////////////////////////////////
 /// Конфигурация логов
+
+pub trait NewLogFile<FILE,LogId>: Clone
+where
+    LogId: LogQueueFileId,
+    FILE: Clone + Debug,
+{
+    fn new_log_file(&mut self) -> Result<FILE,LoqErr<FILE,LogId>>;
+}
+
 pub struct LogQueueConf<
     LogId, FILE, BUFF,
     FFind, FOpen, FValidate, FNewFile,
@@ -273,7 +282,7 @@ where
     FFind: FindFiles<FILE,LogId>,
     FOpen: OpenLogFile<FILE,LogFile<BUFF>,LogId> + Clone,
     FValidate: ValidateLogFiles<FILE,LogFile<BUFF>,LogId>,
-    FNewFile: FnMut() -> Result<FILE,LoqErr<FILE,LogId>> + Clone,
+    FNewFile: NewLogFile<FILE,LogId> + Clone,
 {
     /// Поиск лог файлов
     pub find_files: FFind,
@@ -287,7 +296,7 @@ where
     /// Создание пустого лог файла
     pub new_file: FNewFile,
 
-    pub _p: PhantomData<BUFF>
+    pub _p: PhantomData<(BUFF,LogId,FILE)>
 }
 
 
@@ -300,14 +309,17 @@ where
     FFind: FindFiles<FILE,LogId>,
     FOpen: OpenLogFile<FILE,LogFile<BUFF>,LogId> + Clone,
     FValidate: ValidateLogFiles<FILE,LogFile<BUFF>,LogId>,
-    FNewFile: FnMut() -> Result<FILE,LoqErr<FILE,LogId>> + Clone,
+    FNewFile: NewLogFile<FILE,LogId> + Clone,
 {
     /// Открытие логов
     pub fn open( &self ) -> 
     Result<LogFileQueueImpl<LogId,FILE,BUFF,FNewFile,FOpen>,LoqErr<FILE,LogId>> 
     {
+        info!("find log files");
         let found_files = self.find_files.find_files()?;
         if !found_files.is_empty() {
+            info!("found {cnt} files", cnt=&found_files.len());
+
             let not_validated_open_files = found_files.iter().fold( 
                 Ok::<Vec::<(FILE,LogFile<BUFF>)>,LoqErr<FILE,LogId>>(Vec::<(FILE,LogFile<BUFF>)>::new()), 
                 |res,file| {
@@ -333,7 +345,9 @@ where
 
             Ok(queue)
         } else {
-            let file_name = (self.new_file.clone())()?;
+            info!("log files not found, try init");
+
+            let file_name = (self.new_file.clone()).new_log_file()?;
             let mut log_file = 
                 self.open_log_file.open_log_file(file_name.clone())?;
             let id = LogId::new(None);
@@ -384,7 +398,7 @@ mod full_test {
 
     use crate::bbuff::absbuff::FileBuff;
     use crate::logfile::LogFile;
-    use crate::logqueue::{LogQueueFileNumIDOpen, ValidateStub, path_template};
+    use crate::logqueue::{LogQueueFileNumIDOpen, ValidateStub, path_template, NewLogFile, LoqErr, NewFileStub};
 
     use crate::logqueue::{log_id::*, LogQueueConf, LogFileQueue, LogWriting, LogNavigateLast };
     use crate::logqueue::find_logs::FsLogFind;
@@ -406,9 +420,10 @@ mod full_test {
             open_log_file: LogQueueFileNumIDOpen,
             validate: ValidateStub,
             new_file: path_template(
-                prepared.log_dir_root.to_str().unwrap(), 
-                "${root}/${time:local:yyyy-mm-ddThh-mi-ss}-${rnd:5}.binlog"
-            ).unwrap(),
+                    prepared.log_dir_root.to_str().unwrap(), 
+                    "${root}/${time:local:yyyy-mm-ddThh-mi-ss}-${rnd:5}.binlog"
+                ).unwrap()
+            ,
             _p: PhantomData.clone(),
         };
 
