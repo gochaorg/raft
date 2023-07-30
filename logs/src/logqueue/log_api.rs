@@ -17,10 +17,10 @@ pub trait LogNavigationNear {
     type LogId: Clone + Debug;
 
     /// Получение id следующей записи
-    fn next_record( self, record_id: Self::RecordId ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;
+    fn next_record( &self, record_id: Self::RecordId ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;
 
     /// Получение id предыдущей записи
-    fn previous_record( self, record_id: Self::RecordId ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;    
+    fn previous_record( &self, record_id: Self::RecordId ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;    
 }
 
 /// Навигация в конец
@@ -35,7 +35,7 @@ pub trait LogNavigateLast {
     type LogId: Clone + Debug;
 
     /// Получение последней записи в log queue
-    fn last_record( self ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;
+    fn last_record( &self ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>>;
 }
 
 /// Информация о записи
@@ -86,11 +86,11 @@ pub trait LogReading {
     /// - `record_id` идентификатор записи
     /// 
     /// Результат - запись
-    fn read( self, record_id: Self::RecordId ) -> 
+    fn read( &self, record_id: Self::RecordId ) -> 
         Result<PreparedRecord, LoqErr<Self::FILE,Self::LogId>>;
 
     /// Чтение опций записи
-    fn info( self, record_id: Self::RecordId ) -> 
+    fn info( &self, record_id: Self::RecordId ) -> 
         Result<RecordInfo<Self::FILE,Self::LogId>, LoqErr<Self::FILE,Self::LogId>>;
 
     /// Чтение байтов лог файла
@@ -102,7 +102,7 @@ pub trait LogReading {
     /// 
     /// Результат
     /// - Кол-во прочитанных байтов
-    fn read_raw_bytes( self, log_id: Self::LogId, pos: FileOffset, data_consumer:&mut [u8] ) ->
+    fn read_raw_bytes( &self, log_id: Self::LogId, pos: FileOffset, data_consumer:&mut [u8] ) ->
         Result<u64, LoqErr<Self::FILE, Self::LogId>>;
 }
 
@@ -124,7 +124,7 @@ pub trait LogWriting<RecordId>
     type LogId: Clone + Debug;
 
     /// Запись данных в лог
-    fn write<Record>( self, record:Record ) -> Result<RecordId,LoqErr<Self::FILE,Self::LogId>>
+    fn write<Record>( &self, record:Record ) -> Result<RecordId,LoqErr<Self::FILE,Self::LogId>>
     where Record: Into<PreparedRecord>;
 }
 

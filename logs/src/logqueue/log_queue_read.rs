@@ -10,7 +10,7 @@ use super::{LogNavigationNear, log_id::{RecID, LogQueueFileId}, log_queue::LogFi
 
 /// Реализация чтения логов для dyn LogFileQueue
 impl<LogId, FILE, BUFF> LogNavigationNear
-for & dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>
+for dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>
 where
     LogId: LogQueueFileId,
     BUFF: FlatBuff,
@@ -20,7 +20,7 @@ where
     type FILE = FILE;
     type LogId = LogId;
 
-    fn next_record( self, record_id: RecID<LogId> ) -> 
+    fn next_record( &self, record_id: RecID<LogId> ) -> 
     Result<Option<RecID<LogId>>,LoqErr<Self::FILE,Self::LogId>> {
         let res = 
         self.find_log(record_id.log_file_id.clone())?.and_then(|(_file,log)| {
@@ -43,7 +43,7 @@ where
         Ok(res)
     }
 
-    fn previous_record( self, record_id: RecID<LogId> ) -> 
+    fn previous_record( &self, record_id: RecID<LogId> ) -> 
     Result<Option<RecID<LogId>>,LoqErr<Self::FILE,Self::LogId>> {
         let result =
         if record_id.block_id.value() == 0 {
@@ -73,7 +73,7 @@ where
 }
 
 impl <LogId,FILE,BUFF> LogNavigateLast
-for & dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>
+for dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>
 where
     LogId: LogQueueFileId,
     BUFF: FlatBuff,
@@ -83,7 +83,7 @@ where
     type FILE = FILE;
     type LogId = LogId;
 
-    fn last_record( self ) -> Result<Option<RecID<LogId>>,LoqErr<Self::FILE,Self::LogId>> {
+    fn last_record( &self ) -> Result<Option<RecID<LogId>>,LoqErr<Self::FILE,Self::LogId>> {
         let (_id,file_name,tail) = self.tail();
         let file_name0 = file_name.clone();
         let cnt = tail.count()
@@ -106,7 +106,7 @@ where
 }
 
 impl <LogId,FILE,BUFF> LogReading
-for & dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>
+for dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>
 where
     LogId: LogQueueFileId,
     FILE: Clone + Debug,
@@ -116,7 +116,7 @@ where
     type FILE = FILE;
     type LogId = LogId;
 
-    fn read( self, record_id: RecID<LogId> ) -> 
+    fn read( &self, record_id: RecID<LogId> ) -> 
         Result<PreparedRecord, LoqErr<Self::FILE,Self::LogId>> 
     {
         match self.find_log(record_id.log_file_id.clone())? {
@@ -140,7 +140,7 @@ where
         }
     }
 
-    fn info( self, record_id: RecID<LogId> ) -> 
+    fn info( &self, record_id: RecID<LogId> ) -> 
         Result<RecordInfo<Self::FILE,Self::LogId>, LoqErr<Self::FILE,Self::LogId>> 
     {
         match self.find_log(record_id.log_file_id.clone())? {
@@ -172,7 +172,7 @@ where
         }
     }
 
-    fn read_raw_bytes( self, log_id: Self::LogId, pos: crate::logfile::block::FileOffset, data_consumer:&mut [u8] ) ->
+    fn read_raw_bytes( &self, log_id: Self::LogId, pos: crate::logfile::block::FileOffset, data_consumer:&mut [u8] ) ->
         Result<u64, LoqErr<Self::FILE, Self::LogId>> 
     {
         match self.find_log(log_id.clone())? {

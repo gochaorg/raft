@@ -3,7 +3,7 @@ use crate::logfile::{block::BlockOptions, LogFile, FlatBuff};
 use super::{LogWriting, RecID, LogFileQueue, LogQueueFileId, LoqErr, PreparedRecord};
 
 impl<FILE,BUFF,LogId> LogWriting<RecID<LogId>> 
-for & dyn LogFileQueue<LogId,FILE,LogFile<BUFF>>
+for dyn LogFileQueue<LogId,FILE,LogFile<BUFF>>
 where 
     FILE: Clone + Debug,
     BUFF: FlatBuff,
@@ -12,7 +12,7 @@ where
     type FILE = FILE;
     type LogId = LogId;
 
-    fn write<Record>( self, record:Record ) -> Result<RecID<LogId>,LoqErr<Self::FILE,Self::LogId>> 
+    fn write<Record>( &self, record:Record ) -> Result<RecID<LogId>,LoqErr<Self::FILE,Self::LogId>> 
     where Record: Into<PreparedRecord>
     {
         let prepared : PreparedRecord = record.into();
