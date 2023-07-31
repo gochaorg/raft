@@ -101,7 +101,6 @@ where
     fn previous_record( &self, record_id: Self::RecordId ) -> Result<Option<Self::RecordId>,LoqErr<Self::FILE,Self::LogId>> {
         self.queue.read()?.previous_record(record_id)
     }
-
 }
 
 impl<'a,LogId,FILE,BUFF> LogReading
@@ -115,18 +114,18 @@ where
     type LogId = LogId;
     type RecordId = RecID<LogId>;
 
-    fn read( &self, record_id: Self::RecordId ) -> 
-        Result<PreparedRecord, LoqErr<Self::FILE,Self::LogId>> {
+    fn read( &self, record_id: Self::RecordId ) -> Result<PreparedRecord, LoqErr<Self::FILE,Self::LogId>> 
+    {
         self.queue.read()?.read(record_id)
     }
 
-    fn info( &self, record_id: Self::RecordId ) -> 
-        Result<RecordInfo<Self::FILE,Self::LogId>, LoqErr<Self::FILE,Self::LogId>> {
+    fn info( &self, record_id: Self::RecordId ) -> Result<RecordInfo<Self::FILE,Self::LogId>, LoqErr<Self::FILE,Self::LogId>> 
+    {
         self.queue.read()?.info(record_id)
     }
 
-    fn read_raw_bytes( &self, log_id: Self::LogId, pos: FileOffset, data_consumer:&mut [u8] ) ->
-        Result<u64, LoqErr<Self::FILE, Self::LogId>> {
+    fn read_raw_bytes( &self, log_id: Self::LogId, pos: FileOffset, data_consumer:&mut [u8] ) -> Result<u64, LoqErr<Self::FILE, Self::LogId>> 
+    {
         self.queue.read()?.read_raw_bytes(log_id, pos, data_consumer)
     }
 }
@@ -142,8 +141,8 @@ where
     type LogId = LogId;
 
     fn write<Record>( &self, record:Record ) -> Result<RecID<LogId>,LoqErr<Self::FILE,Self::LogId>>
-    where Record: Into<PreparedRecord> {
+    where Record: Into<PreparedRecord> 
+    {
         self.queue.read()?.write(record)
-        // todo!()
     }
 }

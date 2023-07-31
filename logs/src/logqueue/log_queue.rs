@@ -307,9 +307,9 @@ where
     FILE: Clone + Debug,
     BUFF: FlatBuff,
     FFind: FindFiles<FILE,LogId> + Debug,
-    FOpen: OpenLogFile<FILE,LogFile<BUFF>,LogId> + Clone,
+    FOpen: OpenLogFile<FILE,LogFile<BUFF>,LogId>,
     FValidate: ValidateLogFiles<FILE,LogFile<BUFF>,LogId>,
-    FNewFile: NewLogFile<FILE,LogId> + Clone,
+    FNewFile: NewLogFile<FILE,LogId>,
 {
     /// Открытие логов
     pub fn open( &self ) -> 
@@ -397,7 +397,7 @@ mod full_test {
 
     use crate::bbuff::absbuff::FileBuff;
     use crate::logfile::LogFile;
-    use crate::logqueue::{LogQueueFileNumIDOpen, ValidateStub, path_template, LogQueueImpl, LogQueue};
+    use crate::logqueue::{LogQueueFileNumIDOpen, ValidateStub, path_template, LogQueueImpl, LogQueue, Wrapper, log_queue};
 
     use crate::logqueue::{log_id::*, LogQueueConf, LogFileQueue, LogWriting, LogNavigateLast };
     use crate::logqueue::find_logs::FsLogFind;
@@ -429,11 +429,14 @@ mod full_test {
         let log_queue = log_queue_conf.open().unwrap();
         println!("log_queue openned");
 
-        let mut log_queue = LogQueueImpl::new(log_queue);
-        //let mut log_queue: dyn LogQueue<RecID<LogQueueFileNumID>, LogQueueFileNumID, PathBuf, LogFile<FileBuff>> = Box::new(log_queue);
-
         // let mut log_queue: Box<dyn LogFileQueue<LogQueueFileNumID,PathBuf,LogFile<FileBuff>> + '_>
         //     = Box::new(log_queue);
+
+        // api..
+        let mut log_queue = LogQueueImpl::new(log_queue);
+
+        // api alt
+        // let mut log_queue = Wrapper::from(log_queue);
 
         let rec = log_queue.write(20).unwrap();
         println!("log_queue writed, rec id = {:?}",rec);
