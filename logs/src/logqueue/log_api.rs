@@ -111,6 +111,7 @@ pub trait LogReading {
 }
 
 /// Подготовленные данные для записи
+#[derive(Clone)]
 pub struct PreparedRecord {
     pub data: Vec<u8>,
     pub options: BlockOptions,
