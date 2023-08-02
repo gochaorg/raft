@@ -145,7 +145,7 @@ where
     BUFF: FlatBuff,
 {
     fn from(value: PoisonError<RwLockReadGuard<'_, dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>>>) -> Self {
-        todo!()
+        Self::CantCaptureWriteLock { error: value.to_string() }
     }
 }
 
@@ -156,7 +156,7 @@ where
     BUFF: FlatBuff,
 {
     fn from(value: PoisonError<RwLockWriteGuard<'_, dyn LogFileQueue<LogId, FILE, LogFile<BUFF>>>>) -> Self {
-        todo!()
+        Self::CantCaptureWriteLock { error: value.to_string() }
     }
 }
 

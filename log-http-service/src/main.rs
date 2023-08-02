@@ -10,6 +10,9 @@ mod queue_api;
 /// Статические ресурсы
 mod static_api;
 
+/// Raft
+mod raft;
+
 use actix_cors::Cors;
 use actix_web::{web, App, HttpServer, guard};
 use config::AppConfig;
