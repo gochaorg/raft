@@ -1323,6 +1323,7 @@ dependencies = [
  "actix-swagger",
  "actix-web",
  "actix-web-static-files",
+ "async-trait",
  "chrono",
  "date-format",
  "encoding",

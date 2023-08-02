@@ -27,3 +27,4 @@ encoding = "0.2.33"
 #utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
 log = "0.4.19"
 env_logger = "0.10.0"
+async-trait = "0.1.72"
