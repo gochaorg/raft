@@ -120,7 +120,6 @@ impl NodeClient for NodeClientTest {
 impl NodeInstance for ClusterNode
 {
     async fn on_timer( &mut self ) {
-
         let r = match self.role {
             Role::Leader => {                     
                 // рассылка пингов
@@ -150,6 +149,13 @@ impl NodeInstance for ClusterNode
                         id=self.id, succ=succ_count, tot=nodes.len(), dur=t1.duration_since(t0));
                 }
             },
+            Role::Follower => {
+                // Проверка наличия ping
+                // Если нет, то перейти в статус кандидата
+                self.last_ping_recieve
+                .map(|t| Instant::now().duration_since(t) )
+                .map(|t| t > self.heartbeat_timeout );
+            }
             _ => { () }
         };
 
@@ -214,12 +220,26 @@ fn ping_send_test() {
 
                 let t_now = Instant::now();
                 let t_dur = t_now.duration_since(t_start);
-                if t_dur >= Duration::from_secs(5) { break; }
+
+                if t_dur >= Duration::from_secs(15) { break; }
 
                 info!("cycle {cycle}");
 
+                if cycle == 3 { node0.force_role(Role::Follower) }
+
+                // call on_timer
                 {
                     let mut node = node0.lock().unwrap();
+                    node.clone()
+                }.on_timer().await;
+
+                {
+                    let mut node = node1.lock().unwrap();
+                    node.clone()
+                }.on_timer().await;
+
+                {
+                    let mut node = node2.lock().unwrap();
                     node.clone()
                 }.on_timer().await
             }
