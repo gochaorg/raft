@@ -101,6 +101,9 @@
 /// реализация алгоритма выбора
 mod election;
 
+/// Фоновые задачи
+pub mod bg_tasks;
+
 #[cfg(test)]
 mod test {
     use std::sync::{Arc, RwLock};

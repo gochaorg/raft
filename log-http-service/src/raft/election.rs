@@ -216,7 +216,7 @@ impl NodeInstance for ClusterNode
 
 #[cfg(test)]
 mod test {
-    use futures::TryFutureExt;
+    use futures::{TryFutureExt, join};
 
     use super::*;
 
@@ -384,7 +384,7 @@ mod test {
             let node1c = node1.clone();
             let node2c = node2.clone();
 
-            let h = spawn(async move {
+            let h: actix_rt::task::JoinHandle<()> = spawn(async move {
                 let t_start = Instant::now();        
                 let mut cycle = 0;
                 loop {
@@ -400,7 +400,8 @@ mod test {
 
                     if cycle == 3 { node0c.force_role(Role::Follower) }
 
-                    // call on_timer
+                    // call on_timer   
+
                     info!("node0 {:?}", {node0c.lock().unwrap().role.lock().unwrap() });
                     {
                         let node = node0c.lock().unwrap();
@@ -413,7 +414,7 @@ mod test {
                         node.clone()
                     }.on_timer().await;
 
-                    info!("node1 {:?}", {node2c.lock().unwrap().role.lock().unwrap() });
+                    info!("node2 {:?}", {node2c.lock().unwrap().role.lock().unwrap() });
                     {
                         let node = node2c.lock().unwrap();
                         node.clone()
@@ -421,7 +422,8 @@ mod test {
                 }
             });
             
-            let _ = h.await;
+            //let _ = h.await;
+            sleep(Duration::from_secs(12)).await;
 
             {
                 let log = log.lock().unwrap();
