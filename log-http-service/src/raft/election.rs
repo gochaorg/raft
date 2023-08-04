@@ -66,10 +66,10 @@ struct ClusterNode
     role: Arc<Mutex<Role>>,
 
     /// Время последнего принятого пинга
-    last_ping_recieve: Option<Instant>,
+    last_ping_recieve: Arc<Mutex<Option<Instant>>>,
 
     /// Время последнего отправленного пинга
-    last_ping_send: Option<Instant>,
+    last_ping_send: Arc<Mutex<Option<Instant>>>,
 
     /// Период с которым рассылать пинги
     ping_period: Duration,
@@ -94,7 +94,7 @@ struct ClusterNode
     votes_min_count: u32,
 
     /// За кого был отдан голос в новом цикле голосования
-    vote: Option<String>
+    vote: Arc<Mutex<Option<String>>>
 }
 
 #[allow(unused)]
@@ -104,8 +104,8 @@ impl ClusterNode {
             id: id.to_string(), 
             epoch: 0, 
             role: Arc::new(Mutex::new(Role::Follower)), 
-            last_ping_recieve: None, 
-            last_ping_send: None, 
+            last_ping_recieve: Arc::new(Mutex::new(None)), 
+            last_ping_send: Arc::new(Mutex::new(None)), 
             ping_period: Duration::from_secs(1), 
             lead: None, 
             heartbeat_timeout: Duration::from_secs(3), 
@@ -113,7 +113,7 @@ impl ClusterNode {
             nominate_max_delay: Duration::from_millis(500), 
             nodes: Arc::new(Mutex::new(vec![])), 
             votes_min_count: 1,
-            vote: None
+            vote: Arc::new(Mutex::new(None))
         }
     }
 }
@@ -141,7 +141,12 @@ impl NodeInstance for ClusterNode
         let _ = match role {
             Role::Leader => {                     
                 // рассылка пингов
-                let send_pings_now = self.last_ping_send.map(|prev_t| Instant::now().duration_since(prev_t) >= self.ping_period ).unwrap_or(true);
+                let mut last_ping_send = 
+                    { self.last_ping_send.lock().unwrap().clone() };
+
+                let send_pings_now = last_ping_send
+                    .map(|prev_t| Instant::now().duration_since(prev_t) >= self.ping_period ).unwrap_or(true);
+
                 if send_pings_now {
                     let nodes:Vec<Box<dyn NodeClient>> = {
                         let nodes = self.nodes.lock().unwrap();
@@ -151,7 +156,10 @@ impl NodeInstance for ClusterNode
                     };
 
                     let t0 = Instant::now();
-                    self.last_ping_send = Some(t0.clone());
+                    { 
+                        let mut last_ping_send = self.last_ping_send.lock().unwrap();
+                        *last_ping_send = Some(t0.clone());
+                    }               
 
                     let nodes_ping = join_all(nodes.iter().map(|c| c.ping( self.id.clone() ))).await;
                     let t1 = Instant::now();
@@ -169,13 +177,24 @@ impl NodeInstance for ClusterNode
             },
             Role::Follower => {
                 // Проверка наличия ping
-                // Если нет, то перейти в статус кандидата
-                let self_nominate = self.last_ping_recieve
-                .map(|t| Instant::now().duration_since(t) )
+                // Если нет, то перейти в статус кандидата                
+                // let self_nominate = {
+                //     let mut last_ping_recieve = 
+                //         self.last_ping_recieve.lock().unwrap().clone();
+
+                //     last_ping_recieve
+                //     .map(|t| Instant::now().duration_since(t) )
+                //     .map(|t| t > self.heartbeat_timeout )
+                //     .unwrap_or(false)
+                // };
+
+                let self_nominate = { self.last_ping_recieve.lock().unwrap().clone() 
+                }.map( |t| Instant::now().duration_since(t) )
                 .map(|t| t > self.heartbeat_timeout )
-                .unwrap_or(true);
+                .unwrap_or(false);
 
                 if self_nominate {
+                    info!("nominate {id}",id=self.id);
                     { *self.role.lock().unwrap() = Role::Follower }
 
                     let nodes:Vec<Box<dyn NodeClient>> = {
@@ -185,23 +204,29 @@ impl NodeInstance for ClusterNode
                         .collect()
                     };
 
+                    let t0 = Instant::now();
+
                     let res = join_all(nodes.iter().map(|c| c.nominate(self.epoch + 1, self.id.clone()))).await;
                     let succ_cnt = res.iter().fold(0usize, |acc,it| acc + match it {
                         Ok(_) => 1usize,
                         Err(_) => 0usize
                     });
 
+                    let t1 = Instant::now();
+
                     let win = succ_cnt >= self.votes_min_count as usize;
                     if win {
                         { *self.role.lock().unwrap() = Role::Leader }
                     }
 
-                    info!("Nominate {win} ok={succ_cnt} total={tot}", 
-                        tot=res.len(),
-                        win=match win {
-                            true => "Win",
-                            false => "Loose"
-                        }
+                    info!("nominated {id} with {win} ok={succ_cnt} total={tot} duration={dur:?}", 
+                        id  = self.id,
+                        tot = res.len(),
+                        win = match win {
+                              true  => "Win",
+                              false => "Loose"
+                        },
+                        dur = t1.duration_since(t0)
                     );
                 }
             }
@@ -216,7 +241,7 @@ impl NodeInstance for ClusterNode
 
 #[cfg(test)]
 mod test {
-    use futures::{TryFutureExt, join};
+    use futures::TryFutureExt;
 
     use super::*;
 
@@ -265,7 +290,10 @@ mod test {
                 let mut me = self.consumer.lock().unwrap();
                 info!("mock: send ping to {} from {}", &me.id, &from );
     
-                me.last_ping_recieve = Some(Instant::now());
+                {
+                    let mut last_ping_recieve = me.last_ping_recieve.lock().unwrap();
+                    *last_ping_recieve = Some(Instant::now());
+                }
                 self.log.lock().unwrap().push(LogEntry::Ping { client_id: me.id.clone(), from: from.clone() });
                 Ok(1u64)
             }.await
@@ -287,14 +315,16 @@ mod test {
                 }
 
                 // Уже проголосовал
-                if me.vote.is_some() {
-                    info!("mock: nominate epoch {epoch} candidate {id0} - already matched, me {m}", 
+                let vote = { me.vote.lock().unwrap().clone() };
+                info!("mock {}: nominate {} cur vote {:?}", me.id, candidate, vote);
+                if vote.is_some() {
+                    info!("mock {m}: nominate epoch {epoch} candidate {id0} - already matched", 
                         id0=candidate.clone(),
                         m=me.id
                     );
                     self.log.lock().unwrap().push(LogEntry::Nominame { client_id: me.id.clone(), epoch: epoch, candidate: candidate.clone(), succ: false });
                     return Err(RErr::AlreadVoted { 
-                        nominant: me.vote.as_ref().map(|c| c.clone()).unwrap() 
+                        nominant: vote.as_ref().map(|c| c.clone()).unwrap() 
                     });
                 }
 
@@ -310,14 +340,28 @@ mod test {
                 let dur = dur_disp + mic0.min(mic1);
                 let dur = Duration::from_micros(dur as u64);
 
+                //info!("mock {}: duration {:?}", me.id, dur);
+
                 Ok(dur)
-            }.map_ok(|d| sleep(d))
+            }.map_ok(|d| {
+                let d = d.clone();
+                async move { 
+                    //info!("mock {}: sleep", self.consumer.lock().unwrap().id);
+                    sleep(d).await;
+                }
+            })
             .map_ok(|sleeping| async {
                 sleeping.await;
-                let mut me = self.consumer.lock().unwrap();
-                me.vote = Some(candidate.clone());
 
-                info!("mock: nominate epoch {epoch} candidate {id0} - voted, me {m}", 
+                let me = self.consumer.lock().unwrap();
+
+                {
+                    let mut vote = me.vote.lock().unwrap();
+                    *vote = Some(candidate.clone());
+                }
+                //me.vote = Some(candidate.clone());
+
+                info!("mock {m}: nominate epoch {epoch} candidate {id0} - voted", 
                     id0=candidate.clone(), m=&me.id
                 );
                 self.log.lock().unwrap().push(
@@ -344,8 +388,22 @@ mod test {
         }
     }    
 
+    /// Тест
+    /// 
+    /// 3 участника
+    /// - node0 Leader
+    /// - node1 Follower
+    /// - node2 Follower
+    /// 
+    /// Должно
+    /// 1. Лидер рассылает ping
+    /// 2. Лидер перестает рассылать ping
+    /// 3. Остальные участники голосуют
+    /// 4. Выбираеться новый лидер
+    /// 5. Лидер рассылает ping
+    /// 
     #[test]
-    fn ping_send_test() {
+    fn election_test() {
         use env_logger;
         let _ = env_logger::builder().filter_level(log::LevelFilter::max()).is_test(true).try_init();
 
@@ -396,29 +454,37 @@ mod test {
 
                     if t_dur >= Duration::from_secs(10) { break; }
 
-                    info!("cycle {cycle}");
+                    info!("== cycle {cycle} ==");
 
                     if cycle == 3 { node0c.force_role(Role::Follower) }
 
                     // call on_timer   
 
-                    info!("node0 {:?}", {node0c.lock().unwrap().role.lock().unwrap() });
-                    {
+                    let mut w0 = {
                         let node = node0c.lock().unwrap();
                         node.clone()
-                    }.on_timer().await;
+                    };
 
-                    info!("node1 {:?}", {node1c.lock().unwrap().role.lock().unwrap() });
-                    {
+                    let mut w1 = {
                         let node = node1c.lock().unwrap();
                         node.clone()
-                    }.on_timer().await;
+                    };
 
-                    info!("node2 {:?}", {node2c.lock().unwrap().role.lock().unwrap() });
-                    {
+                    let mut w2 = {
                         let node = node2c.lock().unwrap();
                         node.clone()
-                    }.on_timer().await
+                    };
+
+                    join_all(vec![w0.on_timer(), w1.on_timer(), w2.on_timer()]).await;
+
+                    for nc in vec![ node0c.clone(), node1c.clone(), node2c.clone() ] {
+                        let nc = nc.lock().unwrap();
+                        println!("{nid} role={role:?} vote={vote:?}", 
+                            nid  = nc.id, 
+                            role = nc.role.lock().unwrap().clone(),
+                            vote = { nc.vote.lock().unwrap().clone() },
+                        );
+                    }
                 }
             });
             
