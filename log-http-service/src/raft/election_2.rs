@@ -10,6 +10,8 @@ use super::bg_tasks::*;
 use async_trait::async_trait;
 
 type NodeID = String;
+type EpochID = u32;
+type RID = u32;
 
 #[derive(Clone)]
 struct ClusterNode
@@ -18,7 +20,7 @@ struct ClusterNode
     id: NodeID,
 
     /// Номер эпохи
-    epoch: u32,
+    epoch: EpochID,
 
     /// роль
     role: Role,
@@ -56,7 +58,7 @@ struct ClusterNode
 
 #[async_trait]
 trait NodeClient: Send+Sync {
-    async fn ping( &self, leader:NodeID ) -> Result<(),RErr>;
+    async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<(),RErr>;
     async fn nominate( &self, candidate:NodeID, epoch:u32, ) -> Result<(),RErr>;
 }
 
@@ -89,37 +91,44 @@ impl NodeWorker for NodeInstance {
         let self_nominate = || async {
             info!("self_nominate calling");
 
-            let mut node = self.node.lock().await;
+            let t_0 = Instant::now();
 
-            node.role = Role::Candidate;
+            let (clients, nid, epoch) = {
+                let mut node = self.node.lock().await;
+                node.role = Role::Candidate;
+                (node.nodes.clone(), node.id.clone(), node.epoch)
+            };
 
-            info!("call clients start");
-
-            let clients = join_all(
-                node.nodes.iter().map(|nc| 
-                nc.lock().await.nominate(
-                    node.id.clone(),
-                    node.epoch+1,
-                )
-            )).await;
+            info!("{nid} self_nominate call clients start");
 
             // TODO тут должна быть проверка что на текущем сроке была или нет заявка
             // Рассылаем свою кандидатуру
-            let clients = join_all(
-                node.nodes.iter().map(|nc| 
-                nc.lock()
-            )).await;
-            info!("call clients end");
+            let votes = {
+                let clients = join_all(
+                    clients.iter().map(|nc| 
+                    nc.lock()
+                )).await;
 
-            let votes = join_all(
-                clients.iter().map(|nc|
-                    nc.nominate(
-                        node.id.clone(),
-                        node.epoch+1,
+                info!("{nid} self_nominate call clients locked");
+
+                join_all(
+                    clients.iter().map(|nc|
+                        nc.nominate(
+                            nid.clone(),
+                            epoch+1,
+                        )
                     )
-                )
-            ).await;
-            
+                ).await
+
+                // Vec::<Result<(),RErr>>::new()
+            };
+
+            let t_1 = Instant::now();
+
+            info!("{nid} self_nominate call clients called, time {time:?}",
+                time = t_1.duration_since(t_0)
+            );
+
             // Кол-во голосов для успеха должно быть больше или равно минимума
             let total_requests_count = votes.len();
             let succ_request_count = votes.iter().fold(
@@ -130,13 +139,16 @@ impl NodeWorker for NodeInstance {
                 }
             );
 
-            if node.votes_min_count as usize >= succ_request_count {
-                State::WinNomination { 
-                    votes: succ_request_count,
-                    epoch: node.epoch+1,
+            {
+                let node = self.node.lock().await;
+                if succ_request_count >= node.votes_min_count as usize {
+                    State::WinNomination { 
+                        votes: succ_request_count,
+                        epoch: epoch+1,
+                    }
+                } else {
+                    State::LooseNomination { votes: succ_request_count, total: total_requests_count }
                 }
-            } else {
-                State::LooseNomination { votes: succ_request_count, total: total_requests_count }
             }
         };
 
@@ -155,7 +167,7 @@ impl NodeWorker for NodeInstance {
                 )).await;
                 
                 let pings = join_all(clients.iter().map(|nc|
-                    nc.ping(node.id.clone())
+                    nc.ping(node.id.clone(), node.epoch, 0)
                 )).await;
 
                 let total_requests_count = pings.len();
@@ -167,8 +179,8 @@ impl NodeWorker for NodeInstance {
                     }
                 );
 
-                info!("{n} Leader on_timer, {succ}/{tot}",
-                    n = node.id,
+                info!("{nid} Leader on_timer, {succ}/{tot}",
+                    nid = node.id,
                     succ = succ_request_count,
                     tot = total_requests_count,
                 );                    
@@ -178,21 +190,31 @@ impl NodeWorker for NodeInstance {
         };
 
         let follower_state = || async {
-            let mut node = self.node.lock().await;
-            match node.last_ping_recieve {
+            //let mut node = self.node.lock().await;
+            let (last_ping_recieve_opt,nid) = {
+                let node = self.node.lock().await;
+                ( node.last_ping_recieve.clone(), node.id.clone() )
+            };
+            match last_ping_recieve_opt {
                 None => {
+                    let mut node = self.node.lock().await;
                     node.last_ping_recieve = Some(Instant::now());
-                    info!("assign last_ping_recieve");
+                    info!("{nid} assign last_ping_recieve");
                     State::End
                 },
                 Some( last_ping_recieve ) => {
-                    info!("assigned last_ping_recieve");
+                    info!("{nid} assigned last_ping_recieve");
+                    
+                    let heartbeat_timeout = { 
+                        self.node.lock().await.heartbeat_timeout.clone() 
+                    };
+
                     // Превышен интервал ?
                     let timeout = Instant::now().duration_since(last_ping_recieve);
                     let self_nominate_now =
-                        timeout >= node.heartbeat_timeout;
+                        timeout >= heartbeat_timeout;
 
-                    info!("timeout {timeout:?} self_nominate_now {self_nominate_now}");
+                    info!("{nid} timeout {timeout:?} self_nominate_now {self_nominate_now}");
 
                     if self_nominate_now {
                         self_nominate().await
@@ -231,10 +253,15 @@ impl NodeWorker for NodeInstance {
                     let mut node = self.node.lock().await;
                     node.role = Role::Leader;
                     node.epoch = epoch;
-                    info!("Win in nomination with {votes} votes")
+                    info!("{nid} Win in nomination with {votes} votes, epoch {epoch}",
+                        nid = node.id
+                    )
                 },
                 State::LooseNomination {votes, total} => {
-                    info!("Loose in nomination with {votes} votes in {total} total votes")
+                    let node = self.node.lock().await;
+                    info!("{nid} Loose in nomination with {votes} votes in {total} total votes",
+                        nid = node.id
+                    )
                 }
             }
 
@@ -245,13 +272,15 @@ impl NodeWorker for NodeInstance {
 
 #[cfg(test)]
 mod test {
+    use rand::seq::SliceRandom;
+
     use super::*;
 
     #[derive(Clone)]
     struct NodeClientMockCheck(Arc<Mutex<ClusterNode>>);
     #[async_trait]
     impl NodeClient for NodeClientMockCheck {
-        async fn ping( &self, leader:NodeID ) -> Result<(),RErr> {
+        async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<(),RErr> {
             async { 
                 let mut me = self.0.lock().await;
                 me.epoch += 1;
@@ -312,7 +341,7 @@ mod test {
 
                     for nc in &n.nodes {
                         let nc = nc.lock().await;
-                        let _ = nc.ping(n.id.clone()).await;
+                        let _ = nc.ping(n.id.clone(), 0, 0).await;
                     }
 
                     ()
@@ -339,7 +368,7 @@ mod test {
 
     #[async_trait]
     impl NodeClient for NodeClientMock {
-        async fn ping( &self, leader:NodeID ) -> Result<(),RErr> {
+        async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<(),RErr> {
             let mut node = self.0.lock().await;
             node.last_ping_recieve = Some(Instant::now());
 
@@ -366,6 +395,7 @@ mod test {
 
             sleep(random_between(node.nominate_min_delay.clone(), node.nominate_max_delay.clone())).await;
 
+            node.vote = Some(candidate.clone());
             Ok(())
         }
     }
@@ -390,10 +420,17 @@ mod test {
             vote: None,
             nodes: vec![]
         };
-        let node1 = node0.clone();
-        let node2 = node0.clone();
-        let node3 = node0.clone();
-        let node4 = node0.clone();
+        let mut node1 = node0.clone(); 
+        node1.id = "node1".to_string();
+
+        let mut node2 = node0.clone();
+        node2.id = "node2".to_string();
+
+        let mut node3 = node0.clone();
+        node3.id = "node3".to_string();
+
+        let mut node4 = node0.clone();
+        node4.id = "node4".to_string();
 
         let node0 = NodeInstance { node: Arc::new(Mutex::new(node0)) };
         let node1 = NodeInstance { node: Arc::new(Mutex::new(node1)) };
@@ -411,12 +448,22 @@ mod test {
 
         let cycle_no = Arc::new(Mutex::new(0));
         System::new().block_on(async move {
+            let leaders_count_max = Arc::new(Mutex::new(0));
+            let leaders_count_max2 = leaders_count_max.clone();
+
             // link nodes
             for node in &nodes {
-                for target in &nodes {
+                for target in &nodes {                    
                     let nc = NodeClientMock(target.node.clone());
+                    let target_id = target.node.lock().await.id.clone();
                     let mut node = node.node.lock().await;
-                    node.nodes.push(Arc::new(Mutex::new(nc)));
+                    if target_id != node.id {
+                        println!("link {from} to {to}",
+                            from = node.id,
+                            to = target_id,
+                        );
+                        node.nodes.push(Arc::new(Mutex::new(nc)));
+                    }
                 }
             }
 
@@ -424,18 +471,51 @@ mod test {
             let mut bg = bg_job_async( move || {
                 let cycle_no = cycle_no.clone();
                 let mut nodes = nodes.clone();
+                let leaders_count_max = leaders_count_max.clone();
                 async move {
                     let mut cycle_no = cycle_no.lock().await;
                     *cycle_no += 1;
                     println!("\n== {cycle} ==", cycle=cycle_no);
 
+                    {
+                        let mut rng = rand::thread_rng();
+                        nodes.shuffle(&mut rng);
+                    }
+
                     join_all(nodes.iter_mut().map(|n| n.on_timer())).await;
+
+                    let mut leaders_count = 0;
+                    for node in nodes {
+                        let node = node.node.lock().await;
+                        println!("{nid} {role:?}",
+                            nid = node.id,
+                            role = node.role
+                        );
+
+                        if let Role::Leader = node.role {
+                            leaders_count += 1;
+                        }                        
+                    }
+
+                    let mut leaders_count_max = leaders_count_max.lock().await;
+                    *leaders_count_max = leaders_count_max.max(leaders_count);
+
+                    println!();
                 }
             });
             bg.set_duration(Duration::from_millis(1000));
 
             let _ = bg.start();
             sleep(Duration::from_secs(10)).await;
+
+            println!("");
+            let leaders_count_max = leaders_count_max2.clone();
+            async move {
+                let leaders_count_max = leaders_count_max.lock().await;
+                println!("leaders_count_max {cnt}", cnt=leaders_count_max)
+            }.await;
+
+            println!("");
         });
     }
 }
