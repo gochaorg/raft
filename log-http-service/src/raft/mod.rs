@@ -99,7 +99,14 @@
 //! а значит фоловеры, коммитящие в последующих сроках запись по индексу N, будут коммитить то же самое значение.
 
 /// реализация алгоритма выбора
-mod election;
+mod election_1;
+mod election_2;
+
+mod rand_duration;
+pub use rand_duration::*;
+
+mod domain;
+pub use domain::*;
 
 /// Фоновые задачи
 pub mod bg_tasks;

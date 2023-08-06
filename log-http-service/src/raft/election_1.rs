@@ -19,37 +19,12 @@ use std::fmt::Debug;
 #[allow(unused)]
 use rand::prelude::*;
 
-/// Ошибки
-#[allow(dead_code)]
-enum RErr {
-    /// Нет ответа
-    ReponseTimeout,
-
-    /// Номер эпохи не совпаддает с ожидаемым
-    EpochNotMatch {
-        expect: u32,
-        actual: u32,
-    },
-
-    /// Уже проголосовал
-    AlreadVoted {
-        nominant: String
-    }
-}
+use super::*;
 
 /// Идентификатор последней записи в логе
 type RID = u64;
 
 type NodeID = String;
-
-/// Роль
-#[derive(Clone,Debug)]
-#[allow(unused)]
-enum Role {
-    Follower,
-    Candidate,
-    Leader
-}
 
 /// Узел кластера
 #[derive(Clone,Debug)]

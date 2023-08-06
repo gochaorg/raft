@@ -1,5 +1,5 @@
-use std::{time::Duration, sync::{Arc, Mutex, atomic::AtomicUsize}, thread::JoinHandle};
-use actix_rt::{task::JoinHandle as AsyncJoinHandle};
+use std::{time::Duration, sync::{Arc, Mutex}, thread::JoinHandle};
+use actix_rt::task::JoinHandle as AsyncJoinHandle;
 use futures::Future;
 use log;
 
@@ -8,8 +8,6 @@ pub struct BgJob<F,H>
 {
     /// Управление асинхронной задачей
     handle: Option<H>, 
-
-    //handle_for_drop: Option<Box<dyn FnOnce()>>,
 
     /// Задержка между повторным выполнением
     throttling: Duration,
@@ -22,21 +20,18 @@ pub struct BgJob<F,H>
 
     name: Option<String>,
 }
-
 pub enum BgErr {
     AlreadyRunning
 }
 
-pub fn bg_job<Fu,R>( work: Fu ) -> BgJob<Fu, AsyncJoinHandle<()>> 
+/// Создание асинхронной фоновой периодичной задачи
+pub fn bg_job_async<Fu,R>( work: Fu ) -> BgJob<Fu, AsyncJoinHandle<()>> 
     where
-        //Fu: FnMut() -> R,
-        Fu: Fn() -> R,
-        //Fu: FnOnce() -> R,
+        Fu: Fn() -> R,        
         R: Future<Output = ()>
 {    
     BgJob { 
         handle: None, 
-        //handle_for_drop: None,
         throttling: Duration::from_millis(100), 
         stop_signal: Arc::new(Mutex::new(false)), 
         job: work,
@@ -44,13 +39,13 @@ pub fn bg_job<Fu,R>( work: Fu ) -> BgJob<Fu, AsyncJoinHandle<()>>
     }
 }
 
-pub fn bg_job2<Fu>( work: Fu ) -> BgJob<Fu, JoinHandle<()>> 
+/// Создание синхронной фоновой периодичной задачи - создается отдельный поток
+pub fn bg_job_sync<Fu>( work: Fu ) -> BgJob<Fu, JoinHandle<()>> 
     where
         Fu: Fn()
 {
     BgJob { 
         handle: None, 
-        //handle_for_drop: None,
         throttling: Duration::from_millis(100), 
         stop_signal: Arc::new(Mutex::new(false)), 
         job: work,
@@ -60,14 +55,17 @@ pub fn bg_job2<Fu>( work: Fu ) -> BgJob<Fu, JoinHandle<()>>
 
 impl<F,H> BgJob<F,H> 
 {
+    /// Указывает задержку перед запуском задачи
     pub fn set_duration( &mut self, value:Duration ) {
         self.throttling = value;
     }
 
+    /// Указывает имя задачи
     pub fn set_name( &mut self, name:&str ) {
         self.name = Some(name.to_string());
     }
 
+    /// Посылает сигнал для завершения задачи
     pub fn stop_signal( &mut self ) {
         log::info!("stop_signal");
 
@@ -90,6 +88,7 @@ impl<F,H> BgJob<F,H>
 where
     H: StopHandle
 {
+    /// Проверяет что фоновая задача выполняется или будет запущена
     pub fn is_running( &self ) -> bool { 
         match &self.handle {
             Some(handle) => { ! handle.is_finished() },
@@ -110,6 +109,7 @@ where
     F: 'static,
     R: Future<Output = ()>
 {
+    /// Запук периодичного выполнения фоновой задачи
     fn start( &mut self ) -> Result<(),BgErr> {
         use actix_rt::{spawn, time::sleep};
 
@@ -165,17 +165,23 @@ where
 fn test_bg_async() {
     use actix_rt::System;
     use actix_rt::time::sleep;
+    use std::sync::atomic::AtomicUsize;
 
     let _ = env_logger::builder().filter_level(log::LevelFilter::max()).is_test(true).try_init();
 
+    let cnt_run = Arc::new(AtomicUsize::new(0));
+    let cnt_run2 = cnt_run.clone();
     System::new().block_on( async move {
-        let cnt_run = Arc::new(tokio::sync::Mutex::new(0));
-        //let cnt_run = Box::pin( cnt_run);
+        let job = move || {
+            cnt_run.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            async { 
+                log::info!("do some work");
+            }
+        };
 
-        let mut bg = bg_job(  || async move { 
-            //cnt_run.lock().await;
-            log::info!("do some work");
-        });
+        //let mut bg = BgJob::fromz(job);
+        let mut bg = bg_job_async(job);            
+
         bg.set_duration(Duration::from_millis(1000));
         bg.set_name("test");
 
@@ -185,7 +191,11 @@ fn test_bg_async() {
         bg.stop_signal();
 
         sleep(Duration::from_secs(2)).await;
-    })
+    });
+
+    let cnt = cnt_run2.fetch_and(0, std::sync::atomic::Ordering::SeqCst);
+    println!("run count {cnt}" );
+    assert!( cnt > 2usize );
 }
 
 impl StopHandle for JoinHandle<()> {
@@ -260,7 +270,7 @@ impl<F,H> Drop for BgJob<F,H> {
 fn test_bg() {
     use std::thread::sleep;
 
-    let mut bg = bg_job2( || {
+    let mut bg = bg_job_sync( || {
         println!("do some work native")
     });
     bg.set_duration(Duration::from_secs(1));
