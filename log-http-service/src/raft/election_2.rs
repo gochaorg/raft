@@ -78,21 +78,38 @@ trait NodeWorker {
 #[async_trait]
 impl NodeWorker for NodeInstance {
     async fn on_timer(&mut self) {
-        enum Post {
+        enum State {
+            // Start,
             End,
-            WinNomination { votes:usize, epoch:u32 }
+            WinNomination { votes:usize, epoch:u32 },
+            LooseNomination { votes:usize, total: usize },
         }
 
+        // выдвижения себя как кандидата
         let self_nominate = || async {
+            info!("self_nominate calling");
+
             let mut node = self.node.lock().await;
 
             node.role = Role::Candidate;
 
+            info!("call clients start");
+
+            let clients = join_all(
+                node.nodes.iter().map(|nc| 
+                nc.lock().await.nominate(
+                    node.id.clone(),
+                    node.epoch+1,
+                )
+            )).await;
+
             // TODO тут должна быть проверка что на текущем сроке была или нет заявка
             // Рассылаем свою кандидатуру
-            let clients = join_all(node.nodes.iter().map(|nc| 
+            let clients = join_all(
+                node.nodes.iter().map(|nc| 
                 nc.lock()
             )).await;
+            info!("call clients end");
 
             let votes = join_all(
                 clients.iter().map(|nc|
@@ -114,118 +131,114 @@ impl NodeWorker for NodeInstance {
             );
 
             if node.votes_min_count as usize >= succ_request_count {
-                Post::WinNomination { 
+                State::WinNomination { 
                     votes: succ_request_count,
                     epoch: node.epoch+1,
                 }
             } else {
-                Post::End
+                State::LooseNomination { votes: succ_request_count, total: total_requests_count }
             }
         };
-            
-        let post = {
+
+        // Рассылка пингов
+        let leader_ping = || async {
             let mut node = self.node.lock().await;
-            match node.role {
-                Role::Leader => {
-                    // рассылка пингов
-                    let send_pings_now =
-                        node.last_ping_send.map(|t| 
-                            Instant::now().duration_since(t) >= node.ping_period
-                        ).unwrap_or(true);
 
-                    if send_pings_now {
-                        let clients = join_all(node.nodes.iter().map(|nc| 
-                            nc.lock()
-                        )).await;
-                        
-                        let pings = join_all(clients.iter().map(|nc|
-                            nc.ping(node.id.clone())
-                        )).await;
+            let send_pings_now =
+                node.last_ping_send.map(|t| 
+                    Instant::now().duration_since(t) >= node.ping_period
+                ).unwrap_or(true);
 
-                        let total_requests_count = pings.len();
-                        let succ_request_count = pings.iter().fold(
-                            0usize, |acc,it| 
-                            acc + match it {
-                                Ok(_) => 1,
-                                Err(_) => 0
-                            }
-                        );
+            if send_pings_now {
+                let clients = join_all(node.nodes.iter().map(|nc| 
+                    nc.lock()
+                )).await;
+                
+                let pings = join_all(clients.iter().map(|nc|
+                    nc.ping(node.id.clone())
+                )).await;
 
-                        info!("{n} Leader on_timer, {succ}/{tot}",
-                            n = node.id,
-                            succ = succ_request_count,
-                            tot = total_requests_count,
-                        );                    
-                    };
-
-                    Post::End
-                },
-                Role::Follower => {
-                    match node.last_ping_recieve {
-                        None => {
-                            node.last_ping_recieve = Some(Instant::now());
-                            Post::End
-                        },
-                        Some( last_ping_recieve ) => {
-                            // Превышен интервал ?
-                            if Instant::now().duration_since(last_ping_recieve) > node.heartbeat_timeout {
-                                self_nominate().await
-                                // node.role = Role::Candidate;
-
-                                // // TODO тут должна быть проверка что на текущем сроке была или нет заявка
-                                // // Рассылаем свою кандидатуру
-                                // let clients = join_all(node.nodes.iter().map(|nc| 
-                                //     nc.lock()
-                                // )).await;
-
-                                // let votes = join_all(
-                                //     clients.iter().map(|nc|
-                                //         nc.nominate(
-                                //             node.id.clone(),
-                                //             node.epoch+1,
-                                //         )
-                                //     )
-                                // ).await;
-                                
-                                // // Кол-во голосов для успеха должно быть больше или равно минимума
-                                // let total_requests_count = votes.len();
-                                // let succ_request_count = votes.iter().fold(
-                                //     0usize, |acc,it| 
-                                //     acc + match it {
-                                //         Ok(_) => 1,
-                                //         Err(_) => 0
-                                //     }
-                                // );
-
-                                // if node.votes_min_count as usize >= succ_request_count {
-                                //     Post::WinNomination { 
-                                //         votes: succ_request_count,
-                                //         epoch: node.epoch+1,
-                                //     }
-                                // } else {
-                                //     Post::End
-                                // }
-                            } else {
-                                Post::End
-                            }
-                        }
+                let total_requests_count = pings.len();
+                let succ_request_count = pings.iter().fold(
+                    0usize, |acc,it| 
+                    acc + match it {
+                        Ok(_) => 1,
+                        Err(_) => 0
                     }
+                );
+
+                info!("{n} Leader on_timer, {succ}/{tot}",
+                    n = node.id,
+                    succ = succ_request_count,
+                    tot = total_requests_count,
+                );                    
+            };
+
+            State::End
+        };
+
+        let follower_state = || async {
+            let mut node = self.node.lock().await;
+            match node.last_ping_recieve {
+                None => {
+                    node.last_ping_recieve = Some(Instant::now());
+                    info!("assign last_ping_recieve");
+                    State::End
                 },
-                Role::Candidate => { 
-                    self_nominate().await
-                    // Post::End 
+                Some( last_ping_recieve ) => {
+                    info!("assigned last_ping_recieve");
+                    // Превышен интервал ?
+                    let timeout = Instant::now().duration_since(last_ping_recieve);
+                    let self_nominate_now =
+                        timeout >= node.heartbeat_timeout;
+
+                    info!("timeout {timeout:?} self_nominate_now {self_nominate_now}");
+
+                    if self_nominate_now {
+                        self_nominate().await
+                    } else {
+                        State::End
+                    }
                 }
             }
         };
 
-        match post {
-            Post::End => {},
-            Post::WinNomination { votes, epoch } => {
-                let mut node = self.node.lock().await;
-                node.role = Role::Leader;
-                node.epoch = epoch;
-                info!("Win in nomination with {votes} votes")
+        let mut state = State::End;        
+            
+        loop {
+            state = {
+                let role = { 
+                    self.node.lock().await.role.clone()
+                };
+
+                match role {
+                    Role::Leader => {
+                        leader_ping().await
+                    },
+                    Role::Follower => {
+                        follower_state().await
+                    },
+                    Role::Candidate => { 
+                        sleep(random_between(Duration::from_millis(50),Duration::from_millis(500))).await;
+                        self_nominate().await
+                    }
+                }
+            };
+
+            match state {
+                State::End => {},
+                State::WinNomination { votes, epoch } => {
+                    let mut node = self.node.lock().await;
+                    node.role = Role::Leader;
+                    node.epoch = epoch;
+                    info!("Win in nomination with {votes} votes")
+                },
+                State::LooseNomination {votes, total} => {
+                    info!("Loose in nomination with {votes} votes in {total} total votes")
+                }
             }
+
+            break;
         }
     }
 }
@@ -329,10 +342,100 @@ mod test {
         async fn ping( &self, leader:NodeID ) -> Result<(),RErr> {
             let mut node = self.0.lock().await;
             node.last_ping_recieve = Some(Instant::now());
+
+            info!("{n} {role:?} accept ping",
+                n = node.id,
+                role = node.role
+            );
             Ok(())
         }
-        async fn nominate( &self, _candidate:NodeID, _epoch:u32 ) -> Result<(),RErr> {
+        async fn nominate( &self, candidate:NodeID, epoch:u32 ) -> Result<(),RErr> {
+            let mut node = self.0.lock().await;
+
+            info!("{n} {role:?} accept nominate, candidate={candidate}, epoch={epoch}", 
+                n=node.id,
+                role=node.role
+            );
+
+            // Голос уже отдан
+            if node.vote.is_some() {
+                let vote = node.vote.clone();
+                let vote = vote.unwrap();
+                return Err(RErr::AlreadVoted { nominant: vote });
+            }
+
+            sleep(random_between(node.nominate_min_delay.clone(), node.nominate_max_delay.clone())).await;
+
             Ok(())
         }
+    }
+
+    #[test]
+    fn main_cycle() {
+        use env_logger;
+        let _ = env_logger::builder().filter_level(log::LevelFilter::max()).is_test(true).try_init();
+
+        let node0 = ClusterNode {
+            id: "node0".to_string(),
+            epoch: 0,
+            role: Role::Follower,
+            lead: None,
+            last_ping_recieve: None,
+            last_ping_send: None,        
+            ping_period: Duration::from_secs(1),
+            heartbeat_timeout: Duration::from_secs(3),
+            nominate_min_delay: Duration::from_millis(50),
+            nominate_max_delay: Duration::from_millis(500),
+            votes_min_count: 3,
+            vote: None,
+            nodes: vec![]
+        };
+        let node1 = node0.clone();
+        let node2 = node0.clone();
+        let node3 = node0.clone();
+        let node4 = node0.clone();
+
+        let node0 = NodeInstance { node: Arc::new(Mutex::new(node0)) };
+        let node1 = NodeInstance { node: Arc::new(Mutex::new(node1)) };
+        let node2 = NodeInstance { node: Arc::new(Mutex::new(node2)) };
+        let node3 = NodeInstance { node: Arc::new(Mutex::new(node3)) };
+        let node4 = NodeInstance { node: Arc::new(Mutex::new(node4)) };
+
+        let nodes = vec![
+            node0.clone(),
+            node1.clone(),
+            node2.clone(),
+            node3.clone(),
+            node4.clone(),
+        ];
+
+        let cycle_no = Arc::new(Mutex::new(0));
+        System::new().block_on(async move {
+            // link nodes
+            for node in &nodes {
+                for target in &nodes {
+                    let nc = NodeClientMock(target.node.clone());
+                    let mut node = node.node.lock().await;
+                    node.nodes.push(Arc::new(Mutex::new(nc)));
+                }
+            }
+
+            // bg job
+            let mut bg = bg_job_async( move || {
+                let cycle_no = cycle_no.clone();
+                let mut nodes = nodes.clone();
+                async move {
+                    let mut cycle_no = cycle_no.lock().await;
+                    *cycle_no += 1;
+                    println!("\n== {cycle} ==", cycle=cycle_no);
+
+                    join_all(nodes.iter_mut().map(|n| n.on_timer())).await;
+                }
+            });
+            bg.set_duration(Duration::from_millis(1000));
+
+            let _ = bg.start();
+            sleep(Duration::from_secs(10)).await;
+        });
     }
 }
