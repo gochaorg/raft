@@ -53,13 +53,28 @@ mod test {
         let node3 = node0.clone();
         let node4 = node0.clone();
 
-        let node0 = NodeInstance { node: Arc::new(AsyncMutex::new(node0)) };
-        let node1 = NodeInstance { node: Arc::new(AsyncMutex::new(node1)) };
+        let node0 = NodeInstance { 
+            node: Arc::new(AsyncMutex::new(node0)),
+            changes: DummyNodeChanges()
+        };
+        let node1 = NodeInstance { 
+            node: Arc::new(AsyncMutex::new(node1)),
+            changes: DummyNodeChanges()
+        };
         let node1c = node1.clone();
 
-        let node2 = NodeInstance { node: Arc::new(AsyncMutex::new(node2)) };
-        let node3 = NodeInstance { node: Arc::new(AsyncMutex::new(node3)) };
-        let node4 = NodeInstance { node: Arc::new(AsyncMutex::new(node4)) };    
+        let node2 = NodeInstance { 
+            node: Arc::new(AsyncMutex::new(node2)),
+            changes: DummyNodeChanges()
+        };
+        let node3 = NodeInstance { 
+            node: Arc::new(AsyncMutex::new(node3)),
+            changes: DummyNodeChanges()
+        };
+        let node4 = NodeInstance { 
+            node: Arc::new(AsyncMutex::new(node4)),
+            changes: DummyNodeChanges()
+        };
 
         let node0c = node0.clone();
 
@@ -201,7 +216,10 @@ mod test {
     #[async_trait]
     impl NodeClient for NodeClientMock {
         async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<(),RErr> {
-            let ni = NodeInstance { node: self.0.clone() };
+            let ni = NodeInstance { 
+                node: self.0.clone(),
+                changes: DummyNodeChanges(),
+            };
             ni.ping(leader, epoch, rid).await
         }
         async fn nominate( &self, candidate:NodeID, epoch:u32 ) -> Result<(),RErr> {
@@ -231,7 +249,8 @@ mod test {
     /// 1. 5 участников стартуют как Follower (те 0 Leaders)
     /// 2. спустя время выбирают одного лидера
     /// 3. лидер после рассылает ping с новым номером эпохи
-    /// 4. остальные участники 
+    /// 4. остальные участники меняют номер эпохи
+    /// 5. остальные участники меняют лидера на выбронного
     #[test]
     fn main_cycle() {
         use env_logger;
@@ -264,11 +283,26 @@ mod test {
         let mut node4 = node0.clone();
         node4.id = "node4".to_string();
 
-        let node0 = NodeInstance { node: Arc::new(AsyncMutex::new(node0)) };
-        let node1 = NodeInstance { node: Arc::new(AsyncMutex::new(node1)) };
-        let node2 = NodeInstance { node: Arc::new(AsyncMutex::new(node2)) };
-        let node3 = NodeInstance { node: Arc::new(AsyncMutex::new(node3)) };
-        let node4 = NodeInstance { node: Arc::new(AsyncMutex::new(node4)) };
+        let node0 = NodeInstance { 
+            node: Arc::new(AsyncMutex::new(node0)),
+            changes: DummyNodeChanges()
+        };
+        let node1 = NodeInstance { 
+            node: Arc::new(AsyncMutex::new(node1)),
+            changes: DummyNodeChanges()
+        };
+        let node2 = NodeInstance { 
+            node: Arc::new(AsyncMutex::new(node2)),
+            changes: DummyNodeChanges()
+        };
+        let node3 = NodeInstance { 
+            node: Arc::new(AsyncMutex::new(node3)),
+            changes: DummyNodeChanges()
+        };
+        let node4 = NodeInstance { 
+            node: Arc::new(AsyncMutex::new(node4)),
+            changes: DummyNodeChanges()
+        };
 
         let nodes = vec![
             node0.clone(),
@@ -345,13 +379,14 @@ mod test {
 
             // Проверка результатов
             {
-                let log = log.lock().unwrap();
-                for e in log.iter() {
-                    println!("{e:?}")
+                let log = log.cycles();
+                for es in log.iter() {
+                    println!("{:?}", es.node_states())
                 }
             }
 
             // 5 участников стартуют как Follower (те 0 Leaders)
+            // спустя время выбирают одного лидера
             let leaders_matched = log.state_changes_match(|n| n.leaders, vec![0,1]);
             assert!(leaders_matched,"leaders_matched");
 

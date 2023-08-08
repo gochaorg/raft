@@ -46,7 +46,7 @@ pub struct ClusterNode
     pub role: Role,
 
     /// Ссылка на лидера
-    pub lead: Option<String>,
+    pub lead: Option<NodeID>,
 
     /// Время последнего принятого пинга
     pub last_ping_recieve: Option<Instant>,
@@ -70,18 +70,33 @@ pub struct ClusterNode
     pub votes_min_count: u32,
 
     /// За кого был отдан голос в новом цикле голосования
-    pub vote: Option<String>,
+    pub vote: Option<NodeID>,
 
     /// Остальные участники
     pub nodes: Vec<Arc<Mutex<dyn NodeClient>>>,
 }
 
-pub struct NodeInstance {
-    pub node: Arc<Mutex<ClusterNode>>
+pub trait NodeChanges:Clone {
+    fn id( &self, from:Option<NodeID>, to:Option<NodeID> ) {}
+    fn last_ping_recieve( &self, from:Option<Instant>, to:Option<Instant> ) {}
+    fn last_ping_send( &self, from:Option<Instant>, to:Option<Instant> ) {}
+    fn epoch( &self, from:EpochID, to:EpochID ) {}
+    fn vote( &self, from:Option<NodeID>, to:Option<NodeID> ) {}
 }
 
-impl Clone for NodeInstance {
+#[derive(Debug,Clone)]
+pub struct DummyNodeChanges ();
+
+impl NodeChanges for DummyNodeChanges {
+}
+
+pub struct NodeInstance<NC: NodeChanges> {
+    pub node: Arc<Mutex<ClusterNode>>,
+    pub changes: NC,
+}
+
+impl<NC:NodeChanges> Clone for NodeInstance<NC> {
     fn clone(&self) -> Self {
-        NodeInstance { node: self.node.clone() }
+        NodeInstance { node: self.node.clone(), changes: self.changes.clone() }
     }
 }

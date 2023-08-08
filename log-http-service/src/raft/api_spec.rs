@@ -23,7 +23,7 @@ pub trait NodeService {
 }
 
 #[async_trait]
-impl NodeService for NodeInstance {
+impl<NC: NodeChanges+Sync+Send> NodeService for NodeInstance<NC> {
     async fn on_timer(&mut self) {
         enum State {
             End,
