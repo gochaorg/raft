@@ -223,24 +223,11 @@ mod test {
             ni.ping(leader, epoch, rid).await
         }
         async fn nominate( &self, candidate:NodeID, epoch:u32 ) -> Result<(),RErr> {
-            let mut node = self.0.lock().await;
-
-            info!("{n} {role:?} accept nominate, candidate={candidate}, epoch={epoch}", 
-                n=node.id,
-                role=node.role
-            );
-
-            // Голос уже отдан
-            if node.vote.is_some() {
-                let vote = node.vote.clone();
-                let vote = vote.unwrap();
-                return Err(RErr::AlreadVoted { nominant: vote });
-            }
-
-            sleep(random_between(node.nominate_min_delay.clone(), node.nominate_max_delay.clone())).await;
-
-            node.vote = Some(candidate.clone());
-            Ok(())
+            let ni = NodeInstance { 
+                node: self.0.clone(),
+                changes: DummyNodeChanges(),
+            };
+            ni.nominate(candidate, epoch).await
         }
     }
 

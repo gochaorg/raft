@@ -16,15 +16,17 @@ pub trait NodeClient: Send+Sync {
 #[async_trait]
 pub trait NodeService {
     /// Периодично вызывается сервером
-    async fn on_timer(&mut self);
+    async fn on_timer( &mut self );
 
-    /// Принимает запрос ping от коиента
+    /// Принимает запрос ping от клиента
     async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<(),RErr>;
+
+    async fn nominate( &self, candidate:NodeID, epoch:u32 ) -> Result<(),RErr>;
 }
 
 #[async_trait]
 impl<NC: NodeChanges+Sync+Send> NodeService for NodeInstance<NC> {
-    async fn on_timer(&mut self) {
+    async fn on_timer( &mut self ) {
         enum State {
             End,
             WinNomination { votes:usize, epoch:u32 },
@@ -247,6 +249,27 @@ impl<NC: NodeChanges+Sync+Send> NodeService for NodeInstance<NC> {
             );
         }
 
+        Ok(())
+    }
+
+    async fn nominate( &self, candidate:NodeID, epoch:u32 ) -> Result<(),RErr> {
+        let mut node = self.node.lock().await;
+
+        info!("{n} {role:?} accept nominate, candidate={candidate}, epoch={epoch}", 
+            n=node.id,
+            role=node.role
+        );
+
+        // Голос уже отдан
+        if node.vote.is_some() {
+            let vote = node.vote.clone();
+            let vote = vote.unwrap();
+            return Err(RErr::AlreadVoted { nominant: vote });
+        }
+
+        sleep(random_between(node.nominate_min_delay.clone(), node.nominate_max_delay.clone())).await;
+
+        node.vote = Some(candidate.clone());
         Ok(())
     }
 }
