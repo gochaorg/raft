@@ -76,7 +76,9 @@ pub struct ClusterNode
     pub nodes: Vec<Arc<AsyncMutex<dyn NodeClient>>>,
 }
 
+/// Уведомление о иземении состояния узла
 pub trait NodeChanges:Clone {
+    fn role( &self, from:Role, to:Role ) {}
     fn id( &self, from:Option<NodeID>, to:Option<NodeID> ) {}
     fn last_ping_recieve( &self, from:Option<Instant>, to:Option<Instant> ) {}
     fn last_ping_send( &self, from:Option<Instant>, to:Option<Instant> ) {}

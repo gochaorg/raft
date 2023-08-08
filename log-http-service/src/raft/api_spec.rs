@@ -21,6 +21,7 @@ pub trait NodeService {
     /// Принимает запрос ping от клиента
     async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<(),RErr>;
 
+    /// Принимает запрос на лидера
     async fn nominate( &self, candidate:NodeID, epoch:u32 ) -> Result<(),RErr>;
 }
 
@@ -40,8 +41,12 @@ impl<NC: NodeChanges+Sync+Send> NodeService for NodeInstance<NC> {
             let t_0 = Instant::now();
 
             let (clients, nid, epoch) = {
-                let mut node = self.node.lock().await;
+                let mut node: tokio::sync::MutexGuard<'_, ClusterNode> = self.node.lock().await;
+                
+                let prev = node.role.clone();
                 node.role = Role::Candidate;
+                self.changes.role(prev, node.role.clone());
+
                 (node.nodes.clone(), node.id.clone(), node.epoch)
             };
 
@@ -106,11 +111,17 @@ impl<NC: NodeChanges+Sync+Send> NodeService for NodeInstance<NC> {
                 ).unwrap_or(true);
 
             if send_pings_now {
-                let clients = join_all(node.nodes.iter().map(|nc| 
+                let prev = node.last_ping_send.clone();
+                node.last_ping_send = Some(Instant::now());
+                self.changes.last_ping_send(prev, node.last_ping_send.clone());
+
+                let clients = join_all(
+                    node.nodes.iter().map(|nc| 
                     nc.lock()
                 )).await;
                 
-                let pings = join_all(clients.iter().map(|nc|
+                let pings = join_all(
+                    clients.iter().map(|nc|
                     nc.ping(node.id.clone(), node.epoch, 0)
                 )).await;
 
@@ -127,7 +138,7 @@ impl<NC: NodeChanges+Sync+Send> NodeService for NodeInstance<NC> {
                     nid = node.id,
                     succ = succ_request_count,
                     tot = total_requests_count,
-                );                    
+                );
             };
 
             State::End
@@ -142,7 +153,11 @@ impl<NC: NodeChanges+Sync+Send> NodeService for NodeInstance<NC> {
             match last_ping_recieve_opt {
                 None => {
                     let mut node = self.node.lock().await;
+
+                    let prev = node.last_ping_recieve.clone();
                     node.last_ping_recieve = Some(Instant::now());
+                    self.changes.last_ping_recieve(prev, node.last_ping_recieve.clone());
+
                     info!("{nid} assign last_ping_recieve");
                     State::End
                 },
@@ -195,8 +210,15 @@ impl<NC: NodeChanges+Sync+Send> NodeService for NodeInstance<NC> {
                 State::End => {},
                 State::WinNomination { votes, epoch } => {
                     let mut node = self.node.lock().await;
+
+                    let prev = node.role.clone();
                     node.role = Role::Leader;
+                    self.changes.role(prev, node.role.clone());
+
+                    let prev = node.epoch.clone();
                     node.epoch = epoch;
+                    self.changes.epoch(prev, node.epoch.clone());
+
                     info!("{nid} Win in nomination with {votes} votes, epoch {epoch}",
                         nid = node.id
                     )
