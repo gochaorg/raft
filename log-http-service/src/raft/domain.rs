@@ -1,5 +1,5 @@
 use std::{time::{Duration, Instant}, sync::Arc};
-use tokio::sync::Mutex;
+use tokio::sync::Mutex as AsyncMutex;
 use super::*;
 
 /// Роль
@@ -73,7 +73,7 @@ pub struct ClusterNode
     pub vote: Option<NodeID>,
 
     /// Остальные участники
-    pub nodes: Vec<Arc<Mutex<dyn NodeClient>>>,
+    pub nodes: Vec<Arc<AsyncMutex<dyn NodeClient>>>,
 }
 
 pub trait NodeChanges:Clone {
@@ -91,7 +91,7 @@ impl NodeChanges for DummyNodeChanges {
 }
 
 pub struct NodeInstance<NC: NodeChanges> {
-    pub node: Arc<Mutex<ClusterNode>>,
+    pub node: Arc<AsyncMutex<ClusterNode>>,
     pub changes: NC,
 }
 

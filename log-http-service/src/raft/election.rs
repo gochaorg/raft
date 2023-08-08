@@ -167,7 +167,9 @@ mod test {
     }
 
     #[derive(Clone)]
-    struct NodeClientMock( Arc<AsyncMutex<ClusterNode>>, Arc<SyncMutex<Vec<Event>>> );
+    struct NodeClientMock<NC: NodeChanges> { 
+        node: NodeInstance<NC>
+    }
 
     impl EventLog for &Arc<SyncMutex<Vec<Event>>> {
         fn push( self, e:Event ) {
@@ -214,20 +216,12 @@ mod test {
     }
 
     #[async_trait]
-    impl NodeClient for NodeClientMock {
+    impl<NC: NodeChanges+Send+Sync> NodeClient for NodeClientMock<NC> {
         async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<(),RErr> {
-            let ni = NodeInstance { 
-                node: self.0.clone(),
-                changes: DummyNodeChanges(),
-            };
-            ni.ping(leader, epoch, rid).await
+            self.node.ping(leader, epoch, rid).await
         }
         async fn nominate( &self, candidate:NodeID, epoch:u32 ) -> Result<(),RErr> {
-            let ni = NodeInstance { 
-                node: self.0.clone(),
-                changes: DummyNodeChanges(),
-            };
-            ni.nominate(candidate, epoch).await
+            self.node.nominate(candidate, epoch).await
         }
     }
 
@@ -306,7 +300,9 @@ mod test {
             // link nodes
             for node in &nodes {
                 for target in &nodes {                    
-                    let nc = NodeClientMock(target.node.clone(), log.clone());
+                    let nc = NodeClientMock { 
+                        node: target.clone(), 
+                    };
                     let target_id = target.node.lock().await.id.clone();
                     let mut node = node.node.lock().await;
                     if target_id != node.id {
