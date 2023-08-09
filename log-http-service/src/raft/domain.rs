@@ -44,7 +44,7 @@ pub struct ClusterNode
     pub epoch: EpochID,
 
     // Нормер эпохи самовыдвижения
-    // pub candidate_epoch: Option<EpochID>,
+    pub epoch_of_candidate: Option<EpochID>,
 
     /// роль
     pub role: Role,
@@ -71,10 +71,10 @@ pub struct ClusterNode
     pub nominate_max_delay: Duration,
 
     /// Минимальная задержка перед повтором самовыдвижения
-    // pub renominate_min_delay: Duration,
+    pub renominate_min_delay: Duration,
 
     /// Максимальная задержка перед повтором самовыдвижения
-    // pub renominate_max_delay: Duration,
+    pub renominate_max_delay: Duration,
 
     /// Минимальное кол-во голосов для успеха
     pub votes_min_count: u32,

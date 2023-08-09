@@ -48,19 +48,32 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
 
             let t_0 = Instant::now();
 
-            let (clients, nid, epoch) = {
+            let (clients, nid) = {
                 let mut node: tokio::sync::MutexGuard<'_, ClusterNode> = self.node.lock().await;
                 
                 let prev = node.role.clone();
                 node.role = Role::Candidate;
                 self.changes.change_role(prev, node.role.clone());
 
-                (node.nodes.clone(), node.id.clone(), node.epoch)
+                (node.nodes.clone(), node.id.clone())
             };
 
             info!("{nid} self_nominate call clients start");
 
-            // TODO тут должна быть проверка что на текущем сроке была или нет заявка
+            let nom_epoch = {
+                let mut node = self.node.lock().await;
+                match node.epoch_of_candidate {
+                    Some(e) => {
+                        node.epoch_of_candidate = Some(e+1);
+                        e + 1
+                    },
+                    None => {
+                        node.epoch_of_candidate = Some(node.epoch+1);
+                        node.epoch+1
+                    }
+                }
+            };
+
             // Рассылаем свою кандидатуру
             let votes = {
                 let clients = join_all(
@@ -74,7 +87,7 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
                     clients.iter().map(|nc|
                         nc.nominate(
                             nid.clone(),
-                            epoch+1,
+                            nom_epoch,
                         )
                     )
                 ).await
@@ -101,7 +114,7 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
                 if succ_request_count >= node.votes_min_count as usize {
                     State::WinNomination { 
                         votes: succ_request_count,
-                        epoch: epoch+1,
+                        epoch: nom_epoch,
                     }
                 } else {
                     State::LooseNomination { votes: succ_request_count, total: total_requests_count }
@@ -206,7 +219,8 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
                         follower_state().await
                     },
                     Role::Candidate => { 
-                        sleep(random_between(Duration::from_millis(50),Duration::from_millis(500))).await;
+                        let (delay_min, delay_max) = { let n = self.node.lock().await; (n.renominate_min_delay, n.renominate_max_delay) };
+                        sleep(random_between(delay_min,delay_max)).await;
                         follower_state().await
                     }
                 }
