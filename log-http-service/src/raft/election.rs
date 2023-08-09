@@ -7,11 +7,12 @@ use tokio::{sync::Mutex as AsyncMutex, time::sleep};
 mod test {
     use rand::seq::SliceRandom;
     use async_trait::async_trait;
-    use actix_rt::System;
+    use actix_rt::{System, spawn};
     use futures::future::join_all;
     use super::*;
     use super::super::*;
     use super::super::bg_tasks::*;
+    use std::collections::HashMap;
     use std::sync::Mutex as SyncMutex;
 
     #[derive(Clone)]
@@ -389,12 +390,16 @@ mod test {
     /// 15. начинается выбор нового лидера с новой эпохи - эпоха 4
     /// 16. выбран новый лидер с новым сроком  - эпоха 4
     /// 17. лидер после рассылает ping с новым номером эпохи  - эпоха 4
+    /// 
+    /// требования
+    /// А) выдвинуть кандидатуру можно только один раз на один срок
     #[test]
     fn main_cycle() {
         use env_logger;
         let _ = env_logger::builder().filter_level(log::LevelFilter::max()).is_test(true).try_init();
         let log = Arc::new(SyncMutex::new(Vec::<Event>::new()));
 
+        // Создание узлов кластера
         let node0 = ClusterNode {
             id: "node0".to_string(),
             epoch: 0,
@@ -424,7 +429,7 @@ mod test {
 
         let node0 = NodeInstance { 
             node: Arc::new(AsyncMutex::new(node0)),
-            changes: NodeLog { node_id: "node0".to_string(), log: log.clone() } // log.clone() //DummyNodeChanges()
+            changes: NodeLog { node_id: "node0".to_string(), log: log.clone() }
         };
         let node1 = NodeInstance { 
             node: Arc::new(AsyncMutex::new(node1)),
@@ -491,12 +496,12 @@ mod test {
                     println!("\n== {cycle} ==", cycle=cycle_no);
 
                     log_bg.push(Event::CycleBegin { cycle_no: cycle_no.clone() });
-                    // {
-                    //     let mut rng = rand::thread_rng();
-                    //     nodes.shuffle(&mut rng);
-                    // }
 
-                    join_all(nodes.iter_mut().map(|n| n.on_timer())).await;
+                    join_all(
+                        nodes.iter_mut().map(|n| 
+                            n.on_timer()
+                        )
+                    ).await;
 
                     for node in nodes {
                         let node = node.node.lock().await;
@@ -518,10 +523,12 @@ mod test {
                     println!();
                 }
             });
+
+            // Периодичность задач
             bg.set_duration(Duration::from_millis(1000));
 
             let _ = bg.start();
-            sleep(Duration::from_secs(25)).await;
+            sleep(Duration::from_secs(30)).await;
 
             println!("log");
             {
@@ -532,7 +539,7 @@ mod test {
             }
 
             // Проверка результатов
-            println!("states");
+            println!("\nstates");
             {
                 let log = log.cycles();
                 for (c,es) in log.iter().enumerate() {
@@ -540,10 +547,42 @@ mod test {
                 }
             }
 
+            #[derive(Debug,Clone,PartialEq)]
+            struct Nomination {
+                cycle: i32,
+                epoch: EpochID,                
+            }
+            let mut nominations : HashMap<NodeID,Vec<Nomination>> = HashMap::new();
+            {
+                let events = log.lock().unwrap();
+                for ev in events.iter() {
+                    match ev {
+                        Event::NominateRequest { cycle_no, node_id, candidate, epoch } => {
+                            let nom = Nomination { cycle:*cycle_no, epoch:*epoch };
+                            match nominations.get_mut(candidate) {
+                                Some(lst) => {
+                                    if ! lst.contains(&nom) { lst.push(nom) }
+                                }
+                                None => {
+                                    nominations.insert(candidate.clone(), vec![nom]);
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            println!("\nnominations");
+            for (nid,noms) in nominations {
+                for nom in noms {
+                    println!("{nid} {nom:?}");
+                }
+            }
+
             // 5 участников стартуют как Follower (те 0 Leaders)
             // спустя время выбирают одного лидера
             let leaders_matched = log.state_changes_match(
-                |n| n.leaders, vec![0,1,2,1]);
+                |n| n.leaders, vec![0,1,2,1,2,1]);
             assert!(leaders_matched,"leaders_matched");
 
             // 3. лидер после рассылает ping с новым номером эпохи
@@ -557,6 +596,8 @@ mod test {
                 Some((1,1)),
                 Some((1,2)),
                 Some((2,2)),
+                Some((2,3)),
+                Some((3,3)),
                 ]
             );
             assert!(epoch_matches,"epoch_matches");

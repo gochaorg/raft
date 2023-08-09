@@ -70,6 +70,12 @@ pub struct ClusterNode
     /// Максимальная задержка ответа номинанту
     pub nominate_max_delay: Duration,
 
+    /// Минимальная задержка перед повтором самовыдвижения
+    // pub renominate_min_delay: Duration,
+
+    /// Максимальная задержка перед повтором самовыдвижения
+    // pub renominate_max_delay: Duration,
+
     /// Минимальное кол-во голосов для успеха
     pub votes_min_count: u32,
 
