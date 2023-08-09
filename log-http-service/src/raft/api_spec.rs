@@ -2,7 +2,7 @@ use super::*;
 use async_trait::async_trait;
 use futures::future::join_all;
 use log::{info, warn};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tokio::time::sleep;
 
 /// Клиент к узлу кластера
@@ -48,19 +48,32 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
 
             let t_0 = Instant::now();
 
-            let (clients, nid, epoch) = {
+            let (clients, nid) = {
                 let mut node: tokio::sync::MutexGuard<'_, ClusterNode> = self.node.lock().await;
                 
                 let prev = node.role.clone();
                 node.role = Role::Candidate;
                 self.changes.change_role(prev, node.role.clone());
 
-                (node.nodes.clone(), node.id.clone(), node.epoch)
+                (node.nodes.clone(), node.id.clone())
             };
 
             info!("{nid} self_nominate call clients start");
 
-            // TODO тут должна быть проверка что на текущем сроке была или нет заявка
+            let nom_epoch = {
+                let mut node = self.node.lock().await;
+                match node.epoch_of_candidate {
+                    Some(e) => {
+                        node.epoch_of_candidate = Some(e+1);
+                        e + 1
+                    },
+                    None => {
+                        node.epoch_of_candidate = Some(node.epoch+1);
+                        node.epoch+1
+                    }
+                }
+            };
+
             // Рассылаем свою кандидатуру
             let votes = {
                 let clients = join_all(
@@ -74,7 +87,7 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
                     clients.iter().map(|nc|
                         nc.nominate(
                             nid.clone(),
-                            epoch+1,
+                            nom_epoch+1,
                         )
                     )
                 ).await
@@ -101,7 +114,7 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
                 if succ_request_count >= node.votes_min_count as usize {
                     State::WinNomination { 
                         votes: succ_request_count,
-                        epoch: epoch+1,
+                        epoch: nom_epoch,
                     }
                 } else {
                     State::LooseNomination { votes: succ_request_count, total: total_requests_count }
@@ -206,7 +219,8 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
                         follower_state().await
                     },
                     Role::Candidate => { 
-                        sleep(random_between(Duration::from_millis(50),Duration::from_millis(500))).await;
+                        let (delay_min, delay_max) = { let n = self.node.lock().await; (n.renominate_min_delay, n.renominate_max_delay) };
+                        sleep(random_between(delay_min,delay_max)).await;
                         follower_state().await
                     }
                 }
@@ -225,9 +239,9 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
                     node.epoch = epoch;
                     self.changes.change_epoch(prev, node.epoch.clone());
 
-                    let prev = node.vote.clone();
-                    node.vote = None;
-                    self.changes.change_vote(prev, node.vote.clone());
+                    //let prev = node.vote.clone();
+                    //node.vote = None;
+                    //self.changes.change_vote(prev, node.vote.clone());
 
                     let prev = node.lead.clone();
                     node.lead = None;
@@ -300,9 +314,9 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
                 node.role = Role::Follower;
                 self.changes.change_role(from, node.role.clone());
 
-                let from = node.vote.clone();
-                node.vote = None;
-                self.changes.change_vote(from, node.vote.clone());
+                // let from = node.vote.clone();
+                // node.vote = None;
+                // self.changes.change_vote(from, node.vote.clone());
             }else{
                 self.changes.on_ping_leader_self();
 
@@ -342,17 +356,21 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
         }
 
         // Голос уже отдан
-        if node.vote.is_some() {
-            let vote = node.vote.clone();
-            let vote = vote.unwrap();
-            return Err(RErr::AlreadVoted { nominant: vote });
+        let vote = node.vote.get(&epoch);
+        if vote.is_some() {
+            return Err(RErr::AlreadVoted { nominant: vote.unwrap().clone() });
         }
+
+        // if node.vote.is_some() {
+        //     let vote = node.vote.clone();
+        //     let vote = vote.unwrap();
+        //     return Err(RErr::AlreadVoted { nominant: vote });
+        // }
 
         sleep(random_between(node.nominate_min_delay.clone(), node.nominate_max_delay.clone())).await;
 
-        let from = node.vote.clone();
-        node.vote = Some(candidate.clone());
-        self.changes.change_vote(from, node.vote.clone());
+        node.vote.insert(epoch.clone(), candidate.clone());
+        self.changes.add_vote(epoch.clone(), candidate.clone());
 
         Ok(())
     }

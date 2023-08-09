@@ -1,4 +1,4 @@
-use std::{time::{Duration, Instant}, sync::Arc};
+use std::{time::{Duration, Instant}, sync::Arc, collections::HashMap};
 use tokio::sync::Mutex as AsyncMutex;
 use super::*;
 
@@ -44,7 +44,7 @@ pub struct ClusterNode
     pub epoch: EpochID,
 
     // Нормер эпохи самовыдвижения
-    // pub candidate_epoch: Option<EpochID>,
+    pub epoch_of_candidate: Option<EpochID>,
 
     /// роль
     pub role: Role,
@@ -71,16 +71,16 @@ pub struct ClusterNode
     pub nominate_max_delay: Duration,
 
     /// Минимальная задержка перед повтором самовыдвижения
-    // pub renominate_min_delay: Duration,
+    pub renominate_min_delay: Duration,
 
     /// Максимальная задержка перед повтором самовыдвижения
-    // pub renominate_max_delay: Duration,
+    pub renominate_max_delay: Duration,
 
     /// Минимальное кол-во голосов для успеха
     pub votes_min_count: u32,
 
     /// За кого был отдан голос в новом цикле голосования
-    pub vote: Option<NodeID>,
+    pub vote: HashMap<EpochID,NodeID>,
 
     /// Остальные участники
     pub nodes: Vec<Arc<AsyncMutex<dyn NodeClient>>>,
@@ -101,7 +101,7 @@ pub trait NodeLogging:Clone {
     fn change_last_ping_recieve( &self, from:Option<Instant>, to:Option<Instant> ) {}
     fn change_last_ping_send( &self, from:Option<Instant>, to:Option<Instant> ) {}
     fn change_epoch( &self, from:EpochID, to:EpochID ) {}
-    fn change_vote( &self, from:Option<NodeID>, to:Option<NodeID> ) {}
+    fn add_vote( &self, epoch:EpochID, node:NodeID ) {}
     fn change_leader( &self, from:Option<NodeID>, to:Option<NodeID> ) {}
 }
 
