@@ -25,6 +25,7 @@ pub enum BgErr {
 }
 
 /// Создание асинхронной фоновой периодичной задачи
+#[allow(dead_code)]
 pub fn bg_job_async<Fu,R>( work: Fu ) -> BgJob<Fu, AsyncJoinHandle<()>> 
     where
         Fu: Fn() -> R,        
@@ -40,6 +41,7 @@ pub fn bg_job_async<Fu,R>( work: Fu ) -> BgJob<Fu, AsyncJoinHandle<()>>
 }
 
 /// Создание синхронной фоновой периодичной задачи - создается отдельный поток
+#[allow(dead_code)]
 pub fn bg_job_sync<Fu>( work: Fu ) -> BgJob<Fu, JoinHandle<()>> 
     where
         Fu: Fn()
@@ -53,6 +55,7 @@ pub fn bg_job_sync<Fu>( work: Fu ) -> BgJob<Fu, JoinHandle<()>>
     }
 }
 
+#[allow(dead_code)]
 impl<F,H> BgJob<F,H> 
 {
     /// Указывает задержку перед запуском задачи
