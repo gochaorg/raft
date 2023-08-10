@@ -9,7 +9,7 @@ use tokio::time::sleep;
 #[async_trait]
 pub trait NodeClient<RID>: Send+Sync {
     async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse<RID>,RErr>;
-    async fn nominate( &self, candidate:NodeID, epoch:u32, ) -> Result<(),RErr>;
+    async fn nominate( &self, candidate:NodeID, epoch:u32 ) -> Result<(),RErr>;
 }
 
 /// Ответ на ping
