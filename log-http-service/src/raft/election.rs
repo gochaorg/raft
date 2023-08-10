@@ -19,8 +19,8 @@ mod test {
     struct NodeClientMockCheck<RID>(Arc<AsyncMutex<ClusterNode<RID>>>);
 
     #[async_trait]
-    impl<RID:Sync+Send> NodeClient<RID> for NodeClientMockCheck<RID> {
-        async fn ping( &self, leader:NodeID, _epoch:EpochID, _rid:RID ) -> Result<PingResponse,RErr> {
+    impl<RID:Sync+Send+Default> NodeClient<RID> for NodeClientMockCheck<RID> {
+        async fn ping( &self, leader:NodeID, _epoch:EpochID, _rid:RID ) -> Result<PingResponse<RID>,RErr> {
             async { 
                 let mut me = self.0.lock().await;
                 me.epoch += 1;
@@ -29,7 +29,7 @@ mod test {
                     PingResponse {
                         id: me.id.clone(),
                         epoch: me.epoch.clone(),
-                        rid: 0
+                        rid: RID::default()
                     }
                 ) 
             }.await
@@ -144,7 +144,7 @@ mod test {
         VoteChanged { node_id:NodeID, from:Option<NodeID>, to:Option<NodeID> },
         PingRequest  { cycle_no: i32, node_id:NodeID, leader: NodeID, epoch:EpochID, rid:RID },
         PingResponse { cycle_no: i32, node_id:NodeID, leader: NodeID, epoch:EpochID, rid:RID, 
-            response: Result<PingResponse,RErr> 
+            response: Result<PingResponse<RID>,RErr> 
         },
         NominateRequest {
             cycle_no: i32,
@@ -287,7 +287,7 @@ mod test {
 
     #[async_trait]
     impl<RID:Sync+Send+Clone+Default, NC:NodeLogging<RID>+Send+Sync, Log:EventLog<RID>> NodeClient<RID> for NodeClientMock<RID,NC,Log> {
-        async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse,RErr> {
+        async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse<RID>,RErr> {
             let cycle_no = { self.cycle_no.lock().await.clone() };
 
             self.log.push(Event::PingRequest { 

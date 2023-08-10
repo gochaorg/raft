@@ -8,13 +8,13 @@ use tokio::time::sleep;
 /// Клиент к узлу кластера
 #[async_trait]
 pub trait NodeClient<RID>: Send+Sync {
-    async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse,RErr>;
+    async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse<RID>,RErr>;
     async fn nominate( &self, candidate:NodeID, epoch:u32, ) -> Result<(),RErr>;
 }
 
 /// Ответ на ping
 #[derive(Clone,Debug)]
-pub struct PingResponse {
+pub struct PingResponse<RID> {
     pub id: NodeID,
     pub epoch: EpochID,
     pub rid: RID,
@@ -27,7 +27,7 @@ pub trait NodeService<RID> {
     async fn on_timer( &mut self );
 
     /// Принимает запрос ping от клиента
-    async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse,RErr>;
+    async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse<RID>,RErr>;
 
     /// Принимает запрос на лидера
     async fn nominate( &self, candidate:NodeID, epoch:u32 ) -> Result<(),RErr>;
@@ -205,6 +205,7 @@ impl<RID:Clone+Sync+Send+Default, NC: NodeLogging<RID>+Sync+Send> NodeService<RI
             }
         };
 
+        // Эта хренотень требует рефакторинга
         loop {
             let state = {
                 let role = { 
@@ -263,7 +264,7 @@ impl<RID:Clone+Sync+Send+Default, NC: NodeLogging<RID>+Sync+Send> NodeService<RI
         }
     }
     
-    async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse,RErr> {
+    async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse<RID>,RErr> {
         let mut node = self.node.lock().await;
 
         info!("{nid} {role:?} {n_epoch} accept ping: leader={leader} epoch={epoch}",
@@ -335,7 +336,7 @@ impl<RID:Clone+Sync+Send+Default, NC: NodeLogging<RID>+Sync+Send> NodeService<RI
         Ok(PingResponse { 
             id: node.id.clone(), 
             epoch: node.epoch, 
-            rid: 0 
+            rid: RID::default()
         })
     }
 
