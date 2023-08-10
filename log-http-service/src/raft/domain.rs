@@ -32,7 +32,6 @@ pub enum RErr {
 
 pub type NodeID = String;
 pub type EpochID = u32;
-pub type RID = u32;
 
 #[derive(Clone)]
 pub struct ClusterNode<RID>

@@ -33,6 +33,7 @@ pub trait NodeService<RID> {
     async fn nominate( &self, candidate:NodeID, epoch:u32 ) -> Result<(),RErr>;
 }
 
+/// Реализация по умолчанию
 #[async_trait]
 impl<RID:Clone+Sync+Send+Default, NC: NodeLogging<RID>+Sync+Send> NodeService<RID> for NodeInstance<RID, NC> {
     async fn on_timer( &mut self ) {
