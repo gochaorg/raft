@@ -4,10 +4,9 @@ use std::{time::{Duration, Instant}, rc::Rc, sync::Arc, pin::Pin};
 use tokio::{sync::Mutex as AsyncMutex, time::sleep};
 
 #[cfg(test)]
-mod test {
-    use rand::seq::SliceRandom;
+mod test {    
     use async_trait::async_trait;
-    use actix_rt::{System, spawn};
+    use actix_rt::System;
     use futures::future::join_all;
     use super::*;
     use super::super::*;
