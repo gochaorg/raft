@@ -129,8 +129,7 @@ pub trait LogWriting<RecordId>
     type LogId: Clone + Debug;
 
     /// Запись данных в лог
-    fn write<Record>( &self, record:Record ) -> Result<RecordId,LoqErr<Self::FILE,Self::LogId>>
-    where Record: Into<PreparedRecord>;
+    fn write( &self, record:&PreparedRecord ) -> Result<RecordId,LoqErr<Self::FILE,Self::LogId>>;
 }
 
 /// Общий API лог очереди

@@ -38,7 +38,8 @@ impl From<PlainText> for PreparedRecord {
 pub async fn insert_plain(req_body: String) -> Result<impl Responder,ApiErr> {
     queue(|q|{
         let q = q.lock()?;
-        let rid = q.write( PlainText { content: req_body.clone(), time: Utc::now() } )?;
+        let pr: PreparedRecord = PlainText { content: req_body.clone(), time: Utc::now() }.into();
+        let rid = q.write( &pr )?;
         let id: ID = rid.into();
         Ok( web::Json(id) )
     })
