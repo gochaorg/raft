@@ -2,7 +2,7 @@ use super::*;
 use async_trait::async_trait;
 use futures::future::join_all;
 use log::{info, warn};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tokio::time::sleep;
 
 /// Клиент к узлу кластера

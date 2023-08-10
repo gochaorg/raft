@@ -20,8 +20,8 @@ pub enum RErr {
 
     /// Номер эпохи не совпаддает с ожидаемым
     EpochNotMatch {
-        expect: u32,
-        actual: u32,
+        expect: EpochID,
+        actual: EpochID,
     },
 
     /// Уже проголосовал
