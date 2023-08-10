@@ -1,4 +1,4 @@
-use std::{time::{Duration, Instant}, sync::Arc};
+use std::{time::{Duration, Instant}, sync::Arc, marker::PhantomData};
 use tokio::sync::Mutex as AsyncMutex;
 use super::*;
 
@@ -35,7 +35,7 @@ pub type EpochID = u32;
 pub type RID = u32;
 
 #[derive(Clone)]
-pub struct ClusterNode
+pub struct ClusterNode<RID>
 {
     /// Идентификатор
     pub id: NodeID,
@@ -83,12 +83,12 @@ pub struct ClusterNode
     pub vote: Option<NodeID>,
 
     /// Остальные участники
-    pub nodes: Vec<Arc<AsyncMutex<dyn NodeClient>>>,
+    pub nodes: Vec<Arc<AsyncMutex<dyn NodeClient<RID>>>>,
 }
 
 /// Уведомление о иземении состояния узла
 #[allow(unused_variables)]
-pub trait NodeLogging:Clone {
+pub trait NodeLogging<RID> :Clone {
     fn on_ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) {}
     fn on_ping_leader_match( &self ) {}
     fn on_ping_epoch_greater( &self ) {}
@@ -108,16 +108,17 @@ pub trait NodeLogging:Clone {
 #[derive(Debug,Clone)]
 pub struct DummyNodeChanges ();
 
-impl NodeLogging for DummyNodeChanges {
+impl<RID> NodeLogging<RID> for DummyNodeChanges {
 }
 
-pub struct NodeInstance<NC: NodeLogging> {
-    pub node: Arc<AsyncMutex<ClusterNode>>,
+pub struct NodeInstance<RID, NC:NodeLogging<RID>> {
+    pub node: Arc<AsyncMutex<ClusterNode<RID>>>,
     pub changes: NC,
+    pub _p: PhantomData<RID>
 }
 
-impl<NC:NodeLogging> Clone for NodeInstance<NC> {
+impl<RID, NC:NodeLogging<RID>> Clone for NodeInstance<RID, NC> {
     fn clone(&self) -> Self {
-        NodeInstance { node: self.node.clone(), changes: self.changes.clone() }
+        NodeInstance { node: self.node.clone(), changes: self.changes.clone(), _p: PhantomData.clone() }
     }
 }

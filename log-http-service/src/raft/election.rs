@@ -13,12 +13,14 @@ mod test {
     use super::super::*;
     use super::super::bg_tasks::*;
     use std::collections::{HashMap, HashSet};
+    use std::marker::PhantomData;
     use std::sync::Mutex as SyncMutex;
 
     #[derive(Clone)]
-    struct NodeClientMockCheck(Arc<AsyncMutex<ClusterNode>>);
+    struct NodeClientMockCheck<RID>(Arc<AsyncMutex<ClusterNode<RID>>>);
+
     #[async_trait]
-    impl NodeClient for NodeClientMockCheck {
+    impl<RID:Sync+Send> NodeClient<RID> for NodeClientMockCheck<RID> {
         async fn ping( &self, leader:NodeID, _epoch:EpochID, _rid:RID ) -> Result<PingResponse,RErr> {
             async { 
                 let mut me = self.0.lock().await;
@@ -65,25 +67,30 @@ mod test {
 
         let node0 = NodeInstance { 
             node: Arc::new(AsyncMutex::new(node0)),
-            changes: DummyNodeChanges()
+            changes: DummyNodeChanges(),
+            _p: PhantomData.clone()
         };
         let node1 = NodeInstance { 
             node: Arc::new(AsyncMutex::new(node1)),
-            changes: DummyNodeChanges()
+            changes: DummyNodeChanges(),
+            _p: PhantomData.clone()
         };
         let node1c = node1.clone();
 
         let _node2 = NodeInstance { 
             node: Arc::new(AsyncMutex::new(node2)),
-            changes: DummyNodeChanges()
+            changes: DummyNodeChanges(),
+            _p: PhantomData.clone()
         };
         let _node3 = NodeInstance { 
             node: Arc::new(AsyncMutex::new(node3)),
-            changes: DummyNodeChanges()
+            changes: DummyNodeChanges(),
+            _p: PhantomData.clone()
         };
         let _node4 = NodeInstance { 
             node: Arc::new(AsyncMutex::new(node4)),
-            changes: DummyNodeChanges()
+            changes: DummyNodeChanges(),
+            _p: PhantomData.clone()
         };
 
         let node0c = node0.clone();
@@ -129,7 +136,7 @@ mod test {
     //////////////////////////////
     #[derive(Debug,Clone)]
     #[allow(dead_code)]
-    enum Event {
+    enum Event<RID> {
         NodeState { node_id:NodeID, role:Role, epoch: EpochID, rid:RID },
         CycleBegin { cycle_no:i32 },
         CycleEnd { cycle_no:i32 },
@@ -155,9 +162,9 @@ mod test {
         }
     }
 
-    trait EventLog: Sized+Sync+Send {
-        fn push( &self, e:Event );
-        fn cycles( &self ) -> Vec<Vec<Event>>;
+    trait EventLog<RID>: Sized+Sync+Send {
+        fn push( &self, e:Event<RID> );
+        fn cycles( &self ) -> Vec<Vec<Event<RID>>>;
         fn state_changes<E:Sized+Eq>( &self, f:impl Fn(&NodeStates) -> E) -> Vec<E>;
         fn state_changes_match<E:Sized+Eq>( &self, 
             f:impl Fn(&NodeStates) -> E, 
@@ -184,7 +191,7 @@ mod test {
     trait CycleEvents {
         fn node_states( self, cycle_no:i32 ) -> NodeStates;
     }
-    impl CycleEvents for &Vec<Event> {
+    impl<RID> CycleEvents for &Vec<Event<RID>> {
         fn node_states( self, cycle_no:i32 ) -> NodeStates {
             let mut s = NodeStates { 
                 cycle_no:cycle_no,
@@ -229,21 +236,21 @@ mod test {
     }
 
     #[derive(Clone)]
-    struct NodeClientMock<NC: NodeLogging, Log:EventLog> { 
-        node: NodeInstance<NC>,
+    struct NodeClientMock<RID, NC:NodeLogging<RID>, Log:EventLog<RID>> { 
+        node: NodeInstance<RID,NC>,
         cycle_no: Arc<AsyncMutex<i32>>,
         log: Log
     }
 
-    impl EventLog for Arc<SyncMutex<Vec<Event>>> {
-        fn push( &self, e:Event ) {
+    impl<RID:Sync+Send+Clone> EventLog<RID> for Arc<SyncMutex<Vec<Event<RID>>>> {
+        fn push( &self, e:Event<RID> ) {
             let mut log = self.lock().unwrap();
             log.push(e);
         }
-        fn cycles( &self ) -> Vec<Vec<Event>> {
+        fn cycles( &self ) -> Vec<Vec<Event<RID>>> {
             let log = self.lock().unwrap();
-            let mut res: Vec<Vec<Event>> = vec![vec![]];
-            let mut cur: Vec<Event> = vec![];
+            let mut res: Vec<Vec<Event<RID>>> = vec![vec![]];
+            let mut cur: Vec<Event<RID>> = vec![];
             for e in log.iter() {
                 match e {
                     Event::CycleBegin { cycle_no:_ } => {},
@@ -280,7 +287,7 @@ mod test {
     }
 
     #[async_trait]
-    impl<NC: NodeLogging+Send+Sync, Log:EventLog> NodeClient for NodeClientMock<NC,Log> {
+    impl<RID:Sync+Send+Clone+Default, NC:NodeLogging<RID>+Send+Sync, Log:EventLog<RID>> NodeClient<RID> for NodeClientMock<RID,NC,Log> {
         async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse,RErr> {
             let cycle_no = { self.cycle_no.lock().await.clone() };
 
@@ -298,7 +305,7 @@ mod test {
             {
                 Err(RErr::ReponseTimeout)
             } else {            
-                self.node.ping(leader.clone(), epoch, rid).await
+                self.node.ping(leader.clone(), epoch, rid.clone()).await
             };
 
             self.log.push(Event::PingResponse { 
@@ -343,9 +350,9 @@ mod test {
     }
 
     #[derive(Clone)]
-    struct NodeLog { node_id:NodeID, log: Arc<SyncMutex<Vec<Event>>> }
+    struct NodeLog<RID> { node_id:NodeID, log: Arc<SyncMutex<Vec<Event<RID>>>> }
 
-    impl NodeLogging for NodeLog {
+    impl<RID:Clone> NodeLogging<RID> for NodeLog<RID> {
         fn change_role( &self, from:Role, to:Role ) {
             let mut log = self.log.lock().unwrap();
             log.push(Event::RoleChanged { 
@@ -402,7 +409,7 @@ mod test {
     fn main_cycle() {
         use env_logger;
         let _ = env_logger::builder().filter_level(log::LevelFilter::max()).is_test(true).try_init();
-        let log = Arc::new(SyncMutex::new(Vec::<Event>::new()));
+        let log = Arc::new(SyncMutex::new(Vec::<Event<u32>>::new()));
 
         // Создание узлов кластера
         let node0 = ClusterNode {
@@ -437,23 +444,28 @@ mod test {
 
         let node0 = NodeInstance { 
             node: Arc::new(AsyncMutex::new(node0)),
-            changes: NodeLog { node_id: "node0".to_string(), log: log.clone() }
+            changes: NodeLog { node_id: "node0".to_string(), log: log.clone() },
+            _p: PhantomData.clone()
         };
         let node1 = NodeInstance { 
             node: Arc::new(AsyncMutex::new(node1)),
-            changes: NodeLog { node_id: "node1".to_string(), log: log.clone() }
+            changes: NodeLog { node_id: "node1".to_string(), log: log.clone() },
+            _p: PhantomData.clone()
         };
         let node2 = NodeInstance { 
             node: Arc::new(AsyncMutex::new(node2)),
-            changes: NodeLog { node_id: "node2".to_string(), log: log.clone() }
+            changes: NodeLog { node_id: "node2".to_string(), log: log.clone() },
+            _p: PhantomData.clone()
         };
         let node3 = NodeInstance { 
             node: Arc::new(AsyncMutex::new(node3)),
-            changes: NodeLog { node_id: "node3".to_string(), log: log.clone() }
+            changes: NodeLog { node_id: "node3".to_string(), log: log.clone() },
+            _p: PhantomData.clone()
         };
         let node4 = NodeInstance { 
             node: Arc::new(AsyncMutex::new(node4)),
-            changes: NodeLog { node_id: "node4".to_string(), log: log.clone() }
+            changes: NodeLog { node_id: "node4".to_string(), log: log.clone() },
+            _p: PhantomData.clone()
         };
 
         let nodes = vec![

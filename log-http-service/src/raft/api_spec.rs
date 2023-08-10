@@ -7,7 +7,7 @@ use tokio::time::sleep;
 
 /// Клиент к узлу кластера
 #[async_trait]
-pub trait NodeClient: Send+Sync {
+pub trait NodeClient<RID>: Send+Sync {
     async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse,RErr>;
     async fn nominate( &self, candidate:NodeID, epoch:u32, ) -> Result<(),RErr>;
 }
@@ -22,7 +22,7 @@ pub struct PingResponse {
 
 /// Часть сервиса кластера
 #[async_trait]
-pub trait NodeService {
+pub trait NodeService<RID> {
     /// Периодично вызывается сервером
     async fn on_timer( &mut self );
 
@@ -34,7 +34,7 @@ pub trait NodeService {
 }
 
 #[async_trait]
-impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
+impl<RID:Clone+Sync+Send+Default, NC: NodeLogging<RID>+Sync+Send> NodeService<RID> for NodeInstance<RID, NC> {
     async fn on_timer( &mut self ) {
         enum State {
             End,
@@ -49,7 +49,7 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
             let t_0 = Instant::now();
 
             let (clients, nid) = {
-                let mut node: tokio::sync::MutexGuard<'_, ClusterNode> = self.node.lock().await;
+                let mut node = self.node.lock().await;
                 
                 let prev = node.role.clone();
                 node.role = Role::Candidate;
@@ -143,7 +143,7 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
                 
                 let pings = join_all(
                     clients.iter().map(|nc|
-                    nc.ping(node.id.clone(), node.epoch, 0)
+                    nc.ping(node.id.clone(), node.epoch, RID::default())
                 )).await;
 
                 let total_requests_count = pings.len();
