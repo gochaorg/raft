@@ -24,3 +24,6 @@ pub use wildcard::*;
 
 mod template;
 pub use template::*;
+
+mod duration;
+pub use duration::*;

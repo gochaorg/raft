@@ -421,9 +421,9 @@ mod full_test {
 
     use crate::bbuff::absbuff::FileBuff;
     use crate::logfile::LogFile;
-    use crate::logqueue::{LogQueueFileNumIDOpen, ValidateStub, path_template, LogQueueImpl, Wrapper, LogQueue, LogWriteExt};
+    use crate::logqueue::{LogQueueFileNumIDOpen, ValidateStub, path_template, LogQueueImpl, LogQueue, LogWriteExt};
 
-    use crate::logqueue::{log_id::*, LogQueueConf, LogFileQueue, LogWriting, LogNavigateLast };
+    use crate::logqueue::{log_id::*, LogQueueConf };
     use crate::logqueue::find_logs::FsLogFind;
 
     #[test]
@@ -457,7 +457,7 @@ mod full_test {
         //     = Box::new(log_queue);
 
         // api..
-        let mut log_queue = LogQueueImpl::new(log_queue);
+        let log_queue = LogQueueImpl::new(log_queue);
 
         let mut log_queue: Box<dyn LogQueue<RecID<LogQueueFileNumID>, LogQueueFileNumID, PathBuf, LogFile<FileBuff>>> = Box::new(log_queue);
 

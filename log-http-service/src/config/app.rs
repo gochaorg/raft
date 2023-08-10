@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::{env, path::PathBuf, fs};
 
-use super::{WebServer, QueueConfig};
+use super::{WebServer, QueueConfig, RaftConfig};
 
 /// Настройки приложения
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -14,7 +14,10 @@ pub struct AppConfig {
     pub web_server: WebServer,
 
     /// Настройки очереди
-    pub queue: QueueConfig
+    pub queue: QueueConfig,
+
+    #[serde(default)]
+    pub raft: RaftConfig,
 }
 
 impl Default for AppConfig {
@@ -23,6 +26,7 @@ impl Default for AppConfig {
             work_dir: ".".to_string(),
             web_server: WebServer::default(),
             queue: QueueConfig::default(),
+            raft: RaftConfig::default(),
         }
     }
 }
