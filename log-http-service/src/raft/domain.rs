@@ -30,6 +30,19 @@ pub enum RErr {
     }
 }
 
+/// Текущая очередь
+pub trait RaftQueue<RID>: Sync+Send {
+    /// Возвращает текущий идентификатор записи
+    fn current_record_id( &self ) -> RID;
+}
+
+pub struct RafQueueDummy<RID> ( pub RID );
+impl<RID:Clone+Sync+Send> RaftQueue<RID> for RafQueueDummy<RID> {
+    fn current_record_id( &self ) -> RID {
+        self.0.clone()
+    }
+}
+
 pub type NodeID = String;
 pub type EpochID = u32;
 
@@ -83,6 +96,9 @@ pub struct ClusterNode<RID>
 
     /// Остальные участники
     pub nodes: Vec<Arc<AsyncMutex<dyn NodeClient<RID>>>>,
+
+    /// Очередь сообщений
+    pub queue: Arc<AsyncMutex<dyn RaftQueue<RID>>>
 }
 
 /// Уведомление о иземении состояния узла

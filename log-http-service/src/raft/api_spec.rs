@@ -35,7 +35,7 @@ pub trait NodeService<RID> {
 
 /// Реализация по умолчанию
 #[async_trait]
-impl<RID:Clone+Sync+Send+Default, NC: NodeLogging<RID>+Sync+Send> NodeService<RID> for NodeInstance<RID, NC> {
+impl<RID:Clone+Sync+Send, NC: NodeLogging<RID>+Sync+Send> NodeService<RID> for NodeInstance<RID, NC> {
     async fn on_timer( &mut self ) {
         enum State {
             End,
@@ -141,10 +141,12 @@ impl<RID:Clone+Sync+Send+Default, NC: NodeLogging<RID>+Sync+Send> NodeService<RI
                     node.nodes.iter().map(|nc| 
                     nc.lock()
                 )).await;
+
+                let rid = { node.queue.lock().await.current_record_id().clone() };
                 
                 let pings = join_all(
                     clients.iter().map(|nc|
-                    nc.ping(node.id.clone(), node.epoch, RID::default())
+                    nc.ping(node.id.clone(), node.epoch, rid.clone())
                 )).await;
 
                 let total_requests_count = pings.len();
@@ -334,10 +336,12 @@ impl<RID:Clone+Sync+Send+Default, NC: NodeLogging<RID>+Sync+Send> NodeService<RI
             );
         }
 
+        let rid = { node.queue.lock().await.current_record_id().clone() };
+
         Ok(PingResponse { 
             id: node.id.clone(), 
             epoch: node.epoch, 
-            rid: RID::default()
+            rid: rid
         })
     }
 

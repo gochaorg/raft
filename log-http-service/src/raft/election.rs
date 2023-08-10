@@ -57,7 +57,8 @@ mod test {
             renominate_max_delay: Duration::from_millis(500),
             votes_min_count: 3,
             vote: None,
-            nodes: vec![]
+            nodes: vec![],
+            queue: Arc::new(AsyncMutex::new(RafQueueDummy(0)))
         };
         let node1 = node0.clone();
         let node2 = node0.clone();
@@ -427,7 +428,8 @@ mod test {
             renominate_max_delay: Duration::from_millis(500),
             votes_min_count: 3,
             vote: None,
-            nodes: vec![]
+            nodes: vec![],
+            queue: Arc::new(AsyncMutex::new(RafQueueDummy(0u32)))
         };
         let mut node1 = node0.clone(); 
         node1.id = "node1".to_string();
@@ -592,7 +594,7 @@ mod test {
             }
             // А) выдвинуть кандидатуру можно только один раз на один срок
             println!("\nnominations");
-            for (nid,noms) in nominations.iter() {
+            for (_nid,noms) in nominations.iter() {
                 let mut epoch_dup : HashSet<EpochID> = HashSet::new();
                 for nom in noms {
                     assert!( !epoch_dup.contains(&nom.epoch) );
@@ -602,14 +604,14 @@ mod test {
 
             // 5 участников стартуют как Follower (те 0 Leaders)
             // спустя время выбирают одного лидера
-            let leaders_matched = log.state_changes_match(
+            let _leaders_matched = log.state_changes_match(
                 |n| n.leaders, vec![0,1,2,1,2,1]);
             // assert!(leaders_matched,"leaders_matched");
 
             // 3. лидер после рассылает ping с новым номером эпохи
             
             // 4. остальные участники меняют номер эпохи
-            let epoch_matches =
+            let _epoch_matches =
             log.state_changes_match(|n| n.epoch_min_max, 
                 vec![None,
                 Some((0,0)),
