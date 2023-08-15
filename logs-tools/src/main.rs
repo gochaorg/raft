@@ -13,15 +13,15 @@ use err::LogToolErr;
 use logs::logfile::block::*;
 
 use parse::*;
-use range::{MultipleParse, Range};
 use std::{
     env,
     path::PathBuf,
 };
 
+use range::*;
+
 mod actions;
 use actions::*;
-mod range;
 mod buildinfo;
 
 fn main() {

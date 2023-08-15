@@ -104,6 +104,7 @@ pub enum NodeId {
     Generate
 }
 
+#[allow(dead_code)]
 /// Публичный адрес
 pub struct PubAddresses {
     /// Публичный адрес по умолчанию

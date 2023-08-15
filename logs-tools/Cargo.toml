@@ -10,6 +10,7 @@ build = "build.rs"
 logs = { path = "../logs" }
 parse = { path = "../parse" }
 log-http-client = { path = "../log-http-client" }
+range = { path="../range" }
 
 sha2 = "0.10.6"
 hex = "0.4.3"

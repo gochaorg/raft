@@ -45,7 +45,7 @@ where A: TryFrom<Number,Error=String> + Clone
 
 #[test]
 fn multiple_parse_test() {
-    use crate::range::MultipleParse;
+    use super::MultipleParse;
     use parse::*;
 
     let parser = MultipleParse::new();

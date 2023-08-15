@@ -7,7 +7,9 @@ members = [
     "date-format",
     "log-http-service",
     "log-http-client",
-    "path_template",    
+    "path_template",
+    "discovery",
+    "range"
 ]
 
 # [package]
