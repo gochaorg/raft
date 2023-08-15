@@ -12,12 +12,11 @@ where
     type FILE = FILE;
     type LogId = LogId;
 
-    fn write<Record>( &self, record:Record ) -> Result<RecID<LogId>,LoqErr<Self::FILE,Self::LogId>> 
-    where Record: Into<PreparedRecord>
+    fn write( &self, record:&PreparedRecord ) -> Result<RecID<LogId>,LoqErr<Self::FILE,Self::LogId>> 
     {
-        let prepared : PreparedRecord = record.into();
+        //let prepared : PreparedRecord = record.into();
         let (_,file, mut log) = self.tail();
-        let b_id = log.write_block(&prepared.options, &prepared.data)
+        let b_id = log.write_block(&record.options, &record.data)
             .map_err(|err| 
                 LoqErr::LogDataWrite { 
                     file: file.clone(),

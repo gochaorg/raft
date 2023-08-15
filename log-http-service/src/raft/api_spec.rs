@@ -7,14 +7,14 @@ use tokio::time::sleep;
 
 /// Клиент к узлу кластера
 #[async_trait]
-pub trait NodeClient: Send+Sync {
-    async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse,RErr>;
-    async fn nominate( &self, candidate:NodeID, epoch:u32, ) -> Result<(),RErr>;
+pub trait NodeClient<RID>: Send+Sync {
+    async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse<RID>,RErr>;
+    async fn nominate( &self, candidate:NodeID, epoch:u32 ) -> Result<(),RErr>;
 }
 
 /// Ответ на ping
 #[derive(Clone,Debug)]
-pub struct PingResponse {
+pub struct PingResponse<RID> {
     pub id: NodeID,
     pub epoch: EpochID,
     pub rid: RID,
@@ -22,19 +22,20 @@ pub struct PingResponse {
 
 /// Часть сервиса кластера
 #[async_trait]
-pub trait NodeService {
+pub trait NodeService<RID> {
     /// Периодично вызывается сервером
     async fn on_timer( &mut self );
 
     /// Принимает запрос ping от клиента
-    async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse,RErr>;
+    async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse<RID>,RErr>;
 
     /// Принимает запрос на лидера
     async fn nominate( &self, candidate:NodeID, epoch:u32 ) -> Result<(),RErr>;
 }
 
+/// Реализация по умолчанию
 #[async_trait]
-impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
+impl<RID:Clone+Sync+Send, NC: NodeLogging<RID>+Sync+Send> NodeService<RID> for NodeInstance<RID, NC> {
     async fn on_timer( &mut self ) {
         enum State {
             End,
@@ -49,7 +50,7 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
             let t_0 = Instant::now();
 
             let (clients, nid) = {
-                let mut node: tokio::sync::MutexGuard<'_, ClusterNode> = self.node.lock().await;
+                let mut node = self.node.lock().await;
                 
                 let prev = node.role.clone();
                 node.role = Role::Candidate;
@@ -140,10 +141,12 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
                     node.nodes.iter().map(|nc| 
                     nc.lock()
                 )).await;
+
+                let rid = { node.queue.lock().await.current_record_id().clone() };
                 
                 let pings = join_all(
                     clients.iter().map(|nc|
-                    nc.ping(node.id.clone(), node.epoch, 0)
+                    nc.ping(node.id.clone(), node.epoch, rid.clone())
                 )).await;
 
                 let total_requests_count = pings.len();
@@ -205,6 +208,7 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
             }
         };
 
+        // Эта хренотень требует рефакторинга
         loop {
             let state = {
                 let role = { 
@@ -263,7 +267,7 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
         }
     }
     
-    async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse,RErr> {
+    async fn ping( &self, leader:NodeID, epoch:EpochID, rid:RID ) -> Result<PingResponse<RID>,RErr> {
         let mut node = self.node.lock().await;
 
         info!("{nid} {role:?} {n_epoch} accept ping: leader={leader} epoch={epoch}",
@@ -332,10 +336,12 @@ impl<NC: NodeLogging+Sync+Send> NodeService for NodeInstance<NC> {
             );
         }
 
+        let rid = { node.queue.lock().await.current_record_id().clone() };
+
         Ok(PingResponse { 
             id: node.id.clone(), 
             epoch: node.epoch, 
-            rid: 0 
+            rid: rid
         })
     }
 

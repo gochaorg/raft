@@ -171,11 +171,10 @@ where
     type FILE = FILE;
     type LogId = LogId;
 
-    fn write<Record>( &self, record:Record ) -> Result<RecID<LogId>,LoqErr<Self::FILE,Self::LogId>>
-    where Record: Into<PreparedRecord> {
-        let rec: PreparedRecord = record.into();
-        self.wrap.write( rec.clone(), 
-        self.target.write(rec))
+    fn write( &self, record:&PreparedRecord ) -> Result<RecID<LogId>,LoqErr<Self::FILE,Self::LogId>>
+    {
+        self.wrap.write( record.clone(), 
+        self.target.write(record))
     }
 }
 

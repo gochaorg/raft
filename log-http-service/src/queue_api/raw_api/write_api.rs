@@ -40,7 +40,9 @@ pub async fn write_block( bytes:web::Bytes, path: web::Path<(String,u32)> ) -> R
         let bytes = bytes.to_vec();
         let block = Block::from_bytes(&bytes)?;
 
-        let rid = q.write(WriteBlock(block))?;
+        let pr: PreparedRecord = WriteBlock(block).into();
+
+        let rid = q.write(&pr)?;
         let rid: ID = rid.into();
 
         Ok(web::Json(rid))

@@ -118,6 +118,8 @@ async fn main() -> std::io::Result<()> {
             static_files: static_files_opt.clone(),
         }));
 
+        // https://peterevans.dev/posts/how-to-host-swagger-docs-with-github-pages/
+
         let app = app
             .service(web::resource("/{name}.{ext:html|css|js|png|jpg}").route(web::route().guard(guard::Get()).to(static_api::get_static)));
         let app = app.service(static_api::hello);

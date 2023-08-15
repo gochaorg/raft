@@ -140,8 +140,7 @@ where
     type FILE = FILE;
     type LogId = LogId;
 
-    fn write<Record>( &self, record:Record ) -> Result<RecID<LogId>,LoqErr<Self::FILE,Self::LogId>>
-    where Record: Into<PreparedRecord> 
+    fn write( &self, record:&PreparedRecord ) -> Result<RecID<LogId>,LoqErr<Self::FILE,Self::LogId>>
     {
         self.queue.read()?.write(record)
     }

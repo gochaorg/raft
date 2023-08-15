@@ -1513,6 +1513,7 @@ name = "parse"
 version = "0.1.0"
 dependencies = [
  "either",
+ "lazy_static",
  "regex",
 ]
 

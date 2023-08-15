@@ -4,7 +4,7 @@ use core::fmt::Debug;
 use std::marker::PhantomData;
 
 use crate::logfile::{LogFile, FlatBuff};
-use super::{log_id::*, LoqErr, FindFiles, OpenLogFile, ValidateLogFiles};
+use super::{log_id::*, LoqErr, FindFiles, OpenLogFile, ValidateLogFiles, PreparedRecord, LogQueueImpl, LogQueue};
 
 use log::info;
 
@@ -365,6 +365,30 @@ where
     }
 }
 
+pub trait LogWriteExt<RecordId,FILE:Clone+Debug,LogId:Clone+Debug> {
+    fn append<Record: Into<PreparedRecord>>( &self, record:Record ) -> Result<RecordId,LoqErr<FILE,LogId>>;
+}
+
+impl<'a,FILE:Clone+Debug,LogId:LogQueueFileId,BUFF:FlatBuff> LogWriteExt<RecID<LogId>,FILE,LogId> 
+for LogQueueImpl<'a,LogId,FILE,BUFF> 
+{
+    fn append<Record: Into<PreparedRecord>>( &self, record:Record ) -> Result<RecID<LogId>,LoqErr<FILE,LogId>> {
+        use crate::logqueue::log_api::*;
+
+        let rec: PreparedRecord = record.into();
+        let q = self.queue.read()?;
+        q.write(&rec)
+    }
+}
+
+impl<'a,FILE:Clone+Debug,LogId:LogQueueFileId,LOG> LogWriteExt<RecID<LogId>,FILE,LogId>
+for dyn LogQueue<RecID<LogId>, LogId, FILE, LOG> {
+    fn append<Record: Into<PreparedRecord>>( &self, record:Record ) -> Result<RecID<LogId>,LoqErr<FILE,LogId>> {
+        let rec: PreparedRecord = record.into();
+        self.write(&rec)
+    }
+}
+
 #[cfg(test)]
 mod full_test {
     #[allow(unused)]
@@ -396,9 +420,10 @@ mod full_test {
     }
 
     use crate::bbuff::absbuff::FileBuff;
-    use crate::logqueue::{LogQueueFileNumIDOpen, ValidateStub, path_template, LogQueueImpl};
+    use crate::logfile::LogFile;
+    use crate::logqueue::{LogQueueFileNumIDOpen, ValidateStub, path_template, LogQueueImpl, LogQueue, LogWriteExt};
 
-    use crate::logqueue::{log_id::*, LogQueueConf, LogFileQueue, LogWriting, LogNavigateLast };
+    use crate::logqueue::{log_id::*, LogQueueConf };
     use crate::logqueue::find_logs::FsLogFind;
 
     #[test]
@@ -432,12 +457,13 @@ mod full_test {
         //     = Box::new(log_queue);
 
         // api..
-        let mut log_queue = LogQueueImpl::new(log_queue);
+        let log_queue = LogQueueImpl::new(log_queue);
 
-        // api alt
-        // let mut log_queue = Wrapper::from(log_queue);
+        let mut log_queue: Box<dyn LogQueue<RecID<LogQueueFileNumID>, LogQueueFileNumID, PathBuf, LogFile<FileBuff>>> = Box::new(log_queue);
 
-        let rec = log_queue.write(20).unwrap();
+        //let mut log_queue = Wrapper::from(log_queue);
+
+        let rec = log_queue.append(20).unwrap();
         println!("log_queue writed, rec id = {:?}",rec);
 
         println!("before switch");
@@ -461,14 +487,14 @@ mod full_test {
         assert!(&log_files0[0].1.to_str().unwrap() == &log_files1[0].1.to_str().unwrap() );
         assert!(&log_files1[0].1.to_str().unwrap() != &log_files1[1].1.to_str().unwrap() );
 
-        let rec1 = log_queue.write(30).unwrap();
+        let rec1 = log_queue.append(30).unwrap();
         println!("log_queue writed, rec id = {:?}",rec1);
 
-        let rec2 = log_queue.write(32).unwrap();
+        let rec2 = log_queue.append(32).unwrap();
         println!("log_queue writed, rec id = {:?}",rec2);
         assert!(rec2.block_id.value() > rec1.block_id.value());
 
-        let rec3 = log_queue.write(34).unwrap();
+        let rec3 = log_queue.append(34).unwrap();
         println!("log_queue writed, rec id = {:?}",rec3);
         assert!(rec3.block_id.value() > rec2.block_id.value());
 

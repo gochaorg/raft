@@ -113,6 +113,9 @@ pub use api_spec::*;
 /// Фоновые задачи
 pub mod bg_tasks;
 
+/// API для RAFT
+pub mod rest_api;
+
 #[cfg(test)]
 mod test {
     use std::sync::{Arc, RwLock};
