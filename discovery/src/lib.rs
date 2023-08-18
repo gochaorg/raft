@@ -1,3 +1,14 @@
+mod udp;
+
+mod msg;
+pub use msg::*;
+
+mod ip_range;
+pub use ip_range::*;
+
+mod sockaddr_range;
+pub use sockaddr_range::*;
+
 use async_trait::async_trait;
 
 /// Ошибки
@@ -6,10 +17,10 @@ pub enum DiscoveryError {
 
 /// Служба обнаружения
 #[async_trait]
-pub trait DiscoveryService<A> {
-    async fn start() -> Result<(),DiscoveryError>;
-    async fn stop() -> Result<(),DiscoveryError>;
-    async fn is_running() -> Result<bool,DiscoveryError>;
+pub trait DiscoveryService {
+    async fn start( &mut self ) -> Result<(),DiscoveryError>;
+    async fn stop( &mut self ) -> Result<(),DiscoveryError>;
+    async fn is_running( &self ) -> Result<bool,DiscoveryError>;
 }
 
 /// Клиент службы обнаружения

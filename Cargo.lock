@@ -661,10 +661,12 @@ dependencies = [
 name = "discovery"
 version = "0.1.0"
 dependencies = [
+ "actix-rt",
  "async-trait",
  "derive_more",
  "env_logger",
  "log",
+ "range",
  "resolv-conf",
  "serde",
  "serde_json",

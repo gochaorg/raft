@@ -80,6 +80,16 @@ impl Next<u16> for u16 {
     }
 }
 
+impl Next<u8> for u8 {
+    fn next(v:u8) -> Option<u8> {
+        if v == u8::MAX {
+            None
+        } else {
+            Some(v+1)
+        }
+    }
+}
+
 struct SingleIter<T:Clone> {
     value: T,
     ptr: u8
@@ -260,22 +270,30 @@ where
 fn range_iter_test() {
     let range = Range::Single(10);
     let mut iter = range.into_iter();
-    for _ in 0..5 { println!("{:?}",iter.next()); }
+    //for _ in 0..5 { println!("{:?}",iter.next()); }
+    assert_eq!( iter.next(), Some(10) );
+    assert_eq!( iter.next(), None );
 
-    println!("----");
     let range = Range::FromToExc(7,10);
     let mut iter = range.into_iter();
-    for _ in 0..5 { println!("{:?}",iter.next()); }
+    //for _ in 0..5 { println!("{:?}",iter.next()); }
+    assert_eq!( iter.next(), Some(7) );
+    assert_eq!( iter.next(), Some(8) );
+    assert_eq!( iter.next(), Some(9) );
+    assert_eq!( iter.next(), None );
+    assert_eq!( iter.next(), None );
 
-    println!("----");
     let range = Range::Multiple( vec![
         Range::Single(1),
         Range::FromToExc(7,10)
     ]);
     let mut iter = range.into_iter();
-    for _ in 0..5 { println!("{:?}",iter.next()); }
+    assert_eq!( iter.next(), Some(1) );
+    assert_eq!( iter.next(), Some(7) );
+    assert_eq!( iter.next(), Some(8) );
+    assert_eq!( iter.next(), Some(9) );
+    assert_eq!( iter.next(), None );
 
-    println!("----");
     let range = Range::Multiple( vec![
         Range::Single(1u32),
         Range::FromToExc(7,10),
@@ -284,8 +302,13 @@ fn range_iter_test() {
         ])
     ]);
     let mut iter = range.into_iter();
-    for _ in 0..10 { 
-        let v = iter.next();
-        println!("{:?}",v);
-    }
+    assert_eq!( iter.next(), Some(1u32) );
+    assert_eq!( iter.next(), Some(7u32) );
+    assert_eq!( iter.next(), Some(8u32) );
+    assert_eq!( iter.next(), Some(9u32) );
+    assert_eq!( iter.next(), Some(12u32) );
+    assert_eq!( iter.next(), Some(13u32) );
+    assert_eq!( iter.next(), Some(14u32) );
+    assert_eq!( iter.next(), Some(15u32) );
+    assert_eq!( iter.next(), None );
 }
