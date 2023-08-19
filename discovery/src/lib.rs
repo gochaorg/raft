@@ -3,11 +3,8 @@ mod udp;
 mod msg;
 pub use msg::*;
 
-mod ip_range;
-pub use ip_range::*;
-
-mod sockaddr_range;
-pub use sockaddr_range::*;
+mod addr_range;
+pub use addr_range::*;
 
 use async_trait::async_trait;
 

@@ -19,3 +19,4 @@ async-trait = "0.1.72"
 actix-rt = "2.8.0"
 
 range = { path="../range" }
+parse = { path="../parse" }
