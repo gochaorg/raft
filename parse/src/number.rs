@@ -36,6 +36,26 @@ impl Number {
             }
         )
     }
+
+    pub fn try_u16( &self ) -> Option<u16> {
+        self.try_u128().and_then(|n| 
+            if n > u16::MAX as u128 {
+                None
+            } else {
+                Some(n as u16)
+            }
+        )
+    }
+
+    pub fn try_u8( &self ) -> Option<u8> {
+        self.try_u128().and_then(|n| 
+            if n > u8::MAX as u128 {
+                None
+            } else {
+                Some(n as u8)
+            }
+        )
+    }
 }
 
 impl TryFrom<Number> for u128 {
