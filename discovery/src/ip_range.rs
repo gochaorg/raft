@@ -6,6 +6,7 @@ use range::Range;
 use range::product;
 
 /// Диапазон ip адресов
+#[derive(Debug,Clone)]
 pub enum IpRange {
     Ip4( Range<u8>, Range<u8>, Range<u8>, Range<u8> ),
     Ip6( Range<u16>, Range<u16>, Range<u16>, Range<u16>, Range<u16>, Range<u16>, Range<u16>, Range<u16> )
@@ -24,6 +25,22 @@ fn iter_v6( r1:Range<u16>, r2:Range<u16>, r3:Range<u16>, r4:Range<u16>, r5:Range
 }
 
 
+impl IntoIterator for &IpRange {
+    type Item = IpAddr;
+    type IntoIter = Box<dyn Iterator<Item = IpAddr>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            IpRange::Ip4(r1, r2, r3, r4) => {
+                Box::new(iter_v4(r1.clone(), r2.clone(), r3.clone(), r4.clone()))
+            }
+            IpRange::Ip6(r1, r2, r3, r4, r5, r6, r7, r8) => {
+                Box::new(iter_v6(r1.clone(), r2.clone(), r3.clone(), r4.clone(), r5.clone(), r6.clone(), r7.clone(), r8.clone()))
+            }
+        }
+    }
+}
+
 impl IntoIterator for IpRange {
     type Item = IpAddr;
     type IntoIter = Box<dyn Iterator<Item = IpAddr>>;
@@ -31,24 +48,11 @@ impl IntoIterator for IpRange {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             IpRange::Ip4(r1, r2, r3, r4) => {
-                Box::new(iter_v4(r1, r2, r3, r4))
+                Box::new(iter_v4(r1.clone(), r2.clone(), r3.clone(), r4.clone()))
             }
             IpRange::Ip6(r1, r2, r3, r4, r5, r6, r7, r8) => {
-                Box::new(iter_v6(r1, r2, r3, r4, r5, r6, r7, r8))
+                Box::new(iter_v6(r1.clone(), r2.clone(), r3.clone(), r4.clone(), r5.clone(), r6.clone(), r7.clone(), r8.clone()))
             }
         }
     }
-}
-
-#[test]
-fn itreee() {
-    let r1 : Range<u8> = todo!();
-    let r2 : Range<u8> = todo!();
-    let r3 : Range<u8> = todo!();
-    let r4 : Range<u8> = todo!();
-    let it = 
-        product(product(product(r1, r2),r3),r4)
-        .map(|(((v1,v2),v3),v4)| (v1,v2,v3,v4))
-        .map(|(v1,v2,v3,v4)| Ipv4Addr::new(v1, v2, v3, v4))
-        ;
 }

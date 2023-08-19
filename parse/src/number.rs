@@ -204,3 +204,68 @@ fn test_number() {
     println!("{:?}", num.try_u128());
     assert!( num.try_u32() == Some(254u32) );
 }
+
+pub struct BaseNumberParser( pub DigitBase );
+impl Parser<Number> for BaseNumberParser {
+    fn parse( &self, source: &str ) -> Option<(Number, CharsCount)> {
+        let digit_parser = DigitParser { base: self.0 };
+
+        let mut digits: Vec<u8> = vec![];
+        let mut chr_count = CharsCount(0);
+        let mut src = source;
+
+        loop {
+            match digit_parser.parse(src) {
+                Some( (d,cc) ) => {
+                    digits.push(d.0);
+                    match src.substring(cc) {
+                        Some(substr) => {
+                            src = substr;
+                            chr_count = chr_count + cc;
+                        },
+                        None => break
+                    };
+                },
+                None => break
+            }
+        };
+
+        if chr_count.0 > 0 {
+            Some(( Number { base: digit_parser.base, digits: digits }, chr_count ))
+        } else {
+            None
+        }
+    }
+}
+
+pub struct HexNumberParser;
+
+impl Parser<Number> for HexNumberParser {
+    fn parse( &self, source: &str ) -> Option<(Number, CharsCount)> {
+        BaseNumberParser(DigitBase::Hex).parse(source)
+    }
+}
+
+pub struct BinNumberParser;
+
+impl Parser<Number> for BinNumberParser {
+    fn parse( &self, source: &str ) -> Option<(Number, CharsCount)> {
+        BaseNumberParser(DigitBase::Bin).parse(source)
+    }
+}
+
+pub struct OctNumberParser;
+
+impl Parser<Number> for OctNumberParser {
+    fn parse( &self, source: &str ) -> Option<(Number, CharsCount)> {
+        BaseNumberParser(DigitBase::Oct).parse(source)
+    }
+}
+
+pub struct DecNumberParser;
+
+impl Parser<Number> for DecNumberParser {
+    fn parse( &self, source: &str ) -> Option<(Number, CharsCount)> {
+        BaseNumberParser(DigitBase::Dec).parse(source)
+    }
+}
