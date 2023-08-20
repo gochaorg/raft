@@ -17,6 +17,7 @@ derive_more = "0.99.17"
 uuid = "1.4.1"
 async-trait = "0.1.72"
 actix-rt = "2.8.0"
+either = "1.8.1"
 
 range = { path="../range" }
 parse = { path="../parse" }

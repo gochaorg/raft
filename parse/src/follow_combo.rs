@@ -86,7 +86,7 @@ fn test_follow_2() {
     assert!( res == Some(((Digit(1),Digit(2)),CharsCount(2))) )
 }
 
-trait ParseAdd<P> {
+pub trait ParseAdd<P> {
     type Out;
     fn follow( self, other: P ) -> Self::Out;
 }
