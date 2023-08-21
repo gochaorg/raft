@@ -40,3 +40,15 @@ pub use duration::*;
 
 mod follow_combo;
 pub use follow_combo::*;
+
+mod alternative_combo;
+pub use alternative_combo::*;
+
+mod map_combo;
+pub use map_combo::*;
+
+mod repeat_combo;
+pub use repeat_combo::*;
+
+mod and_then_combo;
+pub use and_then_combo::*;

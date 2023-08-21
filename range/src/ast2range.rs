@@ -4,12 +4,12 @@ use super::range::Range;
 
 /// Трансформация из [Multiple] (AST) в [Range]
 impl<A> TryFrom<Multiple> for Range<A> 
-where A: TryFrom<Number,Error=String> + Clone
+where A: TryFrom<Number,Error=String> + Clone + PartialEq
 {
     type Error = String;
     fn try_from(value: Multiple) -> Result<Self, Self::Error> {
         fn range_num<A>(r_n: RangeNum) -> Result<Range<A>,String> 
-        where A: TryFrom<Number,Error = String> + Clone
+        where A: TryFrom<Number,Error = String> + Clone + PartialEq
         {
             match r_n {
                 RangeNum::One(n) => {

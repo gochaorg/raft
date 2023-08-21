@@ -4,7 +4,7 @@ use std::net::Ipv6Addr;
 use range::Range;
 use range::product;
 
-#[derive(Debug,Clone)]
+#[derive(Debug,Clone,PartialEq)]
 pub enum IpRange {
     Ip4( Range<u8>, Range<u8>, Range<u8>, Range<u8> ),
     Ip6( Range<u16>, Range<u16>, Range<u16>, Range<u16>, Range<u16>, Range<u16>, Range<u16>, Range<u16> )

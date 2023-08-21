@@ -9,9 +9,13 @@ use parse::ParseAdd;
 use parse::Parser;
 use parse::WhiteSpaceParser;
 use parse::alternative;
+use parse::and_then;
 //use parse::follow;
 use parse::map;
 use parse::repeat;
+use range::Range;
+
+use crate::IpRange;
 //use range::Range;
 //use range::product;
 
@@ -171,8 +175,6 @@ impl Parser<HexNonBreakRange16u> for HexNonBreakRange16uParser {
     }
 }
 
-/////////////////////////////////////
-
 #[derive(Clone,Debug)]
 struct DecNonBreakRange8uParser;
 impl Parser<DecNonBreakRange8u> for DecNonBreakRange8uParser {
@@ -182,6 +184,11 @@ impl Parser<DecNonBreakRange8u> for DecNonBreakRange8uParser {
             Right(v) => DecNonBreakRange8u::One(v.clone())
         }).parse(source)
     }
+}
+
+#[test]
+fn hex_nonbr_range_test() {
+    assert_eq!( HexNonBreakRange16uParser::parse(&HexNonBreakRange16uParser, "8-12").map(|(v,_)| v), Some(HexNonBreakRange16u::FromTo( HexFromTo16u(Hex16u(8),Hex16u(16+2))) ) );
 }
 
 /////////////////////////////////////
@@ -218,6 +225,30 @@ impl Parser<HexRange16u> for HexRange16uParser {
     }
 }
 
+impl From<HexRange16u> for Range<u16> {
+    fn from(value: HexRange16u) -> Self {
+        Range::Multiple(
+            value.0.iter().map(|r| match r {
+                HexNonBreakRange16u::FromTo(from_to) => Range::FromToInc(from_to.0.0, from_to.1.0),
+                HexNonBreakRange16u::One(one) => Range::Single(one.0)
+            }).collect()
+        )
+    }
+}
+
+#[test]
+fn hex_range_test() {
+    assert_eq!( HexRange16uParser::parse(&HexRange16uParser, "1,2,10-12").map(|(v,_)| v), 
+        Some(HexRange16u(
+            vec![
+                HexNonBreakRange16u::One(Hex16u(1)),
+                HexNonBreakRange16u::One(Hex16u(2)),
+                HexNonBreakRange16u::FromTo(HexFromTo16u(Hex16u(16),Hex16u(16+2)))
+            ]
+        )) 
+    );
+}
+
 /////////////////////////////////////
 
 #[derive(Clone,Debug,PartialEq)]
@@ -250,11 +281,31 @@ impl Parser<DecRange8u> for DecRange8uParser {
     }
 }
 
+impl From<DecRange8u> for Range<u8> {
+    fn from(value: DecRange8u) -> Self {
+        Range::Multiple(
+            value.0.iter().map(|a| 
+                match a {
+                    DecNonBreakRange8u::FromTo(from_to) => {
+                        Range::FromToInc(from_to.0.0, from_to.1.0)
+                    },
+                    DecNonBreakRange8u::One(a) => {
+                        Range::Single(a.0)
+                    }
+                }
+            ).collect()
+        )
+    }
+}
+
 #[test]
 fn dec_range_test() {
     let res = DecRange8uParser::parse(&DecRange8uParser, "1,3-5");
     println!("{res:?}");
-    assert_eq!(res.unwrap().0, DecRange8u(vec![DecNonBreakRange8u::One(Dec8u(1))]))
+    assert_eq!(res.unwrap().0, DecRange8u(vec![
+        DecNonBreakRange8u::One(Dec8u(1)),
+        DecNonBreakRange8u::FromTo(DecFromTo8u(Dec8u(3),Dec8u(5))),
+    ]))
 }
 
 /////////////////////////////////////
@@ -262,7 +313,7 @@ fn dec_range_test() {
 #[derive(Clone,Debug)]
 struct Ip4Delim;
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 struct Ip4Range(pub DecRange8u, pub DecRange8u, pub DecRange8u, pub DecRange8u);
 
 struct Ip4RangeParser;
@@ -309,6 +360,32 @@ impl Parser<Ip4Range> for Ip4RangeParser {
 
         parser.parse(source)
     }
+}
+
+#[test]
+fn ip4_range_test() {
+    let res = Ip4RangeParser::parse(&Ip4RangeParser, 
+        "127.0-4.2,3.8,9-10"
+    ).map(|(v,_)|v);
+
+    assert_eq!(res, Some(
+        Ip4Range(
+            DecRange8u(vec![
+                DecNonBreakRange8u::One(Dec8u(127))
+            ]),
+            DecRange8u(vec![
+                DecNonBreakRange8u::FromTo(DecFromTo8u(Dec8u(0), Dec8u(4)))
+            ]),
+            DecRange8u(vec![
+                DecNonBreakRange8u::One(Dec8u(2)),
+                DecNonBreakRange8u::One(Dec8u(3)),
+            ]),
+            DecRange8u(vec![
+                DecNonBreakRange8u::One(Dec8u(8)),
+                DecNonBreakRange8u::FromTo(DecFromTo8u(Dec8u(9), Dec8u(10)))
+            ])
+        )
+    ))
 }
 
 /////////////////////////////////////
@@ -428,4 +505,217 @@ impl Parser<Ip6Range> for Ip6RangeParser {
 
         lst_parser.parse(source)
     }
+}
+
+impl TryFrom<Ip6Range> for IpRange {
+    type Error = String;
+    fn try_from(value: Ip6Range) -> Result<Self, Self::Error> {
+        let values = value.0;
+        if values.len() == 0 { return Err("no values".to_string()); }
+
+        let split_count = values.iter().filter(|e| match e {
+            Ip6ByteAddr::Two(_) => true,
+            _ => false
+        }).count();
+
+        if split_count > 1usize { return Err("split count > 1".to_string()); }
+        
+        if split_count == 0usize {
+            if values.len() != 8 { return Err("expect 8 groups of byte ranges".to_string()); }
+            let hex_range = |a:Ip6ByteAddr| {
+                match a {
+                    Ip6ByteAddr::One(a) => Some(a),
+                    _ => None
+                }
+            };
+
+            let res = 
+            hex_range(values[0].clone()).and_then(|r0|
+                hex_range(values[1].clone()).and_then(|r1|
+                    hex_range(values[2].clone()).and_then(|r2|
+                        hex_range(values[3].clone()).and_then(|r3|
+                            hex_range(values[4].clone()).and_then(|r4|
+                                hex_range(values[5].clone()).and_then(|r5|
+                                    hex_range(values[6].clone()).and_then(|r6|
+                                        hex_range(values[7].clone()).map(|r7|
+                                            (r0.clone(),r1.clone(),r2.clone(),r3.clone(),r4.clone(),r5.clone(),r6.clone(),r7.clone())
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            ).map(|(r0,r1,r2,r3,r4,r5,r6,r7)| 
+                IpRange::Ip6( 
+                    r0.into(),r1.into(),r2.into(),r3.into(),r4.into(),r5.into(),r6.into(),r7.into()
+                )
+            );
+
+            return res.ok_or("bug".to_string());
+        }
+
+        let (left,right) = values.split_at(
+            values.iter().enumerate().filter(
+                |(_,a)| match a {
+                    Ip6ByteAddr::Two(_) => true,
+                    _ => false
+                }
+            ).map(|(i,_)| i).next().unwrap()
+        );
+        let (left,right) = (
+            left.iter().map(|a| match a {
+                Ip6ByteAddr::One(a) => a.clone(),
+                Ip6ByteAddr::Two(a) => a.clone(),
+            }),
+            right.iter().map(|a| match a {
+                Ip6ByteAddr::One(a) => a.clone(),
+                Ip6ByteAddr::Two(a) => a.clone(),
+            })
+        );
+        let left:  Vec<HexRange16u> = left.collect();
+        let right: Vec<HexRange16u> = right.collect();
+
+        let c_diff = 8usize - (left.len() + right.len());
+        if c_diff == 0 {
+            let mut lst : Vec<HexRange16u> = Vec::new();
+            lst.extend(left.clone());
+            lst.extend(right.clone());
+            return Ok(IpRange::Ip6(
+                lst[0].clone().into(), lst[1].clone().into(), lst[2].clone().into(), lst[3].clone().into(), 
+                lst[4].clone().into(), lst[5].clone().into(), lst[6].clone().into(), lst[7].clone().into()
+            ));
+        }
+
+        let left_append = true; //left.len() < right.len();
+
+        let mut lst : Vec<HexRange16u> = Vec::new();
+        lst.extend(left.clone());
+        if left_append {
+            for _i in 0..c_diff {
+                lst.push(HexRange16u(vec![HexNonBreakRange16u::One(Hex16u(0))]));
+            }
+        }
+        lst.extend(right.clone());
+        if ! left_append {
+            for _i in 0..c_diff {
+                lst.push(HexRange16u(vec![HexNonBreakRange16u::One(Hex16u(0))]));
+            }
+        }
+
+        return Ok(IpRange::Ip6(
+            lst[0].clone().into(), lst[1].clone().into(), lst[2].clone().into(), lst[3].clone().into(), 
+            lst[4].clone().into(), lst[5].clone().into(), lst[6].clone().into(), lst[7].clone().into()
+        ));
+    }
+}
+
+impl From<Ip4Range> for IpRange {
+    fn from(value: Ip4Range) -> Self {
+        IpRange::Ip4(
+            value.0.into(), 
+            value.1.into(), 
+            value.2.into(), 
+            value.3.into()
+        )
+    }
+}
+
+pub struct IpRangeParser;
+impl Parser<IpRange> for IpRangeParser {
+    fn parse( &self, source: &str ) -> Option<(IpRange, parse::CharsCount)> {
+        let ip6parse : Rc<dyn Parser<Ip6Range>> = Rc::new( Ip6RangeParser );
+        let ip6parse = and_then(ip6parse, |ip6r|{ 
+            let ip_range = match IpRange::try_from(ip6r.clone()) {
+                Ok(v) => Some(v),
+                Err(_) => None
+            };
+            ip_range
+        });
+
+        let ip4parse : Rc<dyn Parser<Ip4Range>> = Rc::new( Ip4RangeParser );
+        let ip4parse = map(ip4parse, |ip4r| IpRange::from(ip4r.clone()));
+
+        let parse = map(
+            alternative(ip6parse, ip4parse),
+            |et| match et {
+                Left(v) => v.clone(),
+                Right(v) => v.clone()
+            }
+        );
+        
+        parse.parse(source)
+    }
+}
+
+#[test]
+fn ip_range_test() {
+    let res = IpRangeParser::parse(&IpRangeParser, 
+        "127.0-4.2,3.8,9-10"
+    ).map(|(v,_)|v);
+
+    assert_eq!(res, Some(
+        IpRange::Ip4(
+            Range::Multiple(vec![
+                Range::Single(127u8)
+            ]),
+            Range::Multiple(vec![
+                Range::FromToInc(0, 4)
+            ]),
+            Range::Multiple(vec![
+                Range::Single(2),
+                Range::Single(3),
+            ]),
+            Range::Multiple(vec![
+                Range::Single(8),
+                Range::FromToInc(9, 10)
+            ])
+        )
+    ));
+
+    let res = IpRangeParser::parse(&IpRangeParser, 
+        "127 . 0-4 . 2,3 . 8,9-10"
+    ).map(|(v,_)|v);
+
+    assert_eq!(res, Some(
+        IpRange::Ip4(
+            Range::Multiple(vec![
+                Range::Single(127u8)
+            ]),
+            Range::Multiple(vec![
+                Range::FromToInc(0, 4)
+            ]),
+            Range::Multiple(vec![
+                Range::Single(2),
+                Range::Single(3),
+            ]),
+            Range::Multiple(vec![
+                Range::Single(8),
+                Range::FromToInc(9, 10)
+            ])
+        )
+    ));
+
+    let res = IpRangeParser::parse(&IpRangeParser, 
+        "127  .  0 - 4  .  2,3  .  8,9 - 10"
+    ).map(|(v,_)|v);
+
+    assert_eq!(res, Some(
+        IpRange::Ip4(
+            Range::Multiple(vec![
+                Range::Single(127u8)
+            ]),
+            Range::Multiple(vec![
+                Range::FromToInc(0, 4)
+            ]),
+            Range::Multiple(vec![
+                Range::Single(2),
+                Range::Single(3),
+            ]),
+            Range::Multiple(vec![
+                Range::Single(8),
+                Range::FromToInc(9, 10)
+            ])
+        )
+    ));
 }

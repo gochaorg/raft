@@ -27,9 +27,9 @@
 ///     println!("{:?}",v);
 /// }
 /// ```
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 #[allow(dead_code)]
-pub enum Range<T:Sized+Clone> {
+pub enum Range<T:Sized+Clone+PartialEq> {
     Single(T),
     FromToExc(T,T),
     FromToInc(T,T),
