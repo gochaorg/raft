@@ -92,7 +92,6 @@ where
 {
     let str = DurationParser::to_string(value.clone());
     serializer.serialize_str(&str)
-    // todo!()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

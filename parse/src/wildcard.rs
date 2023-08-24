@@ -365,32 +365,6 @@ impl Wildcard {
 
         let mut cap_pos = Vec::<CapPos>::new();
 
-        // for idx in 0..captures.len() {
-        //     let it = &captures[idx];
-        //     match it {
-        //         Capture::Plain { from, to } => {
-        //             c_from = *from;
-        //             c_to = *to;
-        //             cap_pos.push( CapPos::Plain );
-        //         },
-        //         Capture::Several { chars_counts, upper_unlimited: upper_limited } => {
-        //             let start_pos = c_to;
-        //             let end_pos = 
-        //                 if idx >= (captures.len()-1) {
-        //                     text.len()
-        //                 } else {
-        //                     match &captures[idx+1] {
-        //                         Capture::Plain { from, to:_ } => { *from },
-        //                         Capture::Several { chars_counts:_, upper_unlimited:_ } => { todo!() }
-        //                     }
-        //                 };
-        //             c_from = start_pos;
-        //             c_to = end_pos;
-        //             cap_pos.push( CapPos::Several { from: start_pos, to: end_pos, chars_counts: *chars_counts, upper_unlimited: *upper_limited } );
-        //         }
-        //     }
-        // }
-
         if captures.len()>1 {
             for idx in 0..captures.len() {
                 if idx == captures.len()-1 {

@@ -9,7 +9,9 @@ pub use addr_range::*;
 use async_trait::async_trait;
 
 /// Ошибки
+#[derive(Debug,Clone)]
 pub enum DiscoveryError {
+    UnImplemented
 }
 
 /// Служба обнаружения
@@ -22,9 +24,9 @@ pub trait DiscoveryService {
 
 /// Клиент службы обнаружения
 #[async_trait]
-pub trait DiscoverClient<A> {
+pub trait DiscoverClient<A> : Send+Sync {
     /// Обнаружить сервисы в сети
-    async fn discovery() -> Result<Vec<A>,DiscoveryError>;
+    async fn discovery( &self ) -> Result<Vec<A>,DiscoveryError>;
 }
 
 // #[cfg(test)]

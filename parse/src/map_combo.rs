@@ -56,15 +56,3 @@ fn test_map_1() {
     let res = parser.parse(str);
     assert!( res == Some((3u8,CharsCount(2))) )
 }
-
-// pub trait ParseMap<A> {
-//     fn map<R>( self, f: impl Fn(A) -> R ) -> Self::Out;
-// }
-
-// impl<'a,A> ParseMap<A> for Rc<dyn Parser<A> + 'a> {
-//     type Out = Rc<dyn Parser<>;
-
-//     fn map<R>( self, f: impl Fn(A) -> R ) -> Self::Out {
-//         todo!()
-//     }
-// }

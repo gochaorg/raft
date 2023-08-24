@@ -666,6 +666,7 @@ dependencies = [
  "derive_more",
  "either",
  "env_logger",
+ "futures",
  "log",
  "parse",
  "range",
