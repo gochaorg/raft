@@ -1,10 +1,11 @@
-mod udp;
-
 mod msg;
 pub use msg::*;
 
 mod addr_range;
 pub use addr_range::*;
+
+mod udp;
+pub use udp::*;
 
 use async_trait::async_trait;
 
@@ -32,7 +33,6 @@ pub trait DiscoverClient<A> : Send+Sync {
 // #[cfg(test)]
 // mod tests {
 //     use super::*;
-
 //     // #[test]
 //     // fn it_works() {
 //     //     let result = add(2, 2);
