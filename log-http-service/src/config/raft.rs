@@ -9,6 +9,12 @@ pub struct RaftConfig {
     #[serde(default="raft_enabled_default")]
     pub enabled: bool,
 
+    /// Базовый адрес URL на котором запущен WebServer
+    /// 
+    /// Например: `http://my-hosting.com:8080`
+    #[serde(default)]
+    pub base_url: Option<String>,
+
     #[serde(default)]
     /// Идентификатор узла кластера
     pub id: NodeId,
@@ -125,23 +131,24 @@ impl NodeId {
     }
 }
 
-#[allow(dead_code)]
-/// Публичный адрес
-pub struct PubAddresses {
-    /// Публичный адрес по умолчанию
-    pub address: Option<String>,
+// #[allow(dead_code)]
+// /// Публичный адрес
+// pub struct PubAddresses {
+//     /// Публичный адрес по умолчанию
+//     pub address: Option<String>,
 
-    /// Адрес для конкретного узла - id узла
-    pub for_node: HashMap<String,String>,
+//     /// Адрес для конкретного узла - id узла
+//     pub for_node: HashMap<String,String>,
 
-    /// Адрес для конкртеного узла - ip адрес узла
-    pub for_ip: HashMap<String,String>,
-}
+//     /// Адрес для конкртеного узла - ip адрес узла
+//     pub for_ip: HashMap<String,String>,
+// }
 
 impl Default for RaftConfig {
     fn default() -> Self {
         Self { 
             enabled: raft_enabled_default(),
+            base_url: None,
             id: NodeId::Generate,
             ping_period: ping_period_default(),
             heartbeat_timeout: heartbeat_timeout_default(),

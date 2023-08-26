@@ -31,3 +31,4 @@ env_logger = "0.10.0"
 async-trait = "0.1.72"
 rand = "0.8.5"
 discovery = { path="../discovery" }
+local-ip-address = "0.5.4"

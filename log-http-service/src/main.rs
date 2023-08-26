@@ -19,12 +19,12 @@ use config::AppConfig;
 use logs::{logqueue::{find_logs::FsLogFind, LogQueueConf, LogQueueFileNumID, LogQueueFileNumIDOpen, ValidateStub, LogFileQueue}, bbuff::absbuff::FileBuff, logfile::LogFile};
 use logs::logqueue::path_template2;
 use path_template::PathTemplateParser;
-use std::{env, path::PathBuf, sync::{Arc, Mutex}, marker::PhantomData};
+use std::{env, path::PathBuf, sync::{Arc, Mutex}, marker::PhantomData, time::Duration};
 use log::{info, debug};
 use actix_web::middleware::Logger;
 use env_logger::Env;
 
-use crate::{state::{AppState, RaftState}, config::CmdLineParams};
+use crate::{state::{AppState, RaftState}, config::CmdLineParams, raft::bg_tasks::Starter};
 
 
 /// Очередь
@@ -101,13 +101,28 @@ async fn main() -> std::io::Result<()> {
 
     info!("queue openned");
 
+    let base_url = app_conf.web_server.base_url().expect("compute app_conf.web_server.base_url() fail");
+    let base_url = app_conf.raft.base_url.clone().unwrap_or(base_url);
+
     // создание RaftState
     let raft = RaftState {
         id: match &app_conf.raft.id {
             config::NodeId::Generate => { config::NodeId::generate(20) },
             config::NodeId::Name(name) => {name.clone()}
+        },
+
+        base_url: base_url
+    };
+
+    let job = move || {
+        async { 
+            //log::info!("run bg task");
         }
     };
+    let mut bg = raft::bg_tasks::bg_job_async(job);
+    bg.set_duration(Duration::from_secs(2));
+    bg.set_name("discovery");
+    let _ = bg.start();
 
     // configure atix ...........
     HttpServer::new(move || {

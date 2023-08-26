@@ -27,8 +27,10 @@ pub async fn get_state( state:web::Data<AppState> ) -> Result<impl Responder,Api
     #[derive(Serialize)]
     struct StateInfo {
         id: String,
+        base_url: String,
     }
     Ok(web::Json(StateInfo {
-        id: state.id.clone()
+        id: state.id.clone(),
+        base_url: state.base_url.clone(),
     }))
 }

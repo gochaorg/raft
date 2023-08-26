@@ -16,5 +16,8 @@ pub struct AppState {
 #[derive(Clone)]
 pub struct RaftState {
     /// ID узла
-    pub id: String
+    pub id: String,
+
+    /// Базовый адрес
+    pub base_url: String,
 }

@@ -116,6 +116,8 @@ pub mod bg_tasks;
 /// API для RAFT
 pub mod rest_api;
 
+pub mod registry;
+
 #[cfg(test)]
 mod test {
     use std::sync::{Arc, RwLock};
