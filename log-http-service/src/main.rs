@@ -124,7 +124,7 @@ async fn main() -> std::io::Result<()> {
 
         let app = app.app_data(web::Data::new(AppState {
             static_files: static_files_opt.clone(),
-            raft: raft.clone()
+            raft: Arc::new(Mutex::new(raft.clone()))
         }));
 
         // https://peterevans.dev/posts/how-to-host-swagger-docs-with-github-pages/
@@ -133,6 +133,7 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/{name}.{ext:html|css|js|png|jpg}").route(web::route().guard(guard::Get()).to(static_api::get_static)));
         let app = app.service(static_api::hello);
         let app = app.service(web::scope("/queue").configure(queue_api::queue_api_route));
+        let app = app.service(web::scope("/raft").configure(raft::rest_api::raft_api_route));
         app
     })
     .bind((app_conf.clone().web_server.host.clone(), app_conf.web_server.port))?

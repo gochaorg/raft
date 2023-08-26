@@ -116,7 +116,7 @@ impl NodeId {
         let mut id = String::new();
         for _ in 0..len {
             let i = random::<u8>();
-            let i = letters_count % i;
+            let i = i % letters_count;
 
             let s : String = letters.chars().skip(i as usize).take(1).collect();
             id.push_str(&s);

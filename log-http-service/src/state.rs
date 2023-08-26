@@ -9,7 +9,7 @@ pub struct AppState {
     pub static_files: Arc<Mutex<Option<PathBuf>>>,
 
     /// Состояние RAFT
-    pub raft: RaftState
+    pub raft: Arc<Mutex<RaftState>>
 }
 
 /// Состояние RAFT

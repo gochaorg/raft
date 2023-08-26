@@ -5,6 +5,8 @@ use std::fmt::Debug;
 use std::path::PathBuf;
 use std::sync::PoisonError;
 
+use crate::state::RaftState;
+
 #[derive(Debug)]
 pub enum ApiErr 
 {
@@ -23,7 +25,8 @@ pub enum ApiErr
         error: String,
     },
     QueueIsEmpy,
-    LoqErr(String)
+    LoqErr(String),
+    CantLockRaftState { error: String }
 }
 
 impl Display for ApiErr {
@@ -47,7 +50,8 @@ impl error::ResponseError for ApiErr {
             Self::QueueIsEmpy =>
                 format!("QueueIsEmpy"),
             Self::LoqErr(err) =>
-                format!("LoqErr: {err}")
+                format!("LoqErr: {err}"),
+            _ => format!("{:?}", self)
         })
     }
 
@@ -74,7 +78,12 @@ for ApiErr {
 
 impl std::convert::From<LoqErr<PathBuf, logs::logqueue::LogQueueFileNumID>> for ApiErr {
     fn from(value: LoqErr<PathBuf, logs::logqueue::LogQueueFileNumID>) -> Self {
-        //serde_json::to_string(&value);
         Self::LoqErr(format!("{value:?}"))
+    }
+}
+
+impl From<PoisonError<std::sync::MutexGuard<'_, RaftState>>> for ApiErr {
+    fn from(value: PoisonError<std::sync::MutexGuard<'_, RaftState>>) -> Self {
+        Self::CantLockRaftState { error: value.to_string() }
     }
 }
