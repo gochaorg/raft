@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use derive_more::Display;
 use super::*;
 
@@ -35,6 +34,7 @@ fn udp_each_test() {
     use actix_rt::System;
     use std::sync::Arc;
     use std::net::SocketAddr;
+    use std::time::Duration;
 
     use env_logger;
     //env_logger::init();
@@ -79,7 +79,8 @@ fn udp_each_test() {
             Arc::new(socket), 
             //servers_addr.clone(), 
             addr_range,
-            Arc::new(Mutex::new("http".to_string()))
+            Arc::new(Mutex::new("http".to_string())),
+            Arc::new(Mutex::new(Duration::from_millis(1000)))
         );
         
         let res = client.discovery().await;

@@ -16,6 +16,7 @@ pub struct AppConfig {
     /// Настройки очереди
     pub queue: QueueConfig,
 
+    /// Настройки raft
     #[serde(default)]
     pub raft: RaftConfig,
 }

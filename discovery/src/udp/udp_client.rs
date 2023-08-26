@@ -27,7 +27,7 @@ where
     A:Clone+Debug,
     Targets: IntoIterator<Item=SocketAddr>,
 {
-    pub fn new( socket: Arc<UdpSocket>, targets: Targets, pub_address: Arc<Mutex<A>> ) -> Self {
+    pub fn new( socket: Arc<UdpSocket>, targets: Targets, pub_address: Arc<Mutex<A>>, recieve_timeout:Arc<Mutex<Duration>> ) -> Self {
         let mut buff : Vec<u8> = Vec::new();
         buff.resize(BUFFER_SIZE, 0);
 
@@ -36,7 +36,7 @@ where
             targets: targets,
             pub_address: pub_address,
             buffer: Arc::new(Mutex::new(buff)),
-            recieve_timeout: Arc::new(Mutex::new(Duration::from_millis(1000)))
+            recieve_timeout: recieve_timeout
         }
     }
 }

@@ -24,7 +24,7 @@ use log::{info, debug};
 use actix_web::middleware::Logger;
 use env_logger::Env;
 
-use crate::{state::AppState, config::CmdLineParams};
+use crate::{state::{AppState, RaftState}, config::CmdLineParams};
 
 
 /// Очередь
@@ -101,6 +101,14 @@ async fn main() -> std::io::Result<()> {
 
     info!("queue openned");
 
+    // создание RaftState
+    let raft = RaftState {
+        id: match &app_conf.raft.id {
+            config::NodeId::Generate => { config::NodeId::generate(20) },
+            config::NodeId::Name(name) => {name.clone()}
+        }
+    };
+
     // configure atix ...........
     HttpServer::new(move || {
         let cors = Cors::default()
@@ -116,6 +124,7 @@ async fn main() -> std::io::Result<()> {
 
         let app = app.app_data(web::Data::new(AppState {
             static_files: static_files_opt.clone(),
+            raft: raft.clone()
         }));
 
         // https://peterevans.dev/posts/how-to-host-swagger-docs-with-github-pages/

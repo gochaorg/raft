@@ -2,6 +2,7 @@ use std::{time::Duration, collections::HashMap};
 
 use parse::{DurationParser, Parser};
 use serde::{Deserialize, Serialize, Deserializer, de::Error, Serializer};
+use std::net::IpAddr;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RaftConfig {
@@ -63,6 +64,8 @@ pub struct RaftConfig {
     #[serde(default="votes_min_count_default")]
     /// Минимальное кол-во голосов для успеха
     pub votes_min_count: u32,
+
+    //pub discovery
 }
 
 fn raft_enabled_default() -> bool { false }
@@ -94,6 +97,7 @@ where
     serializer.serialize_str(&str)
 }
 
+/// Имя узла кластера
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NodeId {
     /// Стабильное имя
@@ -101,6 +105,24 @@ pub enum NodeId {
 
     /// Генерировать
     Generate
+}
+
+impl NodeId {
+    /// Генерация случайного имени
+    pub fn generate( len:usize ) -> String {
+        use rand::*;
+        let letters = "qwertyuiopasdfghjklzxcvbnm1234567890";
+        let letters_count = letters.chars().count() as u8;
+        let mut id = String::new();
+        for _ in 0..len {
+            let i = random::<u8>();
+            let i = letters_count % i;
+
+            let s : String = letters.chars().skip(i as usize).take(1).collect();
+            id.push_str(&s);
+        }
+        id
+    }
 }
 
 #[allow(dead_code)]
@@ -135,5 +157,41 @@ impl Default for RaftConfig {
 impl Default for NodeId {
     fn default() -> Self {
         NodeId::Generate
+    }
+}
+
+/// Как обнаруживать сервера в сети
+pub enum Discovery {
+    /// Использовать UDP для обнаружения
+    UdpDiscovery {
+        /// Порт на котором будет запущен UDP
+        port: u16,
+
+        /// Адрес на котором будет запущен UDP
+        bind: IpAddr,
+
+        /// Адреса куда посылать рассылку
+        targets: UdpDiscoveryTargets,
+
+        /// Сколько ждать времени ответа от серверов
+        recieve_timeout: Duration
+    }
+}
+
+/// Адреса по которым будет рассылка
+pub enum UdpDiscoveryTargets {
+    IpRange(String),
+    IpList(Vec<IpAddr>),
+}
+
+/// Фоновая задача обнаружения
+pub enum DiscoveryJob {
+    /// Запуститься один раз
+    Once,
+
+    /// Периодично запускать
+    Regular {
+        /// Как часто запускать
+        period: Duration
     }
 }

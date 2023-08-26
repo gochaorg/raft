@@ -1347,6 +1347,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "date-format",
+ "discovery",
  "encoding",
  "env_logger",
  "futures",
