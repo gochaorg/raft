@@ -53,6 +53,7 @@ async fn main() -> std::io::Result<()> {
         CmdLineParams::from_cmd_line().apply(
             AppConfig::find_or_default()
         );
+    let app_conf_ref = app_conf.clone();
     let app_conf = Arc::new(app_conf);
 
     info!("starting server on {}:{}", &app_conf.web_server.host, app_conf.web_server.port);
@@ -99,7 +100,9 @@ async fn main() -> std::io::Result<()> {
         QUEUE_GLOBAL = Some(queue);
     }
 
+    // //////////////////////////////////////////////////////////////////////
     info!("queue openned");
+    // //////////////////////////////////////////////////////////////////////
 
     let base_url = app_conf.web_server.base_url().expect("compute app_conf.web_server.base_url() fail");
     let base_url = app_conf.raft.base_url.clone().unwrap_or(base_url);
@@ -114,16 +117,36 @@ async fn main() -> std::io::Result<()> {
         base_url: base_url
     };
 
-    let job = move || {
-        async { 
-            //log::info!("run bg task");
+
+    // фоновые процессы
+    let conf1 = app_conf.clone();
+    // let job = move || {
+    //     let conf1 = conf1.clone();
+    //     async move { 
+    //         let config::DiscoveryClientAndService {
+    //             client,
+    //             service
+    //         } = conf1.raft.discovery.clone().unwrap().create_discovery_and_client(app_conf_ref.clone()).await.unwrap();
+            
+    //         client.discovery();
+    //     }
+    // };
+    let mut bg = raft::bg_tasks::bg_job_async(move || {
+        let conf1 = conf1.clone();
+        async move {
+            let config::DiscoveryClientAndService {
+                client,
+                service
+            } = conf1.raft.discovery.clone().unwrap().create_discovery_and_client(todo!()).await.unwrap();
+
+            client.discovery();
         }
-    };
-    let mut bg = raft::bg_tasks::bg_job_async(job);
+    });
     bg.set_duration(Duration::from_secs(2));
     bg.set_name("discovery");
     let _ = bg.start();
 
+    // //////////////////////////////////////////////////////////////////////
     // configure atix ...........
     HttpServer::new(move || {
         let cors = Cors::default()

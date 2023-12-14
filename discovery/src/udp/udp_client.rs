@@ -13,7 +13,7 @@ use super::*;
 pub struct UdpClientEach<A,Targets>
 where
     A:Clone+Debug,
-    Targets: IntoIterator<Item=SocketAddr>,
+    Targets: IntoIterator<Item=SocketAddr> + Send,
 {
     socket: Arc<UdpSocket>,
     targets: Targets,
@@ -25,7 +25,7 @@ where
 impl<A,Targets> UdpClientEach<A,Targets> 
 where
     A:Clone+Debug,
-    Targets: IntoIterator<Item=SocketAddr>,
+    Targets: IntoIterator<Item=SocketAddr> + Send,
 {
     pub fn new( socket: Arc<UdpSocket>, targets: Targets, pub_address: Arc<Mutex<A>>, recieve_timeout:Arc<Mutex<Duration>> ) -> Self {
         let mut buff : Vec<u8> = Vec::new();
