@@ -53,7 +53,6 @@ async fn main() -> std::io::Result<()> {
         CmdLineParams::from_cmd_line().apply(
             AppConfig::find_or_default()
         );
-    let app_conf_ref = app_conf.clone();
     let app_conf = Arc::new(app_conf);
 
     info!("starting server on {}:{}", &app_conf.web_server.host, app_conf.web_server.port);
@@ -120,26 +119,16 @@ async fn main() -> std::io::Result<()> {
 
     // фоновые процессы
     let conf1 = app_conf.clone();
-    // let job = move || {
-    //     let conf1 = conf1.clone();
-    //     async move { 
-    //         let config::DiscoveryClientAndService {
-    //             client,
-    //             service
-    //         } = conf1.raft.discovery.clone().unwrap().create_discovery_and_client(app_conf_ref.clone()).await.unwrap();
-            
-    //         client.discovery();
-    //     }
-    // };
     let mut bg = raft::bg_tasks::bg_job_async(move || {
         let conf1 = conf1.clone();
         async move {
-            let config::DiscoveryClientAndService {
-                client,
-                service
-            } = conf1.raft.discovery.clone().unwrap().create_discovery_and_client(todo!()).await.unwrap();
+            // let config::DiscoveryClientAndService {
+            //     client,
+            //     service
+            // } = conf1.raft.discovery.clone().unwrap().create_discovery_and_client(todo!()).await.unwrap();
 
-            client.discovery();
+            // client.discovery();
+            println!("bg job run");
         }
     });
     bg.set_duration(Duration::from_secs(2));

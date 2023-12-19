@@ -1,6 +1,6 @@
-use std::{time::Duration, collections::HashMap, sync::{Arc, Mutex}, net::{SocketAddr, SocketAddrV4, SocketAddrV6}};
+use std::{time::Duration, sync::Arc, net::{SocketAddr, SocketAddrV4, SocketAddrV6}};
 
-use discovery::{DiscoveryService, DiscoverClient, UdpService, IpRangeParser, UdpClientEach, SockAddrRange};
+use discovery::{DiscoveryService, DiscoverClient, UdpService, UdpClientEach, SockAddrRange};
 use either::Either::Left;
 use parse::{DurationParser, Parser};
 use serde::{Deserialize, Serialize, Deserializer, de::Error, Serializer};
