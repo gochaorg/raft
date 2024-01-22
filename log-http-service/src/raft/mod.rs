@@ -113,6 +113,9 @@ pub use api_spec::*;
 /// Фоновые задачи
 pub mod bg_tasks;
 
+mod raft_state;
+pub use raft_state::*;
+
 /// API для RAFT
 pub mod rest_api;
 

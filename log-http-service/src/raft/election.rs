@@ -117,7 +117,7 @@ mod test {
                     ()
                 }
             });
-            bg.set_duration(Duration::from_millis(500));
+            bg.set_timeout(Duration::from_millis(500));
         
             let _= bg.start();
             sleep(Duration::from_secs(2)).await;
@@ -542,9 +542,9 @@ mod test {
             });
 
             // Периодичность задач
-            bg.set_duration(Duration::from_millis(1000));
+            bg.set_timeout(Duration::from_millis(1000));
 
-            let _ = bg.start();
+            let _ = <BgJob<_,_> as Starter>::start(&mut bg);
             sleep(Duration::from_secs(30)).await;
 
             println!("log");

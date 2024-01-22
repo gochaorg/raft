@@ -7,10 +7,10 @@ use log;
 pub struct BgJob<F,H> 
 {
     /// Управление асинхронной задачей
-    handle: Option<H>, 
+    pub handle: Option<H>, 
 
     /// Задержка между повторным выполнением
-    throttling: Duration,
+    pub timeout: Duration,
 
     /// Сигнал остановки
     stop_signal: Arc<Mutex<bool>>,
@@ -20,6 +20,8 @@ pub struct BgJob<F,H>
 
     name: Option<String>,
 }
+
+#[derive(Debug,Clone)]
 pub enum BgErr {
     AlreadyRunning
 }
@@ -33,7 +35,7 @@ pub fn bg_job_async<Fu,R>( work: Fu ) -> BgJob<Fu, AsyncJoinHandle<()>>
 {    
     BgJob { 
         handle: None, 
-        throttling: Duration::from_millis(100), 
+        timeout: Duration::from_millis(100), 
         stop_signal: Arc::new(Mutex::new(false)), 
         job: work,
         name: None,
@@ -48,7 +50,7 @@ pub fn bg_job_sync<Fu>( work: Fu ) -> BgJob<Fu, JoinHandle<()>>
 {
     BgJob { 
         handle: None, 
-        throttling: Duration::from_millis(100), 
+        timeout: Duration::from_millis(100), 
         stop_signal: Arc::new(Mutex::new(false)), 
         job: work,
         name: None,
@@ -59,8 +61,8 @@ pub fn bg_job_sync<Fu>( work: Fu ) -> BgJob<Fu, JoinHandle<()>>
 impl<F,H> BgJob<F,H> 
 {
     /// Указывает задержку перед запуском задачи
-    pub fn set_duration( &mut self, value:Duration ) {
-        self.throttling = value;
+    pub fn set_timeout( &mut self, value:Duration ) {
+        self.timeout = value;
     }
 
     /// Указывает имя задачи
@@ -123,7 +125,7 @@ where
             None => log::info!("starting bg job")
         }
 
-        let throttling = self.throttling.clone();
+        let throttling = self.timeout.clone();
         let stop_signal = self.stop_signal.clone();
         {
             let mut signal = stop_signal.lock().unwrap();
@@ -185,7 +187,7 @@ fn test_bg_async() {
         //let mut bg = BgJob::fromz(job);
         let mut bg = bg_job_async(job);            
 
-        bg.set_duration(Duration::from_millis(1000));
+        bg.set_timeout(Duration::from_millis(1000));
         bg.set_name("test");
 
         let _ = bg.start();
@@ -223,7 +225,7 @@ where
             None => log::info!("starting bg job")
         }
 
-        let throttling = self.throttling.clone();
+        let throttling = self.timeout.clone();
 
         let stop_signal = self.stop_signal.clone();
         {
@@ -276,7 +278,7 @@ fn test_bg() {
     let mut bg = bg_job_sync( || {
         println!("do some work native")
     });
-    bg.set_duration(Duration::from_secs(1));
+    bg.set_timeout(Duration::from_secs(1));
     bg.set_name("test native");
 
     let _ = bg.start();

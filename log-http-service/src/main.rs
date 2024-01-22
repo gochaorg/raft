@@ -13,19 +13,20 @@ mod static_api;
 /// Raft
 mod raft;
 
+use std::{env, marker::PhantomData, path::PathBuf, sync::{Arc, Mutex}, time::Duration};
 use actix_cors::Cors;
+use env_logger::Env;
+use log::{info, debug};
 use actix_web::{web, App, HttpServer, guard};
+use actix_web::middleware::Logger;
+
 use config::AppConfig;
 use logs::{logqueue::{find_logs::FsLogFind, LogQueueConf, LogQueueFileNumID, LogQueueFileNumIDOpen, ValidateStub, LogFileQueue}, bbuff::absbuff::FileBuff, logfile::LogFile};
 use logs::logqueue::path_template2;
 use path_template::PathTemplateParser;
-use std::{env, path::PathBuf, sync::{Arc, Mutex}, marker::PhantomData};
-use log::{info, debug};
-use actix_web::middleware::Logger;
-use env_logger::Env;
 
-use crate::{state::AppState, config::CmdLineParams};
-
+use crate::{config::CmdLineParams, raft::RaftState, state::AppState};
+use crate::raft::bg_tasks::*;
 
 /// Очередь
 static mut QUEUE_GLOBAL: Option<Arc<Mutex<dyn LogFileQueue<LogQueueFileNumID,PathBuf,LogFile<FileBuff>>  >>> = None;
@@ -101,6 +102,36 @@ async fn main() -> std::io::Result<()> {
 
     info!("queue openned");
 
+    ///////////////////////////////////////////////////////
+    let raft_state = RaftState {
+        bg_job: None
+    };
+    let raft_state = Arc::new(Mutex::new(raft_state));
+    let raft_state_0 = raft_state.clone();
+
+    let mut bg = raft::bg_tasks::bg_job_async(move || {
+        let raft_state_00 = raft_state_0.clone();
+        async move {            
+            match raft_state_00.try_lock() {
+                Ok(state) => {
+                    state.on_timer().await;
+                }
+                Err(lock_err) => {}
+            };
+        }
+    });
+
+    bg.set_timeout(Duration::from_secs(2));
+    bg.set_name("raft bg job");
+    let _ = bg.start();
+
+    let m_bg : Box<dyn raft::job::Job + Send + Sync> = Box::new(bg);
+    {
+        let mut r = raft_state.lock().unwrap();
+        r.bg_job = Some(m_bg);
+    }
+    ///////////////////////////////////////////////////////
+
     // configure atix ...........
     HttpServer::new(move || {
         let cors = Cors::default()
@@ -116,6 +147,7 @@ async fn main() -> std::io::Result<()> {
 
         let app = app.app_data(web::Data::new(AppState {
             static_files: static_files_opt.clone(),
+            raft: raft_state.clone()
         }));
 
         // https://peterevans.dev/posts/how-to-host-swagger-docs-with-github-pages/
@@ -123,7 +155,10 @@ async fn main() -> std::io::Result<()> {
         let app = app
             .service(web::resource("/{name}.{ext:html|css|js|png|jpg}").route(web::route().guard(guard::Get()).to(static_api::get_static)));
         let app = app.service(static_api::hello);
-        let app = app.service(web::scope("/queue").configure(queue_api::queue_api_route));
+        let app = app
+            .service(web::scope("/queue").configure(queue_api::queue_api_route))
+            .service(web::scope("/raft").configure(raft::rest_api::route))
+            ;
         app
     })
     .bind((app_conf.clone().web_server.host.clone(), app_conf.web_server.port))?
