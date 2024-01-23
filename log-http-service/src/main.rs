@@ -103,9 +103,7 @@ async fn main() -> std::io::Result<()> {
     info!("queue openned");
 
     ///////////////////////////////////////////////////////
-    let raft_state = RaftState {
-        bg_job: None
-    };
+    let raft_state = RaftState::default();
     let raft_state = Arc::new(Mutex::new(raft_state));
     let raft_state_0 = raft_state.clone();
 

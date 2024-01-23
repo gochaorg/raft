@@ -1,12 +1,9 @@
 use std::sync::Arc;
-
 use log::info;
-use tokio::sync::Mutex as AMutex;
-
-use crate::BgJob;
-use super::bg_tasks::*;
 
 pub mod job {
+    use std::time::Duration;
+
     use super::super::bg_tasks::BgErr;
     use super::super::bg_tasks::BgJob;
     use super::super::bg_tasks::StopHandle;
@@ -16,6 +13,7 @@ pub mod job {
         fn is_running( &self ) -> bool;
         fn stop( &mut self );
         fn start( &mut self ) -> Result<(), BgErr>;
+        fn get_timeout( &self ) -> Duration;
     }
 
     impl <F,H> Job for BgJob<F,H> 
@@ -37,18 +35,32 @@ pub mod job {
         fn start( &mut self ) -> Result<(), BgErr> {
             <BgJob<F,H> as Starter>::start(self)
         }
+
+        fn get_timeout( &self ) -> Duration {
+            self.timeout
+        }
+        
     }
 }
 
 /// Состояние сервера
 pub struct RaftState
 {
-    pub bg_job : Option<Box<dyn job::Job + Send + Sync>>
+    pub bg_job : Option<Box<dyn job::Job + Send + Sync>>,
+    pub nodes : Vec<Node>,
 }
 
-impl RaftState {
+impl Default for RaftState {
+    fn default() -> Self {
+        Self { bg_job: Default::default(), nodes: Default::default() }
+    }
+}
+
+pub struct Node {
+}
+
+impl RaftState {    
     pub async fn on_timer( &self ) {
         info!("raft on timer")
     }
 }
-
