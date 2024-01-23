@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{env, path::PathBuf, fs};
+use std::{env, fs, io, path::{Path, PathBuf}};
 
 use super::{WebServer, QueueConfig, RaftConfig};
 
@@ -49,6 +49,15 @@ impl AppConfig {
                 None => { break None; }
             }
         }
+    }
+
+    pub fn load<P:AsRef<Path>>( file_name:P ) -> io::Result<Self> {
+        fs::read_to_string(file_name).and_then(|str|
+            serde_json::from_str(&str)
+            .map_err(|e| std::io::Error::new(io::ErrorKind::InvalidData, 
+                format!("json deserialize: {}",e.to_string())
+            ))
+        )
     }
 
     pub fn find_or_default() -> Self {

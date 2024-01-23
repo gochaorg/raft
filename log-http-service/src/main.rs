@@ -50,9 +50,25 @@ async fn main() -> std::io::Result<()> {
     //env_logger::init();
     env_logger::init_from_env(Env::default().default_filter_or("info"));
 
+    let cmd_line = CmdLineParams::from_cmd_line();
+
+    let app_conf = cmd_line.clone().conf_file.map(|f| AppConfig::load(PathBuf::from(f)));
+    let app_conf = move || {
+        match app_conf {
+            None => AppConfig::find_or_default(),
+            Some(conf) => match conf {
+                Ok(conf) => conf,
+                Err(err) => {           
+                    println!("config not load! {}", err.to_string());                    
+                    panic!()
+                }
+            }
+        }
+    };
+
     let app_conf = 
-        CmdLineParams::from_cmd_line().apply(
-            AppConfig::find_or_default()
+        cmd_line.apply(
+            app_conf()
         );
     let app_conf = Arc::new(app_conf);
 
@@ -123,7 +139,7 @@ async fn main() -> std::io::Result<()> {
     bg.set_name("raft bg job");
     let _ = bg.start();
 
-    let m_bg : Box<dyn raft::job::Job + Send + Sync> = Box::new(bg);
+    let m_bg : Box<dyn raft::bg_tasks::job::Job + Send + Sync> = Box::new(bg);
     {
         let mut r = raft_state.lock().unwrap();
         r.bg_job = Some(m_bg);
