@@ -1,5 +1,6 @@
 Методы
 
+- Получить текущую версию
 - Получить список файлов
 - Получение rid текущей очереди
 - Просмотр заголовков последних 2 записей
@@ -8,6 +9,97 @@
 - Чтение raw данных записи
 - Запись raw данных записи
 - Переключение лог файла
+
+Получить текущую версию
+==================================
+
+```http
+GET http://localhost:8080/queue/version
+```
+
+ответ
+
+    HTTP/1.1 200 OK
+    content-length: 66
+    connection: close
+    vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+    content-type: application/json
+    date: Sat, 27 Jan 2024 19:20:50 GMT
+
+```json
+{
+  "debug": true,
+  "crate_name": "log_http_service",
+  "crate_ver": "0.1.0"
+}
+```
+
+### Получить величину задержки ответа о текущей версии
+
+```http
+GET http://localhost:8080/queue/version/delay
+```
+
+ответ
+
+    HTTP/1.1 200 OK
+    content-length: 13
+    connection: close
+    vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+    content-type: application/json
+    date: Sat, 27 Jan 2024 22:00:10 GMT
+
+Вариант 1
+
+```json
+{
+  "Seconds": 4
+}
+```
+
+Вариант 2
+
+```json
+{
+  "MilliSeconds": 250
+}
+```
+
+Вариант 3
+
+```json
+"Non"
+```
+
+### Установить величину задержки ответа о текущей версии
+
+Вриант - убрать задержку
+
+```http
+POST http://localhost:8080/queue/version/delay
+content-type: application/json
+
+"Non"
+```
+
+Вариант - указать задержку в миллисекундах
+
+```http
+POST http://localhost:8080/queue/version/delay
+content-type: application/json
+
+{ "MilliSeconds": 250 }
+```
+
+Вариант - указать задержку в секундах
+
+```http
+POST http://localhost:8080/queue/version/delay
+content-type: application/json
+
+{ "Seconds": 3 }
+```
+
 
 Получить список файлов
 ==================================

@@ -116,6 +116,9 @@ pub mod bg_tasks;
 mod raft_state;
 pub use raft_state::*;
 
+mod raft_err;
+pub use raft_err::*;
+
 /// API для RAFT
 pub mod rest_api;
 

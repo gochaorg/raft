@@ -14,19 +14,22 @@ actix-rt = "2.8.0"
 futures-time = "3.0.0"
 futures = "0.3.28"
 tokio = "1.29.1"
-
 mime = "0.3.17"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-parse = { path="../parse" }
-path_template = { path="../path_template" }
-logs = { path="../logs" }
 actix-swagger = "0.3.1"
 chrono = "0.4.26"
-date-format = { path="../date-format" }
 encoding = "0.2.33"
 #utoipa-swagger-ui = { version = "3", features = ["actix-web"] }
 log = "0.4.19"
 env_logger = "0.10.0"
 async-trait = "0.1.72"
 rand = "0.8.5"
+reqwest = { version = "0.11", features = ["json"] }
+derive_more = "0.99.17"
+
+parse = { path="../parse" }
+path_template = { path="../path_template" }
+logs = { path="../logs" }
+date-format = { path="../date-format" }
+log-http-client = { path="../log-http-client" }

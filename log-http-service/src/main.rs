@@ -127,7 +127,7 @@ async fn main() -> std::io::Result<()> {
         let raft_state_00 = raft_state_0.clone();
         async move {            
             match raft_state_00.try_lock() {
-                Ok(state) => {
+                Ok(mut state) => {
                     state.on_timer().await;
                 }
                 Err(lock_err) => {}
@@ -145,6 +145,12 @@ async fn main() -> std::io::Result<()> {
         r.bg_job = Some(m_bg);
     }
     ///////////////////////////////////////////////////////
+    
+    let debug = Arc::new(
+        Mutex::new(
+            crate::state::Debug::default()
+        )
+    );
 
     // configure atix ...........
     HttpServer::new(move || {
@@ -161,7 +167,8 @@ async fn main() -> std::io::Result<()> {
 
         let app = app.app_data(web::Data::new(AppState {
             static_files: static_files_opt.clone(),
-            raft: raft_state.clone()
+            raft: raft_state.clone(),
+            debug: debug.clone(),
         }));
 
         // https://peterevans.dev/posts/how-to-host-swagger-docs-with-github-pages/

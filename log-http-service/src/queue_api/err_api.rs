@@ -1,9 +1,12 @@
 use actix_web::{error, HttpResponse};
 use logs::logqueue::LoqErr;
+use std::fmt::format;
 use std::fmt::Display;
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::sync::PoisonError;
+use crate::raft as raft_state;
+use crate::raft::RaftError;
 
 #[derive(Debug)]
 pub enum ApiErr 
@@ -23,7 +26,10 @@ pub enum ApiErr
         error: String,
     },
     QueueIsEmpy,
-    LoqErr(String)
+    LoqErr(String),
+    MutexErr(String),
+    BadRequest(String),
+    Raft(RaftError)
 }
 
 impl Display for ApiErr {
@@ -36,18 +42,16 @@ impl error::ResponseError for ApiErr {
     fn error_response(&self) -> HttpResponse<actix_web::body::BoxBody> {        
         HttpResponse::build(self.status_code())
         .body(match self {
-            Self::BlockErr(err) => 
-                format!("BlockErr {:?}",err),
-            Self::RecIdNotMatch { expect_log_id, actual_log_id, expect_block_id, actual_block_id } => 
+            Self::BlockErr(err) => format!("BlockErr {:?}",err),
+            Self::RecIdNotMatch { expect_log_id, actual_log_id, expect_block_id, actual_block_id } =>  
                 format!("RecIdNotMatch expect_log_id={expect_log_id} actual_log_id={actual_log_id} expect_block_id={expect_block_id} actual_block_id={actual_block_id}"),
-            Self::RawReadBlockDataTruncated { expected_size, actual_size } =>
-                format!("RawReadBlockDataTruncated: expected_size={expected_size}, actual_size={actual_size}"),
-            Self::CantLockQueue { error } =>
-                format!("CantLockQueue: {error}"),
-            Self::QueueIsEmpy =>
-                format!("QueueIsEmpy"),
-            Self::LoqErr(err) =>
-                format!("LoqErr: {err}")
+            Self::RawReadBlockDataTruncated { expected_size, actual_size } => format!("RawReadBlockDataTruncated: expected_size={expected_size}, actual_size={actual_size}"),
+            Self::CantLockQueue { error } => format!("CantLockQueue: {error}"),
+            Self::QueueIsEmpy => format!("QueueIsEmpy"),
+            Self::LoqErr(err) => format!("LoqErr: {err}"),
+            Self::MutexErr(err) => format!("MutexErr: {err}"),
+            Self::BadRequest(err) => format!("BadRequest {err}"),
+            Self::Raft(err) => format!("Raft {err}")
         })
     }
 
@@ -76,5 +80,23 @@ impl std::convert::From<LoqErr<PathBuf, logs::logqueue::LogQueueFileNumID>> for 
     fn from(value: LoqErr<PathBuf, logs::logqueue::LogQueueFileNumID>) -> Self {
         //serde_json::to_string(&value);
         Self::LoqErr(format!("{value:?}"))
+    }
+}
+
+impl std::convert::From<PoisonError<std::sync::MutexGuard<'_, crate::state::Debug>>> for ApiErr {
+    fn from(value: PoisonError<std::sync::MutexGuard<'_, crate::state::Debug>>) -> Self {
+        ApiErr::MutexErr(format!("can't lock debug in AppState: {}",value.to_string()))
+    }
+}
+
+impl std::convert::From<PoisonError<std::sync::MutexGuard<'_, raft_state::RaftState>>> for ApiErr {
+    fn from(value: PoisonError<std::sync::MutexGuard<'_, raft_state::RaftState>>) -> Self {
+        ApiErr::MutexErr(format!("can't lock raft in AppState: {}",value.to_string()))
+    }
+}
+
+impl From<RaftError> for ApiErr {
+    fn from(value: RaftError) -> Self {
+        ApiErr::Raft(value)
     }
 }

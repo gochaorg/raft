@@ -1,13 +1,23 @@
-use std::sync::{Arc, RwLock};
+use std::{fmt::Debug, sync::{Arc, RwLock}};
 use awc::{Client as HttpClient, http::StatusCode};
 use futures::TryFutureExt;
 use logs::{logfile::block::Block, bbuff::absbuff::ByteBuff};
 use super::*;
 
+#[derive(Clone)]
 pub struct QueueClient
 {
     pub http_client: Arc<HttpClient>,
     pub base_url: String
+}
+
+impl Debug for QueueClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("QueueClient")
+            //.field("http_client", &self.http_client)
+            .field("base_url", &self.base_url)
+            .finish()
+    }
 }
 
 impl QueueClient

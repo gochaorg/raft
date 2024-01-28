@@ -1,0 +1,22 @@
+{
+    "web_server": {
+        "static_files": "${work.dir}/src/static",
+        "host": "127.0.0.2",
+        "port": 8080
+    },
+    "queue": {
+        "find": {
+            "root": "${work.dir}/app_data/queue-second",
+            "wildcard": "*.binlog",
+            "recursive": true
+        },
+        "new_file": {
+            "template": "${work.dir}/app_data/queue-second/${time:local:yyyy-mm-ddThh-mi-ss}-${rnd:5}.binlog"
+        }
+    },
+    "raft": {
+        "id": {
+            "Name" : "node-1"
+        }
+    }
+}
