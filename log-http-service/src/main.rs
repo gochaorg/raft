@@ -75,6 +75,10 @@ async fn main() -> std::io::Result<()> {
     info!("starting server on {}:{}", &app_conf.web_server.host, app_conf.web_server.port);
     let conf_t = app_conf.clone();
 
+    /// Задает переменные в шаблон:
+    /// 
+    /// - `exe.dir` Каталог exe файла, определяется из env
+    /// - `work.dir` Рабочий каталог, может быть переопределен параметрами командной строки
     fn template_vars<'a>( tp: PathTemplateParser<'a>, conf:Arc<AppConfig> ) -> PathTemplateParser<'a> {
         tp.with_variable("exe.dir", env::current_exe().map(|f| f.parent().unwrap().to_str().unwrap().to_string() ).unwrap() )
           .with_variable("work.dir", conf.work_dir.to_string())

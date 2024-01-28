@@ -5,9 +5,12 @@ use reqwest::redirect::Policy;
 use reqwest::Client;
 use serde::Deserialize;
 
+/// Клиент очереди
 #[derive(Clone)]
 pub struct QueueClient {
     pub base_address : String,
+
+    /// http клиент
     pub http_client : Client,
     pub version_timeout: Option<Duration>
 }

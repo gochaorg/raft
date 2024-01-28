@@ -1,3 +1,6 @@
+mod errors;
+pub use errors::*;
+
 mod client_reqwest;
 pub use client_reqwest::*;
 

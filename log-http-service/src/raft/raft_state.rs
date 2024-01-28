@@ -12,6 +12,7 @@ use super::bg_tasks::job;
 /// Состояние сервера
 pub struct RaftState
 {
+    /// Фоновая задача выполняемая 
     pub bg_job : Option<Box<dyn job::Job + Send + Sync>>,
     pub nodes : Vec<Node>,
 }
