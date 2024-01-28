@@ -3,7 +3,6 @@ use std::time::Duration;
 use derive_more::Display;
 use reqwest::redirect::Policy;
 use reqwest::Client;
-use reqwest::Error as ReqErr;
 use serde::Deserialize;
 
 #[derive(Clone)]

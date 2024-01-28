@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use actix_web::{get, post, web, HttpResponse, Responder};
+use actix_web::{get, post, web, Responder};
 use actix_web::Result;
 use date_format::*;
 use date_format::Format;
 use log_http_client::QueueClient;
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Local, Utc};
 
 use crate::queue_api::ApiErr;
 use crate::raft::{Node, Heartbeat};

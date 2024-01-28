@@ -16,7 +16,7 @@ mod raft;
 use std::{env, marker::PhantomData, path::PathBuf, sync::{Arc, Mutex}, time::Duration};
 use actix_cors::Cors;
 use env_logger::Env;
-use log::{info, debug};
+use log::{debug, info, warn};
 use actix_web::{web, App, HttpServer, guard};
 use actix_web::middleware::Logger;
 
@@ -130,7 +130,9 @@ async fn main() -> std::io::Result<()> {
                 Ok(mut state) => {
                     state.on_timer().await;
                 }
-                Err(lock_err) => {}
+                Err(lock_err) => {
+                    warn!("can't lock RaftState {}", lock_err.to_string());
+                }
             };
         }
     });

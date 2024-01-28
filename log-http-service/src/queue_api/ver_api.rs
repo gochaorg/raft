@@ -1,4 +1,4 @@
-use actix_web::{get, post, web, HttpResponse, Responder};
+use actix_web::{get, post, web, Responder};
 use actix_web::Result;
 use serde::{Deserialize, Serialize};
 use tokio::time::sleep;

@@ -1,6 +1,5 @@
 use actix_web::{error, HttpResponse};
 use logs::logqueue::LoqErr;
-use std::fmt::format;
 use std::fmt::Display;
 use std::fmt::Debug;
 use std::path::PathBuf;
