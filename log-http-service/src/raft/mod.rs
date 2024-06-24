@@ -107,15 +107,18 @@ pub use rand_duration::*;
 mod domain;
 pub use domain::*;
 
+/// Спецификация для реализации
 mod api_spec;
 pub use api_spec::*;
 
 /// Фоновые задачи
 pub mod bg_tasks;
 
+/// Состояние Raft
 mod raft_state;
 pub use raft_state::*;
 
+/// Ошибки генерируемые Raft подсистемой
 mod raft_err;
 pub use raft_err::*;
 

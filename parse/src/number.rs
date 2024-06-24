@@ -144,7 +144,7 @@ const HEX_DIGIT_PARSER : DigitParser = DigitParser { base: DigitBase::Hex };
 
 impl Parser<Number> for NumberParser {
     fn parse( &self, source: &str ) -> Option<(Number, CharsCount)> {
-        let mut src = source.clone();
+        let mut src = source;
         let (num_parser,prefix_cc) = LookupParser { max_chars_count: 2 }.parse(source)
             .when_equals("0x", HEX_DIGIT_PARSER)
             .when_equals("0o", OCT_DIGIT_PARSER)

@@ -12,29 +12,65 @@ use super::bg_tasks::job;
 /// Состояние сервера
 pub struct RaftState
 {
-    /// Фоновая задача выполняемая 
+    /// Идентификатор узла
+    pub id: String,
+
+    /// Фоновая задача выполняемая по таймеру
     pub bg_job : Option<Box<dyn job::Job + Send + Sync>>,
+
+    /// Список узлов
     pub nodes : Vec<Node>,
 }
 
-impl Default for RaftState {
-    fn default() -> Self {
-        Self { bg_job: Default::default(), nodes: Default::default() }
+impl RaftState {
+    pub fn new( id:String ) -> Self {
+        Self {
+            id: id,
+            bg_job: None,
+            nodes: Vec::default(),
+        }
     }
 }
 
+// impl Default for RaftState {
+//     fn default() -> Self {
+//         Self { 
+//             bg_job: Default::default(), nodes: Default::default() }
+//     }
+// }
+
+/// Узел
 #[derive(Clone)]
 pub struct Node {
+    /// Идентификатор узла
     pub id: String,
+
+    /// Базовый адрес узла
     pub base_address: String,
+
+    /// Доступность узла
     pub hearbeat: Vec<Heartbeat>,
+
+    /// Клиент 
     pub client: QueueClient,
 }
 
+/// Доступность на конкретный момент времени
 #[derive(Clone)]
 pub enum Heartbeat {
-    Succ { started: DateTime<Utc>, latency: Duration },
+    /// Доступен
+    Succ { 
+        /// Время запроса
+        started: DateTime<Utc>, 
+
+        /// Задержка ответа
+        latency: Duration 
+    },
+
+    /// Недоступен, порт закрыт
     ConnectFail { started: DateTime<Utc> },
+
+    /// Недоступен, нет ответа
     Timeout { started: DateTime<Utc> },
 }
 

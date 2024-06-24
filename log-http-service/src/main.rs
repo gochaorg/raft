@@ -123,7 +123,7 @@ async fn main() -> std::io::Result<()> {
     info!("queue openned");
 
     ///////////////////////////////////////////////////////
-    let raft_state = RaftState::default();
+    let raft_state = RaftState::new( app_conf.raft.id.get_id() );
     let raft_state = Arc::new(Mutex::new(raft_state));
     let raft_state_0 = raft_state.clone();
 

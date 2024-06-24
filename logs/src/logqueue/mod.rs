@@ -70,10 +70,12 @@ pub use err::*;
 
 /// чтение очереди и навигация
 mod log_queue_read;
+#[allow(unused)]
 pub use log_queue_read::*;
 
 /// Запись в очередь
 mod log_queue_write;
+#[allow(unused)]
 pub use log_queue_write::*;
 
 mod log_queue_impl;

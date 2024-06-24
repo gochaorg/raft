@@ -2,6 +2,8 @@ use std::{time::Duration, collections::HashMap};
 
 use parse::{DurationParser, Parser};
 use serde::{Deserialize, Serialize, Deserializer, de::Error, Serializer};
+use rand;
+use gethostname;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RaftConfig {
@@ -95,6 +97,7 @@ where
     // todo!()
 }
 
+/// Идентификатор узла
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NodeId {
     /// Стабильное имя
@@ -104,7 +107,42 @@ pub enum NodeId {
     Generate
 }
 
+impl NodeId {
+    /// Получение идентификатора
+    pub fn get_id( &self ) -> String {
+        match self {
+            NodeId::Name(name) => name.to_string(),
+            NodeId::Generate => {
+                let letters = "qwertyuiopasdfghjklzxcvbnm1234567890";
+                let mut name = "".to_string();
+
+                gethostname::gethostname().to_str().map(|s| {
+                    name.push_str("host-");
+                    name.push_str(s);
+                    name.push_str("-");
+                });
+                
+                name.push_str(&format!("pid{}-",std::process::id()));
+
+                let letters_count = letters.chars().count();
+                for _ in 0..20 {
+                    let r = rand::random::<u8>();
+                    let letter_idx = r as usize % letters_count;
+                    match letters.chars().skip(letter_idx).next() {
+                        Some(letter) => {
+                            name.push(letter);
+                        },
+                        _ => {}
+                    }                    
+                }
+                "".to_string()
+            }
+        }
+    }
+}
+
 /// Публичный адрес
+#[allow(unused)]
 pub struct PubAddresses {
     /// Публичный адрес по умолчанию
     pub address: Option<String>,

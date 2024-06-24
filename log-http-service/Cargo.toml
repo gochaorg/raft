@@ -27,6 +27,7 @@ async-trait = "0.1.72"
 rand = "0.8.5"
 reqwest = { version = "0.11", features = ["json"] }
 derive_more = "0.99.17"
+gethostname = "0.4.3"
 
 parse = { path="../parse" }
 path_template = { path="../path_template" }

@@ -11,4 +11,6 @@ mod range_parser;
 pub use range_parser::*;
 
 mod ast2range;
+
+#[allow(unused)]
 pub use ast2range::*;

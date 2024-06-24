@@ -187,7 +187,7 @@ impl MultipleParse {
 
 impl Parser<Multiple> for MultipleParse {
     fn parse( &self, source: &str ) -> Option<(Multiple, CharsCount)> {
-        let mut src = source.clone();
+        let mut src = source;
         let mut cc = CharsCount(0);
         let mut res = Vec::<RangeNum>::new();
 
