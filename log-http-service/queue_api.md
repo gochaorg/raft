@@ -155,8 +155,11 @@ GET http://localhost:8080/queue/tail/id
     "block_id": "3"
     }
 
-Просмотр заголовков последних 2 записей
+Просмотр заголовков
 ============================================
+
+Просмотр заголовков последних 2 записей
+--------------------------------------------
 
 ```http
 GET http://localhost:8080/queue/headers/last/2
@@ -223,37 +226,50 @@ GET http://localhost:8080/queue/headers/last/2
 }
 ```
 
-
-Добавление plain записи
-==========================
+Заголовки конкретной записи
+---------------------------------
 
 ```http
-POST http://localhost:8080/queue/insert/plain HTTP/1.1
-content-type: text/plain
-
-sample data
+GET http://localhost:8080/queue/record/2/1/headers
 ```
 
-ответ
-
     HTTP/1.1 200 OK
-    content-length: 29
+    content-length: 311
     connection: close
+    vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers
     content-type: application/json
-    date: Sun, 23 Jul 2023 19:14:20 GMT
+    date: Wed, 26 Jun 2024 14:45:11 GMT
 
 ```json
 {
-  "log_id": "0",
-  "block_id": "4"
+  "log_file": "/home/user/code/rust/raft/log-http-service/app_data/queue/2023-07-26T04-11-14-ljeuw.binlog",
+  "log_id": "2",
+  "block_id": 1,
+  "position": 118,
+  "position_str": "118",
+  "head_size": 123,
+  "data_size": 11,
+  "tail_size": 8,
+  "block_options": {
+    "mime": "text/plain",
+    "encoding": "utf-8",
+    "time": "2024-06-26T14:32:59.279491+00:00"
+  }
 }
 ```
 
 Чтение содержимого записи
 ===========================
 
+GET /queue/record/{log_id}/{block_id}/bytes Чтение записи
+------------------------------
+
+- query string
+    - opt2head : `Option<bool>`
+    - opt_prefix : `Option<string>`
+
 ```http
-GET http://localhost:8080/queue/record/0/4/plain?opt2head=true&opt_prefix=bl_ HTTP/1.1
+GET http://localhost:8080/queue/record/0/4/bytes?opt2head=true&opt_prefix=bl_ HTTP/1.1
 ```
 
 ответ
@@ -271,7 +287,7 @@ GET http://localhost:8080/queue/record/0/4/plain?opt2head=true&opt_prefix=bl_ HT
 
 
 Чтение raw данных записи
-=================================
+----------------------------------
 
     🚀 curl -v http://localhost:8080/queue/record/0/4/raw > data
     *   Trying 127.0.0.1:8080...
@@ -309,8 +325,62 @@ GET http://localhost:8080/queue/record/0/4/plain?opt2head=true&opt_prefix=bl_ HT
     000000a0  49 4c a6 00 00 00                                 |IL....|
     000000a6
 
+Добавление записи
+==============================
+
+Добавление plain записи
+----------------------------
+
+```http
+POST http://localhost:8080/queue/insert/text_plain HTTP/1.1
+content-type: text/plain
+
+sample data
+```
+
+ответ
+
+    HTTP/1.1 200 OK
+    content-length: 29
+    connection: close
+    content-type: application/json
+    date: Sun, 23 Jul 2023 19:14:20 GMT
+
+```json
+{
+  "log_id": "0",
+  "block_id": "4"
+}
+```
+
+
+Добавление байтов в конец очереди
+------------------------------------
+
+```http
+POST http://localhost:8080/queue/record/bytes
+
+some data
+```
+
+ответ
+
+    HTTP/1.1 200 OK
+    content-length: 29
+    connection: close
+    content-type: application/json
+    vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+    date: Wed, 26 Jun 2024 14:37:07 GMT
+
+```json
+{
+  "log_id": "2",
+  "block_id": "2"
+}
+```
+
 Запись raw данных записи
-====================================
+---------------------------------------
 
     🚀 curl -v --data-binary @data -X POST http://localhost:8080/queue/record/0/4/raw
     Note: Unnecessary use of -X or --request, POST is already inferred.
@@ -331,6 +401,7 @@ GET http://localhost:8080/queue/record/0/4/plain?opt2head=true&opt_prefix=bl_ HT
     < 
     * Connection #0 to host localhost left intact
     {"log_id":"0","block_id":"5"}
+
 
 Переключение лог файла
 ==================================
