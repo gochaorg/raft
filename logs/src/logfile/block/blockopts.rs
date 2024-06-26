@@ -167,3 +167,28 @@ impl From<BlockOptions> for HashMap<String,String> {
         map
     }
 }
+
+impl TryFrom<HashMap<String,String>> for BlockOptions {
+    type Error = BlockErr;
+
+    fn try_from(value: HashMap<String,String>) -> Result<Self, Self::Error> {
+        let mut opt = BlockOptions::default();
+        for (key,value) in value.into_iter() {
+            opt.set(key, value)?;
+        }
+        Ok(opt)
+    }
+}
+
+impl TryFrom<&HashMap<String,String>> for BlockOptions {
+    type Error = BlockErr;
+
+    fn try_from(value: &HashMap<String,String>) -> Result<Self, Self::Error> {
+        let mut opt = BlockOptions::default();
+        for (key,value) in value.into_iter() {
+            opt.set(key, value)?;
+        }
+        Ok(opt)
+    }
+}
+

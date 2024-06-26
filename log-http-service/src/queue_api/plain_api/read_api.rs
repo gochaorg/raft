@@ -1,7 +1,9 @@
-use actix_web::{web, get, Error, HttpResponse};
+use std::collections::HashMap;
+
+use actix_web::{get, web, Error, HttpResponse, Responder};
 use logs::logfile::block::BlockId;
 use logs::logqueue::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use futures::{future::ok, stream::once};
 
 use crate::{queue, queue_api::ApiErr};
@@ -16,8 +18,14 @@ pub struct RawBodyOpts {
 }
 
 /// Получение тела записи
-#[get("/record/{log:[0-9]+}/{block:[0-9]+}/plain")]
-pub async fn read_plain(path: web::Path<(String,u32)>, query:web::Query<RawBodyOpts>) -> Result<HttpResponse,ApiErr> {
+/// 
+/// ```
+/// query_string ::= [opt2head ['&' opt_prefix]]
+/// opt2head ::= 'opt2head=' ( 'true' | 'false' )
+/// opt_prefix ::= 'opt_prefix=' prefix
+/// ```
+#[get("/record/{log:[0-9]+}/{block:[0-9]+}/bytes")]
+pub async fn read_bytes(path: web::Path<(String,u32)>, query:web::Query<RawBodyOpts>) -> Result<HttpResponse,ApiErr> {
     let raw_opt = query.into_inner();
 
     let (log_id, block_id) = path.into_inner();
@@ -73,3 +81,50 @@ pub async fn read_plain(path: web::Path<(String,u32)>, query:web::Query<RawBodyO
     })
 }
 
+#[derive(Serialize)]
+struct RecordHeader {
+    pub log_file: String,
+    pub log_id: String,
+    pub block_id: u32,
+    // фактически u64
+    pub position: u64, 
+    pub position_str: String, 
+    pub head_size: u32,
+    pub data_size: u32,
+    pub tail_size: u16,
+    pub block_options: HashMap<String,String>,
+}
+
+#[get("/record/{log:[0-9]+}/{block:[0-9]+}/headers")]
+pub async fn header_of( path: web::Path<(String,u32)> ) -> Result<impl Responder,ApiErr> {
+    let (log_id, block_id_src) = path.into_inner();
+    let log_id = u128::from_str_radix(&log_id,10).unwrap();
+
+    let log_id = LogQueueFileNumID { id: log_id, previous: None };
+    let block_id = BlockId::new(block_id_src);
+    let rec_id = RecID { log_file_id: log_id, block_id: block_id };
+
+    queue(|q| {
+        let q = q.lock()?;
+
+        let info = q.info(rec_id.clone())?;
+        let mut b_opts: HashMap<String,String> = HashMap::new();
+        for (k,v) in info.block_options.into_iter() {
+            b_opts.insert(k.to_string(), v.to_string());
+        }
+
+        Ok(web::Json(
+            RecordHeader {
+                log_file: info.log_file.to_str().map(|s| s.to_string()).unwrap_or("?".to_string()),
+                log_id: info.log_id.id().to_string(),
+                block_id: info.block_id.0,
+                position: info.position.0,
+                position_str: info.position.0.to_string(),
+                head_size: info.head_size.0,
+                data_size: info.data_size.0,
+                tail_size: info.tail_size.0,
+                block_options: b_opts,
+            }
+        ))
+    })
+}

@@ -6,7 +6,7 @@ use crate::bbuff::streambuff::{ByteBuff, ByteReader, ByteWriter};
 ///
 /// Предполагается что идентификаторы растут линейно, равномерно с 0 до u32::MAX в пределах одного лог файла
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BlockId(u32);
+pub struct BlockId(pub u32);
 
 impl ByteWriter<BlockId> for ByteBuff {
     fn write(&mut self, v: BlockId) {

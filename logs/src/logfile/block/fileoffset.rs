@@ -4,7 +4,7 @@ use crate::bbuff::streambuff::{ByteBuff, ByteReader, ByteWriter};
 
 /// Смещение относительно начала файла в байтах
 #[derive(Copy, Clone, Debug, Default, PartialEq, PartialOrd)]
-pub struct FileOffset(u64);
+pub struct FileOffset(pub u64);
 
 impl fmt::Display for FileOffset {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

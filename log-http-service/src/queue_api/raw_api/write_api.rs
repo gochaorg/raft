@@ -20,7 +20,6 @@ pub async fn write_block( bytes:web::Bytes, path: web::Path<(String,u32)> ) -> R
     
     let log_id = LogQueueFileNumID { id: log_id, previous: None };
     let block_id = BlockId::new(block_id);
-    let _rec_id = RecID { log_file_id: log_id, block_id: block_id };
 
     queue(|q|{
         let q = q.lock()?;

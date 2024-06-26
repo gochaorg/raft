@@ -18,6 +18,39 @@ use serde::Serialize;
 //     fn should_skip(&self) { self.is_none() }
 // }
 
+#[derive(Serialize)]
+struct RecordId {
+    rid: ID,
+    header:RecordHeader
+}
+
+#[derive(Serialize)]
+enum RecordHeader {
+    Succ {
+        log_file: String,
+        log_id: String,
+        block_id: String,
+        options: HashMap<String,String>,
+        position: String,
+        head_size: u32,
+        data_size: u32,
+        tail_size: u16,
+
+        #[serde(skip_serializing_if="Option::is_none")]
+        preview: Option<String>,
+    },
+    Fail(String)
+}
+
+#[derive(Serialize)]
+struct HeadersResult {
+    values: Vec<RecordId>,
+
+    #[serde(skip_serializing_if="Option::is_none")]
+    navigate_error: Option<String>,
+}
+
+
 /// Просмотр заголовков последних n записей
 #[get("/headers/last/{count}")]
 pub async fn lasn_n_headers( path: web::Path<u32> ) -> Result<impl Responder,ApiErr> {
@@ -25,44 +58,12 @@ pub async fn lasn_n_headers( path: web::Path<u32> ) -> Result<impl Responder,Api
     queue(|q| {
         let q = q.lock()?;
 
-        #[derive(Serialize)]
-        struct Item {
-            rid: ID,
-            result:ItemValue
-        }
-
-        #[derive(Serialize)]
-        enum ItemValue {
-            Succ {
-                log_file: String,
-                log_id: String,
-                block_id: String,
-                options: HashMap<String,String>,
-                position: String,
-                head_size: u32,
-                data_size: u32,
-                tail_size: u16,
-
-                #[serde(skip_serializing_if="Option::is_none")]
-                preview: Option<String>,
-            },
-            Fail(String)
-        }
-
-        #[derive(Serialize)]
-        struct Result {
-            values: Vec<Item>,
-
-            #[serde(skip_serializing_if="Option::is_none")]
-            navigate_error: Option<String>,
-        }
-
-        let mut res = Vec::<Item>::new();
+        let mut res = Vec::<RecordId>::new();
         let mut nav_err: Option<String> = None;
 
         match q.last_record().unwrap() {
             None => {
-                Ok( web::Json(Result{ values: res, navigate_error:nav_err }) )
+                Ok( web::Json(HeadersResult{ values: res, navigate_error:nav_err }) )
             }
             Some(mut rid) => {
                 let mut cnt = cnt;
@@ -89,9 +90,9 @@ pub async fn lasn_n_headers( path: web::Path<u32> ) -> Result<impl Responder,Api
                                 .and_then(|res| res.ok());
 
                             res.push(
-                                Item { 
+                                RecordId { 
                                     rid: rid.clone().into(), 
-                                    result: ItemValue::Succ { 
+                                    header: RecordHeader::Succ { 
                                         log_file: opts.log_file.to_str().unwrap().to_string(),
                                         log_id: opts.log_id.id.to_string(),
                                         block_id: opts.block_id.value().to_string(),
@@ -106,9 +107,9 @@ pub async fn lasn_n_headers( path: web::Path<u32> ) -> Result<impl Responder,Api
                         },
                         Err(err) => {
                             res.push(
-                                Item { 
+                                RecordId { 
                                     rid: rid.clone().into(), 
-                                    result: ItemValue::Fail( format!("{:?}",err) ) 
+                                    header: RecordHeader::Fail( format!("{:?}",err) ) 
                                 });
                         }
                     }
@@ -123,8 +124,9 @@ pub async fn lasn_n_headers( path: web::Path<u32> ) -> Result<impl Responder,Api
                         }
                     }
                 }
-                Ok( web::Json(Result{ values: res, navigate_error:nav_err }) )
+                Ok( web::Json(HeadersResult{ values: res, navigate_error:nav_err }) )
             }
         }
     })
 }
+
