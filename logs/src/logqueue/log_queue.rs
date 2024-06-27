@@ -8,13 +8,22 @@ use super::{log_id::*, LoqErr, FindFiles, OpenLogFile, ValidateLogFiles, Prepare
 
 use log::info;
 
-/// Очередь логов
+/// Очередь [лог файлов](crate::logfile).
+/// 
+/// Задачи:
+/// - Получение списка лог файлов
+/// - Получение лог файла для записи
+/// - Переключение лог файла - создает новый лог файл и назначет его текущем
+/// 
+/// Реализация [struct LogFileQueueImpl](crate::logqueue::LogFileQueueImpl)
+/// 
+/// см [общее описание](crate::logqueue)
 pub trait LogFileQueue<LogId,FILE,LOG>
 where 
     LogId: Clone + Debug, 
     FILE: Clone + Debug 
 {
-    /// Переключение лога
+    /// Переключение лога    
     /// 
     /// Возвращает идентификатор нового лог файла
     fn switch( &mut self ) -> Result<(FILE,LogId),LoqErr<FILE,LogId>>;
@@ -56,7 +65,7 @@ where
 
 }
 
-/// Очередь логов
+/// Очередь логов, содержит основные данные для работы с уже открытой очередью
 #[derive(Clone)]
 pub struct LogFileQueueImpl<LogId,FILE,BUFF,FNewFile,FOpen> 
 where
@@ -175,7 +184,6 @@ where
     }
 
     /// Чтение id текущего лог файла
-    #[allow(unused)]
     fn current_log_id_read<R,F>( &self, consume:F ) -> Result<R,LoqErr<FILE,LogId>>
     where
         R: Sized,
@@ -200,17 +208,19 @@ where
     FOpen: OpenLogFile<FILE,LogFile<BUFF>,LogId>
 {
     fn switch( &mut self ) -> Result<(FILE,LogId),LoqErr<FILE,LogId>> {
-        let file_name = self.new_file.new_log_file()?;
-        let mut log_file = self.open_file.open_log_file(file_name.clone())?;
-        let new_log_id = self.current_log_id_read(|id| LogId::new(Some(id.id())))?;
-        new_log_id.write(&file_name, &mut log_file)?;
+        let new_file_name = self.new_file.new_log_file()?;
+        let mut new_log_file = self.open_file.open_log_file(new_file_name.clone())?;
+        let new_log_id = self.current_log_id_read(
+            |old_log_id| LogId::new(Some(old_log_id.id()))
+        )?;
+        new_log_id.write(&new_file_name, &mut new_log_file)?;
         self.invalidate_cache();
 
-        self.tail = (new_log_id.clone(),file_name.clone(),log_file);
+        self.tail = (new_log_id.clone(),new_file_name.clone(),new_log_file);
         self.files.push( self.tail.clone() );
 
         (*self.current_log_id.borrow_mut()) = Some(new_log_id);
-        Ok((file_name.clone(),new_log_id))
+        Ok((new_file_name.clone(),new_log_id))
     }
 
     fn find_log( &self, id:LogId ) -> Result<Option<(FILE,LogFile<BUFF>)>,LoqErr<FILE,LogId>> {

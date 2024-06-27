@@ -96,10 +96,13 @@ pub trait LogQueueFileId : Eq + std::fmt::Display + Clone + Copy + Debug + Block
     }
 }
 
-///  Идентификатор лог файла - число
+/// Сквозной идентификатор лог файла - число
 #[derive(Debug,Clone,PartialEq,Hash)]
 pub struct LogQueueFileNumID {
+    /// Текущий лог файл
     pub id:u128,
+
+    /// Предыдущий // TODO delete
     pub previous:Option<u128>
 }
 
