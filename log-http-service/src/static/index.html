@@ -53,15 +53,15 @@
                                 <span class="logId">{{header.rid.log_id}}</span>
                                 <span class="blockId">{{header.rid.block_id}}</span>
                             </div>
-                            <div v-if="header.result.Succ">
-                                <div class="file">{{header.result.Succ.log_file}}</div>
+                            <div v-if="header.header.Succ">
+                                <div class="file">{{header.header.Succ.log_file}}</div>
                                 <div class="options">
-                                    <div class="option" v-for="(value, name) in header.result.Succ.options">
+                                    <div class="option" v-for="(value, name) in header.header.Succ.options">
                                         <span class="name">{{name}}</span> = <span class="value">{{value}}</span>
                                     </div>
                                 </div>
-                                <div class="preview" v-if="header.result.Succ.preview">
-                                    {{header.result.Succ.preview}}
+                                <div class="preview" v-if="header.header.Succ.preview">
+                                    {{header.header.Succ.preview}}
                                 </div>
                             </div>
                         </div>

@@ -102,7 +102,7 @@ class QueueApi {
      * @returns promise with { log_id: string, block_id: string }
     */
     insertPlain(text) {
-        return fetch(this.base + '/insert/plain', {
+        return fetch(this.base + '/insert/text_plain', {
             method: 'POST',
             headers: {
                 'Content-Type': 'text/plain'
