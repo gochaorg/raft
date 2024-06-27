@@ -1,5 +1,6 @@
 use actix_web::web;
 
+/// Идентификатор записи
 mod rec_id;
 pub use rec_id::*;
 
@@ -15,12 +16,13 @@ mod log_switch_api;
 /// API Чтения / Записи plain/text
 mod plain_api;
 
-// API Чтения / Записи binary block
+/// API Чтения / Записи binary block
 mod raw_api;
 
 /// API Просмотра версии
 mod ver_api;
 
+/// Ошибки генерируемые queue api
 mod err_api;
 pub use err_api::*;
 

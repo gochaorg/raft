@@ -5,37 +5,57 @@ use super::{FileOffset, Limit, TAIL_SIZE};
 /// Ошибка при операциях с блоком лога
 #[derive(Debug, Clone)]
 pub enum BlockErr {
+    /// Ошибка чтения/записи данных с лиска
     IO {
         message: String,
         os_error: Option<i32>,
     },
+
+    /// Ошибка при работе с "абсолюным" буфером
     AbsBuff(ABuffError),
+
+    /// Размер заголовка слишком мал, 
+    /// возникает при чтении
     BlockHeaderToSmall {
         actual: u64,
         min_size: u64,
     },
+
+    /// Блок данных усечен - меньше, чем ожидалось
     BlockDataTruncated {
         expect_data_size: u64,
         reads_data_size: u64,
     },
+
+    /// Ошибка чтения заголовока блока
     BlockHeadReadFail {
         head_data: Vec<u8>,
         error: String,
     },
+
+    /// Позиция указанная для чтения tail.rs меньше допустимого TAIL_SIZE(=8)
     PositionToSmall {
         min_position: FileOffset,
         actual: FileOffset,
     },
+
+    /// Неожиданный конец файла
     NoData {
         reads: u64,
         expect: u64,
     },
+
+    /// Ожидался маркер в конце блока
     TailMarkerMismatched {
         tail_data: [u8; TAIL_SIZE as usize],
     },
+
+    /// Маркер в конец блока указывает, за пределы блока
     TailPointerOuside {
         pointer: i128,
     },
+
+    /// Ограничение по размер записываемых данных в блок
     Limit {
         message: String,
         limit: u64,

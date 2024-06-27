@@ -13,16 +13,23 @@ use crate::logfile::FlatBuff;
 /// Ошибка чтения/записи
 #[derive(Debug, Clone)]
 pub enum ABuffError {
+    /// Некая общая ошибка
     Generic(String),
+
+    /// Ошибка диска при чтения/записи
     IO {
         message: String,
         os_error: Option<i32>,
     },
+
+    /// Ограничение размера
     Limit {
         message: String,
         limit: u64,
         target: u64,
     },
+
+    /// Данные частично записаны, скорей всего места нет
     PartialWrited {
         message: String,
         actual: u64,

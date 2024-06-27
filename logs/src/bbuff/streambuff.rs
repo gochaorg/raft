@@ -4,6 +4,7 @@ use crate::perf::Tracker;
 
 /// Запись байтового представления в текщую позиции и перемещение позиции
 pub trait ByteWriter<V: Sized> {
+    /// Запись байтового представления в текщую позиции и перемещение позиции
     fn write(&mut self, v: V);
 }
 
@@ -19,7 +20,8 @@ pub struct ByteBuff {
     /// Буфер
     pub buff: Vec<u8>,
 
-    /// Позиция записи
+    /// Позиция записи/чтения.
+    /// Смещается при операциях чтения, записи.
     pub position: usize,
 
     /// Метрики
@@ -73,13 +75,13 @@ impl ByteBuff {
         }
     }
 
-    /// Сбор: устанавливает pointer = 0, len = 0
+    /// Сбор: устанавливает position = 0, len = 0
     pub fn reset(&mut self) {
         self.buff.truncate(0);
         self.position = 0;
     }
 
-    /// Запись массива байт в текущую позицию и смещение позиции
+    /// Запись массива байт в текущую позицию и смещение позиции (position) на переданное кол-во байт
     pub fn write_byte_arr(&mut self, data: &[u8]) {
         let available = self.buff.len() - self.position;
         // extends if need
@@ -126,14 +128,14 @@ impl ByteBuff {
     }
 }
 
-// Запись массива
+/// Запись массива и смещение position
 impl ByteWriter<&[u8]> for ByteBuff {
     fn write(&mut self, v: &[u8]) {
         self.write_byte_arr(v);
     }
 }
 
-// Запись байта
+/// Запись байта и смещение position
 impl ByteWriter<u8> for ByteBuff {
     fn write(&mut self, v: u8) {
         let data = v.to_le_bytes();
@@ -141,7 +143,7 @@ impl ByteWriter<u8> for ByteBuff {
     }
 }
 
-// Запись 2 байтов
+/// Запись 2 байтов и смещение position
 impl ByteWriter<u16> for ByteBuff {
     fn write(&mut self, v: u16) {
         let data = v.to_le_bytes();
@@ -149,7 +151,7 @@ impl ByteWriter<u16> for ByteBuff {
     }
 }
 
-// Запись 4 байтов
+/// Запись 4 байтов и смещение position
 impl ByteWriter<u32> for ByteBuff {
     fn write(&mut self, v: u32) {
         let data = v.to_le_bytes();
@@ -157,7 +159,7 @@ impl ByteWriter<u32> for ByteBuff {
     }
 }
 
-// Запись 8 байтов
+/// Запись 8 байтов и смещение position
 impl ByteWriter<u64> for ByteBuff {
     fn write(&mut self, v: u64) {
         let data = v.to_le_bytes();
@@ -165,17 +167,21 @@ impl ByteWriter<u64> for ByteBuff {
     }
 }
 
+/// Запись 8 байтов и смещение position
 impl ByteWriter<usize> for ByteBuff {
+    /// Запись 8 байтов и смещение position
     fn write(&mut self, v: usize) {
         self.write(v as u64)
     }
 }
 
-/// Чтение данных из байтового массива
+/// Чтение данных из байтового массива и смещение позиции к следующей
 pub trait ByteReader<V> {
+    /// Чтение данных из байтового массива и смещение позиции к следующей
     fn read(&mut self, target: &mut V) -> Result<(), String>;
 }
 
+/// Чтение данных и смещение позиции к следующей
 impl ByteReader<u8> for ByteBuff {
     fn read(&mut self, target: &mut u8) -> Result<(), String> {
         let available = self.buff.len() - self.position;
@@ -189,6 +195,7 @@ impl ByteReader<u8> for ByteBuff {
     }
 }
 
+/// Чтение данных и смещение позиции к следующей
 impl ByteReader<u16> for ByteBuff {
     fn read(&mut self, target: &mut u16) -> Result<(), String> {
         let available = self.buff.len() - self.position;
@@ -203,6 +210,7 @@ impl ByteReader<u16> for ByteBuff {
     }
 }
 
+/// Чтение данных и смещение позиции к следующей
 impl ByteReader<u32> for ByteBuff {
     fn read(&mut self, target: &mut u32) -> Result<(), String> {
         let available = self.buff.len() - self.position;
@@ -222,6 +230,7 @@ impl ByteReader<u32> for ByteBuff {
     }
 }
 
+/// Чтение данных и смещение позиции к следующей
 impl ByteReader<u64> for ByteBuff {
     fn read(&mut self, target: &mut u64) -> Result<(), String> {
         let available = self.buff.len() - self.position;
@@ -245,7 +254,9 @@ impl ByteReader<u64> for ByteBuff {
     }
 }
 
+/// Чтение данных u64 и смещение позиции к следующей
 impl ByteReader<usize> for ByteBuff {
+    /// Чтение данных u64 и смещение позиции к следующей
     fn read(&mut self, target: &mut usize) -> Result<(), String> {
         let mut size: u64 = 0;
         self.read(&mut size)?;
@@ -261,6 +272,7 @@ pub struct ByteArrayRead {
     pub expect_size: u32,
 }
 
+/// Чтение данных и смещение позиции к следующей
 impl ByteReader<ByteArrayRead> for ByteBuff {
     fn read(&mut self, target: &mut ByteArrayRead) -> Result<(), String> {
         let available = (self.buff.len() as i64) - (self.position as i64);

@@ -243,16 +243,3 @@ fn test_block_rw() {
 
     println!("{:?}", rblock.head);
 }
-
-// /// Построение блока
-// pub struct BlockBuilder<'a> {
-//   /// Ссылка на данные
-//   pub data: &'a[u8],
-
-//   pub tail: &'a[u8],
-
-//   pub block_id:  &'a BlockId,
-//   pub data_id:   &'a DataId,
-//   pub back_refs: &'a Vec<(BlockId, FileOffset)>,
-//   pub options:   &'a BlockOptions
-// }

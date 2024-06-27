@@ -30,34 +30,7 @@ pub struct BlockHead {
 pub const HEAD_MIN_SIZE: u32 = 22 + BLOCK_OPTION_MIN_SIZE;
 
 #[derive(Clone, Debug)]
-#[cfg_attr(doc, aquamarine::aquamarine)]
 /// Ссылка на предыдущий блок
-///  ```mermaid
-///  flowchart RL
-///  a
-///  b
-///  c
-///  d
-///  e
-///  f
-///  g
-///  h
-///  h --> |расстояние 1| g --> |1| f --> |1| e --> |1| d --> |1| c --> |1| b --> |1| a
-///  
-///  h -.-> |расстояние 2| f
-///  f -.-> |2| d
-///  g -.-> |2| e
-///  e -.-> |2| c
-///  c -.-> |2| a
-///  d -.-> |2| b
-///  
-///  h -.-> |расстояние 4| d
-///  g -.-> |4| c
-///  f -.-> |4| b
-///  d -.-> |4| a
-///  
-///  h -.-> |расстояние 8| a
-///  ```
 pub struct BackRefs {
     pub refs: Box<Vec<(BlockId, FileOffset)>>,
 }

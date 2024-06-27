@@ -1,6 +1,7 @@
 use serde::Serialize;
 use logs::logqueue::*;
 
+/// Идентификатор записи
 #[derive(Serialize)]
 pub struct ID {
     pub log_id: String,

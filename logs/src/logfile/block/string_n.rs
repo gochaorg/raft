@@ -80,6 +80,10 @@ impl ByteWriter<String32> for ByteBuff {
 }
 
 impl ByteReader<String32> for ByteBuff {
+    /// Чтение строки String32
+    /// 
+    /// - size: u32 - размер в байтах
+    /// - data: [u8; size] - данные, utf-8
     fn read(&mut self, target: &mut String32) -> Result<(), String> {
         let mut size: u32 = 0;
         self.read(&mut size)?;
@@ -176,6 +180,10 @@ impl ByteWriter<String16> for ByteBuff {
 }
 
 impl ByteReader<String16> for ByteBuff {
+    /// Чтение строки String16
+    /// 
+    /// - size: u16 - размер в байтах
+    /// - data: [u8; size] - данные, utf-8
     fn read(&mut self, target: &mut String16) -> Result<(), String> {
         let mut size: u16 = 0;
         self.read(&mut size)?;
