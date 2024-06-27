@@ -1,5 +1,8 @@
 {
-  "editor.tabSize": 4,
-  "editor.detectIndentation": false
-  
+    "editor.tabSize": 4,
+    "editor.detectIndentation": false,
+    "rust-analyzer.runnables.extraTestBinaryArgs": [
+        "--show-output",
+        "--nocapture"
+    ]  
 }

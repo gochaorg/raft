@@ -1,4 +1,4 @@
-use std::{time::Duration, sync::{Arc, Mutex}, thread::JoinHandle};
+use std::{io::Write, sync::{Arc, Mutex}, thread::JoinHandle, time::Duration};
 use actix_rt::task::JoinHandle as AsyncJoinHandle;
 use futures::Future;
 use log;
@@ -317,15 +317,18 @@ impl<F,H> Drop for BgJob<F,H> {
 fn test_bg() {
     use std::thread::sleep;
 
+    println!("test");
+
     let mut bg = bg_job_sync( || {
-        println!("do some work native")
+        println!("do some work native");
+        std::io::stdout().flush().unwrap();
     });
     bg.set_timeout(Duration::from_secs(1));
     bg.set_name("test native");
 
     let _ = bg.start();
 
-    sleep(Duration::from_secs(4));
+    sleep(Duration::from_secs(10));
     bg.stop_signal();
 
     sleep(Duration::from_secs(2));    
