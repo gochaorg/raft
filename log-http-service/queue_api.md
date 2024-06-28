@@ -181,7 +181,7 @@ GET http://localhost:8080/queue/headers/last/2
         "log_id": "0",
         "block_id": "3"
       },
-      "result": {
+      "header": {
         "Succ": {
           "log_file": "/home/user/code/rust/raft/log-http-service/app_data/queue/2023-07-21T18-29-39-a9p29.binlog",
           "log_id": "0",
@@ -204,7 +204,7 @@ GET http://localhost:8080/queue/headers/last/2
         "log_id": "0",
         "block_id": "2"
       },
-      "result": {
+      "header": {
         "Succ": {
           "log_file": "/home/user/code/rust/raft/log-http-service/app_data/queue/2023-07-21T18-29-39-a9p29.binlog",
           "log_id": "0",

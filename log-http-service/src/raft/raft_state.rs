@@ -7,7 +7,10 @@ use log::error;
 
 use log_http_client::QueueClient;
 use log_http_client::Error as ClientError;
+use serde::Deserialize;
+use serde::Serialize;
 use super::bg_tasks::job;
+use super::Role;
 
 /// Состояние сервера
 pub struct RaftState
@@ -20,6 +23,12 @@ pub struct RaftState
 
     /// Список узлов
     pub nodes : Vec<Node>,
+
+    /// Кто текущий мастер
+    pub master: Option<MasterNode>,
+
+    /// Роль текущего сервера
+    pub role: Option<Role>,
 }
 
 impl RaftState {
@@ -28,16 +37,11 @@ impl RaftState {
             id: id,
             bg_job: None,
             nodes: Vec::default(),
+            master: None,
+            role: None,
         }
     }
 }
-
-// impl Default for RaftState {
-//     fn default() -> Self {
-//         Self { 
-//             bg_job: Default::default(), nodes: Default::default() }
-//     }
-// }
 
 /// Узел
 #[derive(Clone)]
@@ -53,6 +57,13 @@ pub struct Node {
 
     /// Клиент 
     pub client: QueueClient,
+}
+
+/// Мастер узел
+#[derive(Clone,Debug,Serialize,Deserialize)]
+pub struct MasterNode {
+    pub id: String,
+    pub base_address: String,
 }
 
 /// Доступность на конкретный момент времени

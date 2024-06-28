@@ -1,9 +1,10 @@
 use std::{time::{Duration, Instant}, sync::Arc, marker::PhantomData};
+use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex as AsyncMutex;
 use super::*;
 
 /// Роль
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,Deserialize,Serialize)]
 #[allow(unused)]
 pub enum Role {
     Follower,

@@ -1,5 +1,5 @@
 use core::str;
-use std::fmt::{format, write, Display};
+use std::fmt::Display;
 use std::{collections::HashMap, fmt::Debug};
 use std::time::Duration;
 use logs::logfile::block::{BlockErr, BlockOptions, String16, String32};
@@ -21,7 +21,10 @@ pub struct QueueClient {
     pub http_client : Client,
 
     /// timeout ответа на запрос version
-    pub version_timeout: Option<Duration>
+    pub version_timeout: Option<Duration>,
+
+    // Заголовок Raft-Master-Id
+    pub raft_master_id: Option<String>,
 }
 
 impl Debug for QueueClient {
@@ -43,6 +46,7 @@ impl QueueClient {
             base_address: base_address.into(), 
             http_client: c,
             version_timeout: None,
+            raft_master_id: None,
         })
     }
 }
@@ -379,6 +383,11 @@ impl QueueClient {
             req = req.header(format!("{pref}{k}"), format!("{v}"));
         }
 
+        match &self.raft_master_id {
+            Some(id) => { req = req.header("Raft-Master-Id", id) },
+            None => {}
+        }
+
         req = req.body(block_wr.data);
 
         QueueBlockId::try_send(req).await
@@ -453,9 +462,14 @@ impl Display for LogSwitched {
 
 impl QueueClient {
     pub async fn log_switch( &self )  -> Result<LogSwitched,Error> {
-        let req = self.http_client.post(
+        let mut req = self.http_client.post(
             format!("{addr}/queue/tail/switch", addr=self.base_address)
         );
+
+        match &self.raft_master_id {
+            Some(id) => { req = req.header("Raft-Master-Id", id) },
+            None => {}
+        }
 
         Ok(req.send().await?.json().await?)
     }

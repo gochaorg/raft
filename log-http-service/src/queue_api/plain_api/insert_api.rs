@@ -1,4 +1,4 @@
-use actix_web::{post, web, HttpRequest, Responder};
+use actix_web::{post, web, HttpRequest, HttpResponse, Responder};
 use actix_web::Result;
 use chrono::{DateTime, Utc};
 use date_format::{DateFormatParser, Format};
@@ -10,7 +10,8 @@ use encoding::{Encoding, EncoderTrap};
 use serde::Deserialize;
 
 use crate::queue;
-use crate::queue_api::{ID, ApiErr};
+use crate::queue_api::{validate_raft_master, ApiErr, ID};
+use crate::state::AppState;
 
 struct PlainText {
     content: String,
@@ -36,13 +37,18 @@ impl From<PlainText> for PreparedRecord {
 
 /// Добавление plain записи
 #[post("/insert/text_plain")]
-pub async fn insert_text_plain(req_body: String) -> Result<impl Responder,ApiErr> {
-    queue(|q|{
-        let q = q.lock()?;
-        let pr: PreparedRecord = PlainText { content: req_body.clone(), time: Utc::now() }.into();
-        let rid = q.write( &pr )?;
-        let id: ID = rid.into();
-        Ok( web::Json(id) )
+pub async fn insert_text_plain( state: web::Data<AppState>, req_body: String, req: HttpRequest ) -> 
+    Result<HttpResponse,ApiErr> 
+{
+    validate_raft_master(&state, &req, || {
+        queue(|q|{
+            let q = q.lock()?;
+            let pr: PreparedRecord = PlainText { content: req_body.clone(), time: Utc::now() }.into();
+            let rid = q.write( &pr )?;
+            let id: ID = rid.into();
+            
+            Ok(HttpResponse::Ok().json(id))
+        })
     })
 }
 
@@ -58,106 +64,110 @@ pub struct WriteBytesOpt {
 /// Добавление записи в указанную позицию - в конец очереди
 /// Проверяется корректность указания конца
 #[post("/record/{log:[0-9]+}/{block:[0-9]+}/bytes")]
-pub async fn write_bytes_at_tail( bytes:web::Bytes, path: web::Path<(String,u32)>, req: HttpRequest, query:web::Query<WriteBytesOpt> ) -> Result<impl Responder,ApiErr> {
-    let (log_id, block_id) = path.into_inner();
-    let log_id = u128::from_str_radix(&log_id,10).unwrap();
+pub async fn write_bytes_at_tail( state: web::Data<AppState>, bytes:web::Bytes, path: web::Path<(String,u32)>, req: HttpRequest, query:web::Query<WriteBytesOpt> ) -> Result<HttpResponse,ApiErr> {
+    validate_raft_master(&state, &req, || {
+        let (log_id, block_id) = path.into_inner();
+        let log_id = u128::from_str_radix(&log_id,10).unwrap();
 
-    let block_id = BlockId::new(block_id);
-    let log_id = LogQueueFileNumID { id: log_id, previous: None };
+        let block_id = BlockId::new(block_id);
+        let log_id = LogQueueFileNumID { id: log_id, previous: None };
 
-    queue(|q|{
-        let q = q.lock()?;
+        queue(|q|{
+            let q = q.lock()?;
 
-        // Проверка корректности указания позиции
-        match q.last_record()? {
-            Some(last_rec_id) => {
-                match (last_rec_id.block_id == block_id, last_rec_id.log_file_id.id() == log_id.id()) {
-                    (true,true) => Ok(()),
+            // Проверка корректности указания позиции
+            match q.last_record()? {
+                Some(last_rec_id) => {
+                    match (last_rec_id.block_id == block_id, last_rec_id.log_file_id.id() == log_id.id()) {
+                        (true,true) => Ok(()),
+                        _ => Err(ApiErr::RecIdNotMatch { 
+                            expect_log_id: last_rec_id.log_file_id.id().to_string(), 
+                            actual_log_id: log_id.id().to_string(), 
+                            expect_block_id: last_rec_id.block_id.to_string(), 
+                            actual_block_id: block_id.to_string() 
+                        })
+                    }
+                },
+                None => match block_id.0 {
+                    0 => Ok(()),
                     _ => Err(ApiErr::RecIdNotMatch { 
-                        expect_log_id: last_rec_id.log_file_id.id().to_string(), 
+                        expect_log_id: "0".to_string(), 
                         actual_log_id: log_id.id().to_string(), 
-                        expect_block_id: last_rec_id.block_id.to_string(), 
+                        expect_block_id: "0".to_string(), 
                         actual_block_id: block_id.to_string() 
                     })
                 }
-            },
-            None => match block_id.0 {
-                0 => Ok(()),
-                _ => Err(ApiErr::RecIdNotMatch { 
-                    expect_log_id: "0".to_string(), 
-                    actual_log_id: log_id.id().to_string(), 
-                    expect_block_id: "0".to_string(), 
-                    actual_block_id: block_id.to_string() 
-                })
-            }
-        }?;
+            }?;
 
-        // формирование записи
-        let bytes = bytes.to_vec();
-        let mut b_opt = BlockOptions::default();
+            // формирование записи
+            let bytes = bytes.to_vec();
+            let mut b_opt = BlockOptions::default();
 
-        let write_opt = query.clone().into_inner();
-        if write_opt.head2opt.unwrap_or(false) {
-            let pref = write_opt.opt_prefix.unwrap_or("".to_string());
-            let pref_usize = pref.len();
-            for (header_name,header_value) in  req.headers().into_iter() {
-                if header_name.as_str().starts_with(&pref) {
-                    let (_, key) = header_name.as_str().split_at(pref_usize);
-                    let value = header_value.to_str()
-                        .map_err(|e| ApiErr::BadRequest(
-                            format!("can't decode header {}: {}", header_name.as_str(), e.to_string())))?.to_string();
-                    b_opt.set(key, value)?;
+            let write_opt = query.clone().into_inner();
+            if write_opt.head2opt.unwrap_or(false) {
+                let pref = write_opt.opt_prefix.unwrap_or("".to_string());
+                let pref_usize = pref.len();
+                for (header_name,header_value) in  req.headers().into_iter() {
+                    if header_name.as_str().starts_with(&pref) {
+                        let (_, key) = header_name.as_str().split_at(pref_usize);
+                        let value = header_value.to_str()
+                            .map_err(|e| ApiErr::BadRequest(
+                                format!("can't decode header {}: {}", header_name.as_str(), e.to_string())))?.to_string();
+                        b_opt.set(key, value)?;
+                    }
                 }
             }
-        }
 
-        let pr = PreparedRecord {
-            data: bytes,
-            options: b_opt 
-        };
+            let pr = PreparedRecord {
+                data: bytes,
+                options: b_opt 
+            };
 
-        let rid = q.write(&pr)?;
-        let rid: ID = rid.into();
+            let rid = q.write(&pr)?;
+            let rid: ID = rid.into();
 
-        Ok(web::Json(rid))
+            Ok(HttpResponse::Ok().json(rid))
+        })
     })
 }
 
 /// Добавление записи в указанную позицию - в конец очереди
 /// Проверяется корректность указания конца
 #[post("/record/bytes")]
-pub async fn write_bytes( bytes:web::Bytes, req: HttpRequest, query:web::Query<WriteBytesOpt> ) -> Result<impl Responder,ApiErr> {
-    queue(|q|{
-        let q = q.lock()?;
+pub async fn write_bytes( state: web::Data<AppState>, bytes:web::Bytes, req: HttpRequest, query:web::Query<WriteBytesOpt> ) -> Result<HttpResponse,ApiErr> {
+    validate_raft_master(&state, &req, || {
+        queue(|q|{
+            let q = q.lock()?;
 
-        // формирование записи
-        let bytes = bytes.to_vec();
-        let mut b_opt = BlockOptions::default();
+            // формирование записи
+            let bytes = bytes.to_vec();
+            let mut b_opt = BlockOptions::default();
 
-        let write_opt = query.clone().into_inner();
-        if write_opt.head2opt.unwrap_or(false) {
-            let pref = write_opt.opt_prefix.unwrap_or("".to_string());
-            let pref_usize = pref.len();
-            for (header_name,header_value) in  req.headers().into_iter() {
-                if header_name.as_str().starts_with(&pref) {
-                    let (_, key) = header_name.as_str().split_at(pref_usize);
-                    let value = header_value.to_str()
-                        .map_err(|e| ApiErr::BadRequest(
-                            format!("can't decode header {}: {}", header_name.as_str(), e.to_string())))?.to_string();
-                    b_opt.set(key, value)?;
+            let write_opt = query.clone().into_inner();
+            if write_opt.head2opt.unwrap_or(false) {
+                let pref = write_opt.opt_prefix.unwrap_or("".to_string());
+                let pref_usize = pref.len();
+                for (header_name,header_value) in  req.headers().into_iter() {
+                    if header_name.as_str().starts_with(&pref) {
+                        let (_, key) = header_name.as_str().split_at(pref_usize);
+                        let value = header_value.to_str()
+                            .map_err(|e| ApiErr::BadRequest(
+                                format!("can't decode header {}: {}", header_name.as_str(), e.to_string())))?.to_string();
+                        b_opt.set(key, value)?;
+                    }
                 }
             }
-        }
 
-        let pr = PreparedRecord {
-            data: bytes,
-            options: b_opt 
-        };
+            let pr = PreparedRecord {
+                data: bytes,
+                options: b_opt 
+            };
 
-        let rid = q.write(&pr)?;
-        let rid: ID = rid.into();
+            let rid = q.write(&pr)?;
+            let rid: ID = rid.into();
 
-        Ok(web::Json(rid))
+            Ok(HttpResponse::Ok().json(rid))
+        })
     })
 }
 

@@ -26,6 +26,10 @@ mod ver_api;
 mod err_api;
 pub use err_api::*;
 
+/// Валидация состояния Raft
+mod raft_state_validate;
+pub use raft_state_validate::*;
+
 /// настройка ручек
 pub fn queue_api_route( cfg: &mut web::ServiceConfig ) {
     cfg

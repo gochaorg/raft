@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use actix_web::{get, post, web, Responder};
+use actix_web::{delete, get, post, web, HttpResponse, Responder};
 use actix_web::Result;
 use date_format::*;
 use date_format::Format;
@@ -9,7 +9,7 @@ use log_http_client::QueueClient;
 use serde::{Deserialize, Serialize};
 
 use crate::queue_api::ApiErr;
-use crate::raft::{Node, Heartbeat};
+use crate::raft::*;
 use crate::state::AppState;
 use crate::raft::RaftError;
 
@@ -27,8 +27,13 @@ pub fn route( cfg: &mut web::ServiceConfig ) {
         .service(bg_job_stop)
         .service(bg_job_start)
         .service(node_add)
+        .service(node_del)
         .service(node_list)
         .service(node_status)
+        .service(master_set)
+        .service(master_reset)
+        .service(id_get)
+        .service(id_set)
         ;
 }
 
@@ -37,8 +42,10 @@ async fn status( state: web::Data<AppState> ) -> Result<impl Responder,ApiErr> {
     #[derive(Serialize)]
     #[serde(rename_all = "camelCase")]
     struct Status {
+        id: String,
         status: String,
         bg_job: BgJobStatus,
+        master: Option<MasterNode>,
     }
 
     #[derive(Serialize)]
@@ -56,11 +63,13 @@ async fn status( state: web::Data<AppState> ) -> Result<impl Responder,ApiErr> {
 
     Ok(web::Json(
         Status {
+            id: state.id.clone(),
             status: "ok".to_string(),
             bg_job: BgJobStatus {
                 running: bg_running,
                 timeout: bg_timeout
-            }
+            },
+            master: state.master.clone(),
         }
     ))
 }
@@ -125,6 +134,24 @@ async fn node_add( state: web::Data<AppState>, body:web::Json<NodeAddBody>, path
     Ok(web::Json(""))
 }
 
+#[derive(Debug,Deserialize)]
+struct NodeDelPath {
+    pub node_id: String,
+}
+
+#[delete("/node/{node_id}")]
+async fn node_del( state: web::Data<AppState>, path: web::Path<NodeDelPath> ) -> Result<impl Responder,ApiErr> {
+    let mut state = state.raft.lock()?;
+    let path = path.into_inner();
+
+    match state.nodes.iter().enumerate().find_map(|(idx,n)| if n.id == path.node_id { Some(idx) } else { None } ) {
+        Some(idx) => { state.nodes.remove(idx); Ok(()) },
+        _ => { Err(ApiErr::BadRequest(format!("node {} not found", path.node_id))) }
+    }?;
+
+    Ok(web::Json(""))
+}
+
 #[get("/node")]
 async fn node_list( state: web::Data<AppState> ) -> Result<impl Responder,ApiErr> {
     let raft = state.raft.lock()?;
@@ -132,11 +159,17 @@ async fn node_list( state: web::Data<AppState> ) -> Result<impl Responder,ApiErr
     #[derive(Serialize)]
     struct NodeView {
         pub base_address:String,
+        pub heartbeat_timeout: Option<Duration>,
     }
     let mut nodes: HashMap<String, NodeView> = HashMap::new();
 
     for node in raft.nodes.iter() {
-        nodes.insert(node.id.to_string(), NodeView { base_address: node.base_address.to_string() });
+        nodes.insert(
+            node.id.to_string(), 
+            NodeView { 
+                base_address: node.base_address.to_string(),
+                heartbeat_timeout: node.client.version_timeout.clone(),
+            });
     }
 
     Ok(web::Json(nodes))
@@ -187,3 +220,46 @@ async fn node_status( state: web::Data<AppState>, path: web::Path<NodeAddPath> )
         hearbeat: node.hearbeat.iter().map(|h| HBeat::from(h.clone(), &df)).collect()
     }))
 }
+
+#[derive(Debug,Deserialize)]
+struct MasterSet {
+    id: String,
+    base_address: String,
+}
+
+#[post("/master/set")]
+async fn master_set( state: web::Data<AppState>, body:web::Json<MasterSet> ) -> Result<impl Responder,ApiErr> {
+    let mut raft = state.raft.lock()?;
+    let body = body.into_inner();
+
+    raft.master = Some(MasterNode { id: body.id.clone(), base_address: body.base_address.clone() });
+
+    Ok(web::Json(""))
+}
+
+#[post("/master/reset")]
+async fn master_reset( state: web::Data<AppState> ) -> Result<impl Responder,ApiErr> {
+    let mut raft = state.raft.lock()?;
+    raft.master = None;
+    Ok(web::Json(""))
+}
+
+#[get("/id")]
+async fn id_get( state: web::Data<AppState> ) -> Result<impl Responder,ApiErr> {
+    let raft = state.raft.lock()?;
+    Ok(HttpResponse::Ok().json(raft.id.clone()))
+}
+
+#[post("/id")]
+async fn id_set( state: web::Data<AppState>, body:web::Json<String> ) -> Result<impl Responder,ApiErr> {
+    let mut raft = state.raft.lock()?;
+    let new_id = body.into_inner();
+    let old_id = raft.id.clone();
+    raft.id = new_id.clone();
+
+    #[derive(Serialize)]
+    struct IdChange { old_id: String, new_id: String }
+
+    Ok(HttpResponse::Ok().json( IdChange { old_id: old_id, new_id: new_id.clone() } ))
+}
+

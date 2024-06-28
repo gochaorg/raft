@@ -68,6 +68,7 @@ impl TryFrom<QueueClientBuilder> for QueueClient {
             base_address: value.base_address.unwrap(), 
             http_client: cb.build().map_err(Error::from)?,
             version_timeout: None,
+            raft_master_id: None,
         };
         Ok(res)
     }
