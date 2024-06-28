@@ -1,4 +1,4 @@
-use std::{io::Write, sync::{Arc, Mutex}, thread::JoinHandle, time::Duration};
+use std::{sync::{Arc, Mutex}, thread::JoinHandle, time::Duration};
 use actix_rt::task::JoinHandle as AsyncJoinHandle;
 use futures::Future;
 use log;
@@ -321,7 +321,6 @@ fn test_bg() {
 
     let mut bg = bg_job_sync( || {
         println!("do some work native");
-        std::io::stdout().flush().unwrap();
     });
     bg.set_timeout(Duration::from_secs(1));
     bg.set_name("test native");

@@ -1,4 +1,4 @@
-use actix_web::{web, HttpRequest, HttpResponse, Responder};
+use actix_web::{web, HttpRequest, HttpResponse};
 use actix_web::post;
 use logs::logfile::block::{BlockId, Block};
 use logs::logqueue::*;

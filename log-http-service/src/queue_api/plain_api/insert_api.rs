@@ -1,4 +1,4 @@
-use actix_web::{post, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{post, web, HttpRequest, HttpResponse};
 use actix_web::Result;
 use chrono::{DateTime, Utc};
 use date_format::{DateFormatParser, Format};

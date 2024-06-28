@@ -1,4 +1,4 @@
-use actix_web::{http::Uri, web, HttpRequest, HttpResponse};
+use actix_web::{web, HttpRequest, HttpResponse};
 use crate::state::AppState;
 use super::ApiErr;
 
@@ -53,10 +53,4 @@ pub fn validate_raft_master<F: FnOnce() -> Result<HttpResponse,ApiErr>>( state: 
             })
         }
     }
-}
-
-#[test]
-fn uri_test(){
-    let cur = Uri::try_from("http://localhost:8080/abc/cde?f=g&h=i").unwrap();
-    println!("{}", cur.path_and_query().unwrap());
 }
