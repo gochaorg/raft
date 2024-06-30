@@ -9,9 +9,10 @@ use std::{
 
 use crate::perf::Tracker;
 use crate::logfile::FlatBuff;
+use serde::Serialize;
 
 /// Ошибка чтения/записи
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum ABuffError {
     /// Некая общая ошибка
     Generic(String),

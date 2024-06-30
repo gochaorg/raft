@@ -1,6 +1,7 @@
 use std::{time::{Duration, Instant}, path::PathBuf, fs::{File, create_dir_all}, rc::Rc, sync::Mutex, fmt::Debug};
 use path_template::PathTemplate;
 use log::{info,error};
+use serde::Serialize;
 
 /// Генерация файла с уникальным именем
 #[derive(Clone)]
@@ -48,7 +49,7 @@ pub struct NewFile {
     pub file: Rc<Mutex<File>>
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,Serialize)]
 pub enum NewFileGeneratorErr {
     /// Превышено максимальное кол-во попыток
     AttemptLimit {

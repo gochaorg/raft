@@ -4,7 +4,7 @@ use std::{collections::HashMap, fmt::Debug};
 use std::time::Duration;
 use logs::logfile::block::{BlockErr, BlockOptions, String16, String32};
 use logs::logqueue::PreparedRecord;
-use reqwest::Client;
+use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use crate::{errors::*, QueueBlockId};
 
@@ -73,10 +73,14 @@ impl QueueClient {
             None => req
         };
 
-        let res = req
-            .send()
-            .await?.json::<Version>().await?;
-        Ok(res)
+        let res = req.send().await?;
+        let status = res.status();
+        let text = res.text().await?;
+
+        match status == StatusCode::OK {
+            false => Err(Error::un_expected_status(status, &text)),
+            true => Ok(serde_json::from_str(&text)?)
+        }
     }
 }
 
@@ -121,7 +125,14 @@ impl QueueClient {
         let req = self.http_client
         .get(format!("{}/queue/log/files",self.base_address));
 
-        Ok(req.send().await?.json().await?)
+        let res = req.send().await?;
+        let status = res.status();
+        let text = res.text().await?;
+
+        match status == StatusCode::OK {
+            false => Err(Error::un_expected_status(status, &text)),
+            true => Ok(serde_json::from_str(&text)?)
+        }
     }
 }
 
@@ -186,7 +197,14 @@ impl QueueClient {
             block_id=block_id.block_id
         ));
 
-        Ok(req.send().await?.json().await?)
+        let res = req.send().await?;
+        let status = res.status();
+        let text = res.text().await?;
+
+        match status==StatusCode::OK {
+            false => Err(Error::un_expected_status(status, &text)),
+            true => Ok(serde_json::from_str(&text)?)
+        }
     }    
 }
 
@@ -258,6 +276,11 @@ impl QueueClient {
                 pref=pref
             )
         ).send().await?;
+
+        let status = res.status();
+        if status != StatusCode::OK {
+            return Err(Error::un_expected_status(status, "no body"));
+        }
 
         let mut block_opts: HashMap<String,String> = HashMap::new();
 
@@ -400,10 +423,11 @@ fn block_write_2() {
     System::new().block_on(async {
         let client = QueueClient::new(BASE_ADDR).unwrap();
         let tid = client.tail_id().await.unwrap();
+        //let tid = QueueBlockId { block_id: 99, log_id: 11 };
         let result = client.block_write(
             BlockWrite::from("foo").expect_tail( &tid ).option("k", "v").unwrap()
-        ).await.unwrap();
-        println!("result:\n {result}");
+        ).await;
+        println!("result:\n {result:?}");
     })
 }
 
@@ -437,7 +461,17 @@ impl QueueClient {
             None => {}
         }
 
-        Ok(req.send().await?.json().await?)
+        let res = req.send().await?;
+        let status = res.status();
+        let text = res.text().await?;
+        match status == StatusCode::OK {
+            false => {
+                Err(Error::un_expected_status(status, &text))
+            },
+            true => {
+                Ok( serde_json::from_str::<LogSwitched>(&text)? )
+            }
+        }
     }
 }
 

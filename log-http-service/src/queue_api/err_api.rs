@@ -1,5 +1,6 @@
 use actix_web::{error, HttpResponse};
 use logs::logqueue::LoqErr;
+use serde::Serialize;
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::sync::PoisonError;
@@ -7,8 +8,9 @@ use crate::raft::rest_api::sync::LogShippingError;
 use crate::raft as raft_state;
 use crate::raft::RaftError;
 use derive_more::Display;
+use actix_swagger::StatusCode;
 
-#[derive(Debug,Display)]
+#[derive(Debug,Display,Serialize)]
 pub enum ApiErr 
 {    
     #[display(fmt="BlockErr {:?}", _0)]
@@ -55,7 +57,7 @@ pub enum ApiErr
 }
 
 impl error::ResponseError for ApiErr {
-    fn error_response(&self) -> HttpResponse<actix_web::body::BoxBody> {        
+    fn error_response(&self) -> HttpResponse<actix_web::body::BoxBody> {     
         HttpResponse::build(self.status_code())
         .body(match self {
             Self::BlockErr(err) => format!("BlockErr {:?}",err),
@@ -74,8 +76,11 @@ impl error::ResponseError for ApiErr {
 
     fn status_code(&self) -> actix_swagger::StatusCode {
         match self {
-            Self::BlockErr(_) => actix_swagger::StatusCode::INTERNAL_SERVER_ERROR,
-            _ => actix_swagger::StatusCode::INTERNAL_SERVER_ERROR
+            Self::BlockErr(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::Raft(RaftError::LogShipping(LogShippingError::CargoPlanFailBlockNotFound(_))) => StatusCode::BAD_REQUEST,
+            Self::BadRequest(_) => StatusCode::BAD_REQUEST,
+            Self::RecIdNotMatch { expect_log_id:_, actual_log_id:_, expect_block_id:_, actual_block_id:_ } => StatusCode::BAD_REQUEST,
+            _ => StatusCode::INTERNAL_SERVER_ERROR
         }
     }
 }

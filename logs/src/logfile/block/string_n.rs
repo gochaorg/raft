@@ -1,10 +1,9 @@
 use std::fmt::Display;
-
 use crate::bbuff::streambuff::{ByteArrayRead, ByteBuff, ByteReader, ByteWriter};
-
 use super::BlockErr;
+use serde::Serialize;
 
-#[derive(Debug, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Clone, PartialEq, Hash, Eq, Serialize)]
 /// Строка не больше 4gb данных
 pub struct String32(String);
 
@@ -104,7 +103,7 @@ impl ByteReader<String32> for ByteBuff {
 
 ////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Clone, PartialEq, Hash, Eq, Serialize)]
 /// Строка не больше 64kb данных
 pub struct String16(String);
 

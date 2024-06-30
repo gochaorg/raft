@@ -1,7 +1,7 @@
 use core::str;
 use std::fmt::Display;
 use logs::{logfile::block::BlockId, logqueue::{LogQueueFileNumID, RecID}};
-use reqwest::RequestBuilder;
+use reqwest::{RequestBuilder, StatusCode};
 use serde::{Deserialize, Serialize};
 use crate::errors::*;
 use std::cmp::*;
@@ -41,19 +41,26 @@ impl QueueBlockId {
             /// Идентификатор записи в логе
             pub block_id: String,
         }
-        
-        Ok(request.send().await?.json::<QueueRecIdRaw>().await?)
-        .and_then(|rraw|{
-            rraw.block_id.parse::<u32>()
-            .map_err(|e| Error::DecodeBody(format!("can't decode block_id {b} as u32 {e:?}", b=rraw.block_id)))
-            .and_then(|b_id| {
-                rraw.log_id.parse::<u128>()
-                    .map_err(|e| Error::DecodeBody(format!("can't decode log_id {l} as u128 {e:?}", l=rraw.log_id)))
-                    .map(|l_id| 
-                        QueueBlockId { log_id: l_id, block_id: b_id }
-                    )
-            })
-        })
+
+        let resp = request.send().await?;
+        let status_code = resp.status().as_u16();
+        let text = resp.text().await?;
+
+        match status_code == StatusCode::OK {
+            false => Err(Error::UnExpectedStatus(format!("{status_code}\n{text}"))),
+            true => {
+                let rraw = serde_json::from_str::<QueueRecIdRaw>(&text)?;
+                rraw.block_id.parse::<u32>()
+                .map_err(|e| Error::DecodeBody(format!("can't decode block_id {b} as u32 {e:?}", b=rraw.block_id)))
+                .and_then(|b_id| {
+                    rraw.log_id.parse::<u128>()
+                        .map_err(|e| Error::DecodeBody(format!("can't decode log_id {l} as u128 {e:?}", l=rraw.log_id)))
+                        .map(|l_id| 
+                            QueueBlockId { log_id: l_id, block_id: b_id }
+                        )
+                })
+            }
+        }
     }
 }
 

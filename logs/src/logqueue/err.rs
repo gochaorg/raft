@@ -10,8 +10,10 @@ use super::{new_file::NewFileGeneratorErr, LogFileQueue};
 #[allow(unused)]
 use super::{LogIdReadWriteErr, LogQueueFileNumID, LogWriteErr};
 
+use serde::Serialize;
+
 /// Ошибки очереди логов
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,Serialize)]
 pub enum LoqErr<FILE,LogId>
 where 
     FILE: Clone + Debug,

@@ -1,9 +1,9 @@
 use std::fmt;
-
+use serde::Serialize;
 use crate::bbuff::streambuff::{ByteBuff, ByteReader, ByteWriter};
 
 /// Смещение относительно начала файла в байтах
-#[derive(Copy, Clone, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, PartialOrd, Serialize)]
 pub struct FileOffset(pub u64);
 
 impl fmt::Display for FileOffset {

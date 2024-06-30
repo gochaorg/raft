@@ -1412,6 +1412,8 @@ dependencies = [
  "path_template",
  "rand",
  "random-access-disk",
+ "serde",
+ "serde_json",
  "sha2",
 ]
 

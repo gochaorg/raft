@@ -7,7 +7,7 @@ use crate::logfile::block::{String32, BlockErr, BlockId, BlockOptions};
 use crate::logfile::block::Block;
 use std::hash::Hash;
 use std::any::type_name;
-
+use serde::Serialize;
 use super::LoqErr;
 
 /// Запись идентификатора в блок
@@ -214,7 +214,7 @@ pub const LOG_FILE_ID_TYPE_KEY: &str =  "log_file_id_type";
 pub const LOG_FILE_NUM_TYPE: &str =     "LogQueueFileNumID";
 
 /// Ошибки чтения / записи идентификатора
-#[derive(Debug,Clone)]
+#[derive(Debug,Clone,Serialize)]
 pub enum LogIdReadWriteErr {
     BlockErr(BlockErr),
     ValueAlreadyDefined(String32),

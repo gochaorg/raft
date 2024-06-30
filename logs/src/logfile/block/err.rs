@@ -1,9 +1,9 @@
 use crate::bbuff::absbuff::ABuffError;
-
+use serde::Serialize;
 use super::{FileOffset, Limit, TAIL_SIZE};
 
 /// Ошибка при операциях с блоком лога
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum BlockErr {
     /// Ошибка чтения/записи данных с лиска
     IO {

@@ -11,7 +11,7 @@ use serde::Serialize;
 use crate::{queue, queue_api::ApiErr, state::AppState, QUEUE};
 use derive_more::Display;
 
-#[derive(Debug,Display)]
+#[derive(Debug,Display,Serialize)]
 pub enum LogShippingError {
     #[display(fmt="Can't create cargo plan, block {} not found in queue", _0)]
     CargoPlanFailBlockNotFound(QueueBlockId)
@@ -33,6 +33,10 @@ impl From<PoisonError<std::sync::MutexGuard<'_, std::option::Option<chrono::Date
     fn from(value: PoisonError<std::sync::MutexGuard<'_, std::option::Option<chrono::DateTime<chrono::Utc>>>>) -> Self {
         ApiErr::MutexErr(format!("can't lock node log_ship, ___ {}", value.to_string()))
     }
+}
+
+#[derive(Debug,Clone)]
+pub struct CargoItem {
 }
 
 /// "Груз" который надо доставить на клиента
@@ -65,13 +69,29 @@ async fn try_build_cargo( queue: QUEUE, client: QueueClient ) -> Result<Option<C
                 Ok(None)
             } else {
                 // need shipping
-                let cargo = qblock_ids_downto(queue_qbid, client_qbid, queue.clone())?;
+                let mut cargo = qblock_ids_downto(queue_qbid, client_qbid, queue.clone())?;
+                if cargo.is_empty() {
+                    return Ok(None);
+                }
+
                 if ! cargo.first().map(|bid| bid.clone()==client_qbid ).unwrap_or(false) {
                     // не найден блок с которого произовдить накат логов
                     return Err(LogShippingError::CargoPlanFailBlockNotFound(client_qbid).into());
                 }
 
+                // Пропуск первого блока, ибо он уже есть
+                cargo.remove(0);
+
                 if cargo.is_empty() { return Ok(None); }
+
+                println!("-----------------------------------");
+                println!("cargo:");
+                println!("  queue  tail id: {queue_qbid}");
+                println!("  client tail id: {client_qbid}");
+                for (c_idx,c_qbid) in cargo.iter().enumerate() {
+                    println!("  block#{c_idx} {c_qbid}");
+                }
+
                 Ok(Some(Cargo {
                     blocks_ids: Arc::new(cargo),
                     log: Arc::new(Mutex::new(vec![])),
@@ -284,3 +304,5 @@ pub async fn log_shipping_clean( state: web::Data<AppState> ) -> Result<HttpResp
 
     Ok(HttpResponse::Ok().body("body"))
 }
+
+

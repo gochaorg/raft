@@ -1,7 +1,12 @@
 use derive_more::Display;
+use reqwest::{Request, Response, StatusCode};
+use serde::Serialize;
 
-#[derive(Debug,Clone,Display)]
+#[derive(Debug,Clone,Display,Serialize)]
 pub enum Error {
+    #[display(fmt = "UnExpectedStatus: {}", _0)]
+    UnExpectedStatus(String),
+
     #[display(fmt = "BuildClient: {}", _0)]
     BuildClient(String),
 
@@ -10,6 +15,9 @@ pub enum Error {
 
     #[display(fmt = "DecodeBody: {}", _0)]
     DecodeBody(String),
+
+    #[display(fmt = "JsonDecodeBody: {}", _0)]
+    JsonDecodeBody(String),
 
     #[display(fmt = "Status: {}", _0)]
     Status(String),
@@ -44,3 +52,16 @@ impl From<reqwest::Error> for Error {
         Error::Undefined(value.to_string())
     }
 }
+
+impl From<serde_json::Error> for Error {
+    fn from(value: serde_json::Error) -> Self {
+        Error::JsonDecodeBody(value.to_string())
+    }
+}
+
+impl Error {
+    pub fn un_expected_status( status: StatusCode, body: &str ) -> Self {
+        Self::UnExpectedStatus(format!("status = {}\nbody:\n{}", status, body ))
+    }
+}
+

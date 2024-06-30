@@ -1,9 +1,10 @@
 use log_http_client::Error as ClientError;
 use derive_more::Display;
+use serde::Serialize;
 
 use super::rest_api::sync::LogShippingError;
 
-#[derive(Debug,Display)]
+#[derive(Debug,Display,Serialize)]
 pub enum RaftError {
     #[display(fmt="Can't create client {}", _0)]
     CantCreateClient(ClientError),

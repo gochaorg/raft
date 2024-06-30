@@ -54,6 +54,7 @@ use super::block::*;
 use std::fmt::{self, Debug};
 use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Instant;
+use serde::Serialize;
 
 pub trait FlatBuff : ReadBytesFrom + WriteBytesTo + BytesCount + ResizeBytes + Clone {}
 
@@ -120,7 +121,7 @@ where
 }
 
 /// Возможные ошибки
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub enum LogErr {
     /// Предыдущий блок не найден
     PreviousBlockNotExists(BlockId),
