@@ -28,8 +28,10 @@ use path_template::PathTemplateParser;
 use crate::{config::CmdLineParams, raft::RaftState, state::AppState};
 use crate::raft::bg_tasks::*;
 
+pub type QUEUE = Arc<Mutex<dyn LogFileQueue<LogQueueFileNumID,PathBuf,LogFile<FileBuff>> >>;
+
 /// Очередь
-static mut QUEUE_GLOBAL: Option<Arc<Mutex<dyn LogFileQueue<LogQueueFileNumID,PathBuf,LogFile<FileBuff>>  >>> = None;
+static mut QUEUE_GLOBAL: Option<QUEUE> = None;
 
 /// Работа с очередю
 /// 

@@ -4,6 +4,7 @@ use std::fmt::Display;
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::sync::PoisonError;
+use crate::raft::rest_api::sync::LogShippingError;
 use crate::raft as raft_state;
 use crate::raft::RaftError;
 
@@ -28,7 +29,8 @@ pub enum ApiErr
     LoqErr(String),
     MutexErr(String),
     BadRequest(String),
-    Raft(RaftError)
+    Raft(RaftError),
+    ClientError(log_http_client::Error),
 }
 
 impl Display for ApiErr {
@@ -50,7 +52,8 @@ impl error::ResponseError for ApiErr {
             Self::LoqErr(err) => format!("LoqErr: {err}"),
             Self::MutexErr(err) => format!("MutexErr: {err}"),
             Self::BadRequest(err) => format!("BadRequest {err}"),
-            Self::Raft(err) => format!("Raft {err}")
+            Self::Raft(err) => format!("Raft {err}"),
+            Self::ClientError(err) => format!("Client {err}"),
         })
     }
 
@@ -97,5 +100,17 @@ impl std::convert::From<PoisonError<std::sync::MutexGuard<'_, raft_state::RaftSt
 impl From<RaftError> for ApiErr {
     fn from(value: RaftError) -> Self {
         ApiErr::Raft(value)
+    }
+}
+
+impl From<log_http_client::Error> for ApiErr {
+    fn from(value: log_http_client::Error) -> Self {
+        Self::ClientError(value)
+    }
+}
+
+impl From<LogShippingError> for ApiErr {
+    fn from(value: LogShippingError) -> Self {
+        Self::Raft(RaftError::LogShipping(value))
     }
 }

@@ -37,7 +37,7 @@ GET http://localhost:8080/raft/node
       "nanos": 0
     }
   }
-}
+}    
 ```
 
 Просмотр heart beat
@@ -53,7 +53,7 @@ POST http://127.0.0.2:8080/raft/master/set
 content-type: application/json
 
 {
-    "id": "node0",
+    "id": "node-a",
     "base_address": "http://127.0.0.1:8080"
 }
 ```
@@ -110,3 +110,55 @@ GET http://127.0.0.2:8080/raft/status
     * Connection #0 to host 127.0.0.2 left intact
     accept only from master
 
+Log shipping
+=========================
+
+Добавить данные в master, так чтоб бы было отличие, master опережал
+
+```http
+POST http://localhost:8080/queue/insert/text_plain
+content-type: text/plain
+
+sample data
+```
+
+Проверить tail id, на master
+
+```http
+GET http://localhost:8080/queue/tail/id
+```
+
+    {
+        "log_id": "2",
+        "block_id": "3"
+    }
+
+```http
+GET http://127.0.0.2:8080/queue/tail/id
+```
+
+    {
+        "log_id": "2",
+        "block_id": "0"
+    }
+
+Запустить транспортировку
+
+```http
+POST http://localhost:8080/raft/logShipping/node-a
+```
+
+должно быть
+
+```json
+{
+  "job_id": 0,
+  "cargo_size": 4
+}
+```
+
+Запрос лога
+
+```http
+GET http://localhost:8080/raft/logShipping/node-a/0/log
+```

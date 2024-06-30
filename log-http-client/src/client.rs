@@ -3,9 +3,10 @@ use std::fmt::Display;
 use std::{collections::HashMap, fmt::Debug};
 use std::time::Duration;
 use logs::logfile::block::{BlockErr, BlockOptions, String16, String32};
-use reqwest::{Client, RequestBuilder};
+use logs::logqueue::PreparedRecord;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use crate::errors::*;
+use crate::{errors::*, QueueBlockId};
 
 /// Адрес для тестирования
 #[cfg(test)]
@@ -138,47 +139,6 @@ fn log_files() {
 
 //#region tail_id()
 
-/// Идентификатор записи в очереди
-#[derive(Debug,Clone,Deserialize,Serialize)]
-pub struct QueueBlockId {
-    /// Идентификатор лог файла
-    pub log_id: String,
-
-    /// Идентификатор записи в логе
-    pub block_id: u32,
-}
-
-impl Display for QueueBlockId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f,"QueueBlockId {{ log_id={log_id}, block_id={block_id} }}", 
-            log_id=self.log_id, 
-            block_id=self.block_id)
-    }
-}
-
-impl QueueBlockId {
-    async fn try_send(request: RequestBuilder) -> Result<QueueBlockId, Error> {
-        #[derive(Debug,Clone,Deserialize,Serialize)]
-        struct QueueRecIdRaw {
-            /// Идентификатор лог файла
-            pub log_id: String,
-        
-            /// Идентификатор записи в логе
-            pub block_id: String,
-        }
-        
-        
-        Ok(request.send().await?.json::<QueueRecIdRaw>().await?)
-        .and_then(|rraw|{
-            rraw.block_id.parse::<u32>()
-            .map_err(|e| Error::DecodeBody(format!("{e:?}")))
-            .map(|b_id| {
-                QueueBlockId { log_id: rraw.log_id.clone(), block_id: b_id }
-            })
-        })
-    }
-}
-
 impl QueueClient {
     /// Получение QueueBlockId текущей очереди - позиция конца очереди
     pub async fn tail_id( &self ) -> Result<QueueBlockId,Error> {
@@ -236,7 +196,7 @@ fn block_info() {
     System::new().block_on(async {
         let client = QueueClient::new(BASE_ADDR).unwrap();
         let result = client.block_info(
-            &QueueBlockId { log_id: "0".to_string(), block_id: 1 }
+            &QueueBlockId { log_id: 0, block_id: 1 }
         ).await.unwrap();
         println!("result:\n {result:?}");
     })
@@ -255,7 +215,7 @@ pub struct BlockRead {
     pub options: HashMap<String,String>,
 
     /// Идентификатор лог файла
-    pub log_id: String,
+    pub log_id: u128,
 
     /// Номер блока в логе
     pub block_id: u32,
@@ -316,7 +276,7 @@ impl QueueClient {
         Ok(BlockRead {
             bytes: bytes,
             options: block_opts,
-            log_id: block_id.log_id.clone(),
+            log_id: block_id.log_id,
             block_id: block_id.block_id,
         })
     }
@@ -328,7 +288,7 @@ fn block_read() {
     System::new().block_on(async {
         let client = QueueClient::new(BASE_ADDR).unwrap();
         let result = client.block_read(
-            &QueueBlockId { log_id: "0".to_string(), block_id: 1 }
+            &QueueBlockId { log_id: 0, block_id: 1 }
         ).await.unwrap();
         println!("result:\n {result}");
     })
@@ -344,8 +304,8 @@ pub struct BlockWrite {
 }
 
 impl BlockWrite {
-    pub fn expect_tail( self, qbid: &QueueBlockId ) -> Self {
-        Self { expect_tail: Some(qbid.clone()), ..self }
+    pub fn expect_tail<T: Into<QueueBlockId>>( self, qbid: T ) -> Self {
+        Self { expect_tail: Some(qbid.into()), ..self }
     }
 
     pub fn option<
@@ -415,6 +375,12 @@ impl From<&str> for BlockWrite {
         bytes.extend_from_slice(value.as_bytes());
 
         Self { data:bytes, expect_tail:None, options: BlockOptions::default() }
+    }
+}
+
+impl From<PreparedRecord> for BlockWrite {
+    fn from(value: PreparedRecord) -> Self {
+        Self { expect_tail: None, options: value.options, data: value.data }
     }
 }
 

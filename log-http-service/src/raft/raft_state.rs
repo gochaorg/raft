@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::sync::atomic::AtomicU32;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use chrono::DateTime;
 use chrono::Utc;
@@ -10,6 +13,7 @@ use log_http_client::Error as ClientError;
 use serde::Deserialize;
 use serde::Serialize;
 use super::bg_tasks::job;
+use super::rest_api::sync::Cargo;
 use super::Role;
 
 /// Состояние сервера
@@ -57,6 +61,10 @@ pub struct Node {
 
     /// Клиент 
     pub client: QueueClient,
+    
+    /// Задачи доставки логов
+    pub log_shipping: Arc<Mutex<HashMap<u32,Cargo>>>,
+    pub log_shipping_idseq: Arc<AtomicU32>,
 }
 
 /// Мастер узел
