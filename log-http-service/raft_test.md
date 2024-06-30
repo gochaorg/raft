@@ -119,7 +119,14 @@ Log shipping
 POST http://localhost:8080/queue/insert/text_plain
 content-type: text/plain
 
-sample data
+cargo a
+```
+
+```http
+POST http://localhost:8080/queue/insert/text_plain
+content-type: text/plain
+
+cargo b
 ```
 
 Проверить tail id, на master

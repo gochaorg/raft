@@ -1,42 +1,57 @@
 use actix_web::{error, HttpResponse};
 use logs::logqueue::LoqErr;
-use std::fmt::Display;
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::sync::PoisonError;
 use crate::raft::rest_api::sync::LogShippingError;
 use crate::raft as raft_state;
 use crate::raft::RaftError;
+use derive_more::Display;
 
-#[derive(Debug)]
+#[derive(Debug,Display)]
 pub enum ApiErr 
-{
+{    
+    #[display(fmt="BlockErr {:?}", _0)]
     BlockErr(logs::logfile::block::BlockErr),
+
+    #[display(fmt=
+        "RecIdNotMatch log_id: expect={} actual={}, block_id: expect={} actual={}", 
+        expect_log_id, actual_log_id, expect_block_id, actual_block_id)]
     RecIdNotMatch {
         expect_log_id: String,
         actual_log_id: String,
         expect_block_id: String,
         actual_block_id: String,
     },
+
+    #[display(fmt="RawReadBlockDataTruncated size: expect={} actual={}", expected_size, actual_size)]
     RawReadBlockDataTruncated {
         expected_size: u64,
         actual_size: u64,
     },
+
+    #[display(fmt="CantLockQueue {}", error)]
     CantLockQueue {
         error: String,
     },
-    QueueIsEmpy,
-    LoqErr(String),
-    MutexErr(String),
-    BadRequest(String),
-    Raft(RaftError),
-    ClientError(log_http_client::Error),
-}
 
-impl Display for ApiErr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f,"{}", self)
-    }
+    #[display(fmt="QueueIsEmpy")]
+    QueueIsEmpy,
+
+    #[display(fmt="LoqErr {}", _0)]
+    LoqErr(String),
+
+    #[display(fmt="MutexErr {}", _0)]
+    MutexErr(String),
+
+    #[display(fmt="BadRequest {}", _0)]
+    BadRequest(String),
+
+    #[display(fmt="Raft {}", _0)]
+    Raft(RaftError),
+
+    #[display(fmt="ClientError {}", _0)]
+    ClientError(log_http_client::Error),
 }
 
 impl error::ResponseError for ApiErr {
