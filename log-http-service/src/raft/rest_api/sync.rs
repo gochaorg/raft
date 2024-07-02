@@ -35,15 +35,20 @@ impl From<PoisonError<std::sync::MutexGuard<'_, std::option::Option<chrono::Date
     }
 }
 
-#[derive(Debug,Clone)]
-pub struct CargoItem {
+#[derive(Debug,Clone,Copy)]
+pub enum CargoItem {
+    BlockTransfer {
+        source: QueueBlockId,
+        expected: QueueBlockId,
+    },
+    Switch
 }
 
 /// "Груз" который надо доставить на клиента
 #[derive(Debug,Clone)]
 pub struct Cargo {
     /// Упарадоченная последовательность - в порядке возрастания: от младшего к старшему.
-    pub blocks_ids: Arc<Vec<QueueBlockId>>,
+    pub blocks_ids: Arc<Vec<CargoItem>>,
 
     /// Лог
     pub log: Arc<Mutex<Vec<String>>>,
@@ -79,8 +84,17 @@ async fn try_build_cargo( queue: QUEUE, client: QueueClient ) -> Result<Option<C
                     return Err(LogShippingError::CargoPlanFailBlockNotFound(client_qbid).into());
                 }
 
-                // Пропуск первого блока, ибо он уже есть
-                cargo.remove(0);
+                let cargo: Vec<CargoItem> = cargo.iter().zip(cargo.iter().skip(1))
+                    .map(|(expect,source )| {
+                        if source.is_log_first() {
+                            CargoItem::Switch
+                        } else {
+                            CargoItem::BlockTransfer { 
+                                source: source.clone(), 
+                                expected: expect.clone(),
+                            }
+                        }
+                    }).collect();
 
                 if cargo.is_empty() { return Ok(None); }
 
@@ -88,8 +102,8 @@ async fn try_build_cargo( queue: QUEUE, client: QueueClient ) -> Result<Option<C
                 println!("cargo:");
                 println!("  queue  tail id: {queue_qbid}");
                 println!("  client tail id: {client_qbid}");
-                for (c_idx,c_qbid) in cargo.iter().enumerate() {
-                    println!("  block#{c_idx} {c_qbid}");
+                for (c_idx,item) in cargo.iter().enumerate() {
+                    println!("  block#{c_idx} {item:?}");
                 }
 
                 Ok(Some(Cargo {
@@ -189,23 +203,38 @@ async fn log_shipping_impl( client: QueueClient, cargo: Cargo, queue: QUEUE ) ->
     log(format!("start log shipping, cargo size: {} blocks", block_count));
 
     for (idx, qbid) in cargo.blocks_ids.iter().enumerate() {
-        let qbid = qbid.clone();
-        log(format!("shipping block [{idx}/{block_count}] {qbid}", idx=idx+1 ));
+        let cargo_item = qbid.clone();
+        log(format!("shipping block [{idx}/{block_count}] {cargo_item:?}", idx=idx+1 ));
 
         let queue = queue.lock()?;
-        
-        if qbid.is_log_first() && !qbid.is_queue_first() {
-            log(format!("log switch"));
-            client.log_switch().await?;
-        }else{
-            log(format!("block read from queue"));
-            let block: BlockWrite = queue.read(qbid.into())?.into();
 
-            let block = block.expect_tail(qbid);
+        match cargo_item {
+            CargoItem::Switch => {
+                log(format!("log switch"));
+                client.log_switch().await?;
+            }
+            CargoItem::BlockTransfer { source, expected } => {
+                log(format!("block read from queue"));
+                let block: BlockWrite = queue.read(source.into())?.into();
+                let block = block.expect_tail(expected);
 
-            log(format!("block write to client"));
-            client.block_write(block).await?;
+                log(format!("block write to client"));
+                client.block_write(block).await?;
+            }
         }
+        
+        // if qbid.is_log_first() && !qbid.is_queue_first() {
+        //     log(format!("log switch"));
+        //     client.log_switch().await?;
+        // }else{
+        //     log(format!("block read from queue"));
+        //     let block: BlockWrite = queue.read(qbid.into())?.into();
+
+        //     let block = block.expect_tail(qbid);
+
+        //     log(format!("block write to client"));
+        //     client.block_write(block).await?;
+        // }
     }
     Ok(())
 }
