@@ -222,19 +222,6 @@ async fn log_shipping_impl( client: QueueClient, cargo: Cargo, queue: QUEUE ) ->
                 client.block_write(block).await?;
             }
         }
-        
-        // if qbid.is_log_first() && !qbid.is_queue_first() {
-        //     log(format!("log switch"));
-        //     client.log_switch().await?;
-        // }else{
-        //     log(format!("block read from queue"));
-        //     let block: BlockWrite = queue.read(qbid.into())?.into();
-
-        //     let block = block.expect_tail(qbid);
-
-        //     log(format!("block write to client"));
-        //     client.block_write(block).await?;
-        // }
     }
     Ok(())
 }
