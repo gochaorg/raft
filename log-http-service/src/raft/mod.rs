@@ -101,6 +101,7 @@
 /// реализация алгоритма выбора
 mod election;
 
+/// случайная задержка
 mod rand_duration;
 pub use rand_duration::*;
 
@@ -124,6 +125,9 @@ pub use raft_err::*;
 
 /// API для RAFT
 pub mod rest_api;
+
+/// Асинхронная достака логов
+pub mod log_shipping;
 
 #[cfg(test)]
 mod test {

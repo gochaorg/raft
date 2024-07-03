@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::sync::atomic::AtomicU32;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use actix_web::{delete, get, post, web, HttpResponse, Responder};
@@ -84,15 +82,16 @@ async fn node_add( state: web::Data<AppState>, body:web::Json<NodeAddBody>, path
     let path = path.into_inner();    
     let body = body.into_inner();
 
-    let id = &path.node_id;
+    let mut raft = state.raft.lock()?;
+    let self_node_id = raft.id.clone();
+    let node_id = &path.node_id;
     let base_addr = &body.base_address;
 
-    let mut raft = state.raft.lock()?;
-    let id_matched = raft.nodes.iter().find_map(|a| if a.id.eq(id){ Some(()) }else{ None } ).is_some();
+    let id_matched = raft.nodes.iter().find_map(|a| if a.id.eq(node_id){ Some(()) }else{ None } ).is_some();
     let addr_matched = raft.nodes.iter().find_map(|a| if a.base_address.eq(base_addr){ Some(()) }else{ None } ).is_some();
 
     if id_matched { 
-        return Err(ApiErr::BadRequest(format!("node {id} already registerd")));
+        return Err(ApiErr::BadRequest(format!("node {node_id} already registerd")));
     }
 
     if addr_matched { 
@@ -100,16 +99,12 @@ async fn node_add( state: web::Data<AppState>, body:web::Json<NodeAddBody>, path
     }
 
     let mut client = QueueClient::new(base_addr.to_string()).map_err(|e| RaftError::CantCreateClient(e))?;
+    client.raft_master_id = Some(self_node_id);
     client.version_timeout = Some(Duration::from_secs(3));
 
-    raft.nodes.push(Node {
-        id: id.to_string(),
-        base_address: base_addr.to_string(),
-        hearbeat: vec![],
-        client: client,
-        log_shipping: Arc::new(Mutex::new(HashMap::new())),
-        log_shipping_idseq: Arc::new(AtomicU32::new(0)),
-    });
+    raft.nodes.push(
+        Node::new(node_id.to_string(), base_addr.to_string(), client)
+    );
 
     Ok(web::Json(""))
 }

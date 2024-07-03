@@ -4,7 +4,7 @@ use serde::Serialize;
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::sync::PoisonError;
-use crate::raft::rest_api::sync::LogShippingError;
+use crate::raft::log_shipping::LogShippingError;
 use crate::raft as raft_state;
 use crate::raft::RaftError;
 use derive_more::Display;

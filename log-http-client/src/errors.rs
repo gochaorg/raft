@@ -1,5 +1,5 @@
 use derive_more::Display;
-use reqwest::{Request, Response, StatusCode};
+use reqwest::StatusCode;
 use serde::Serialize;
 
 #[derive(Debug,Clone,Display,Serialize)]

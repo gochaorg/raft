@@ -2,7 +2,7 @@ use log_http_client::Error as ClientError;
 use derive_more::Display;
 use serde::Serialize;
 
-use super::rest_api::sync::LogShippingError;
+use super::log_shipping::LogShippingError;
 
 #[derive(Debug,Display,Serialize)]
 pub enum RaftError {

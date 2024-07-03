@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-use std::sync::atomic::AtomicU32;
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use chrono::DateTime;
 use chrono::Utc;
@@ -12,8 +9,10 @@ use log_http_client::QueueClient;
 use log_http_client::Error as ClientError;
 use serde::Deserialize;
 use serde::Serialize;
+use crate::queue_api::ApiErr;
+
 use super::bg_tasks::job;
-use super::rest_api::sync::Cargo;
+use super::log_shipping::*;
 use super::Role;
 
 /// Состояние сервера
@@ -45,6 +44,13 @@ impl RaftState {
             role: None,
         }
     }
+
+    pub fn find_node( &self, node_id: &str ) -> Result<&Node, ApiErr> {
+        match self.nodes.iter().find(|n| n.id == node_id ) {
+            None => Err(ApiErr::BadRequest(format!("Not found {}", node_id))),
+            Some(node) => Ok(node)
+        }
+    }
 }
 
 /// Узел
@@ -63,14 +69,29 @@ pub struct Node {
     pub client: QueueClient,
     
     /// Задачи доставки логов
-    pub log_shipping: Arc<Mutex<HashMap<u32,Cargo>>>,
-    pub log_shipping_idseq: Arc<AtomicU32>,
+    pub log_shipping: LogShipping,
 }
+
+impl Node {
+    pub fn new( id: String, base_address: String, client: QueueClient ) -> Self {
+        Self {
+            id: id,
+            base_address: base_address,
+            hearbeat: Vec::new(),
+            client: client,
+            log_shipping: LogShipping::default(),
+        }
+    }
+}
+ 
 
 /// Мастер узел
 #[derive(Clone,Debug,Serialize,Deserialize)]
 pub struct MasterNode {
+    /// Идентификатор ведущего узла
     pub id: String,
+
+    /// Адрес ведущего узла
     pub base_address: String,
 }
 
