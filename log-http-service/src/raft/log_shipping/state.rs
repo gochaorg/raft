@@ -1,12 +1,12 @@
 use std::{collections::HashMap, sync::{atomic::AtomicU32, Arc, Mutex}};
 
 use chrono::{DateTime, Utc};
-use log_http_client::{QueueBlockId, QueueClient};
+use log_http_client::QueueBlockId;
+use serde::{Deserialize, Serialize};
 use tokio::task::AbortHandle;
 
-use crate::QUEUE;
 
-use super::{log_shipping_start, LogShippingError};
+use super::LogShippingError;
 
 /// Состояние доставки логов
 #[derive(Debug,Clone)]
@@ -15,28 +15,23 @@ pub struct LogShipping {
     job_idseq: Arc<AtomicU32>,
 }
 
-impl LogShipping {
-    fn add_job( &self, tr: Transfer ) -> Result<TransferId,LogShippingError> {
-        let t_id = TransferId(self.job_idseq.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
-        let mut jobs = self.jobs.lock()?;
-        jobs.insert(t_id, tr);
-        Ok(t_id)
-    }
-
-    pub fn start( &self, qc: QueueClient, tr: Transfer, queue: QUEUE )  -> Result<TransferId,LogShippingError> {
-        let tr_id = self.add_job(tr.clone())?;
-        log_shipping_start(qc, tr.clone(), queue);
-        Ok(tr_id)
-    }
-}
-
 impl Default for LogShipping {
     fn default() -> Self {
         Self { jobs: Default::default(), job_idseq: Default::default() }
     }
 }
 
-#[derive(Debug,PartialEq,Eq,Hash,Clone,Copy)]
+impl LogShipping {
+    pub fn add_job( &self, tr: Transfer ) -> Result<TransferId,LogShippingError> {
+        let t_id = TransferId(self.job_idseq.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
+        let mut jobs = self.jobs.lock()?;
+        jobs.insert(t_id, tr);
+        Ok(t_id)
+    }
+}
+
+
+#[derive(Debug,PartialEq,Eq,Hash,Clone,Copy,Serialize,Deserialize)]
 pub struct TransferId(pub u32);
 
 /// Доставляемая порция груза
@@ -87,4 +82,16 @@ impl From<Cargo> for Transfer {
             current_proc: Arc::new(Mutex::new(None)) 
         }
     }
+}
+
+impl Transfer {
+    pub fn is_finished( &self ) -> Result<bool,LogShippingError> {        
+        let res = match self.current_proc.lock()?.as_ref().map(|h| h.is_finished()) {
+            Some(fin) => fin,
+            None => false
+        };
+        Ok(res)
+    }
+
+    //pub fn finish_time( &self ) 
 }

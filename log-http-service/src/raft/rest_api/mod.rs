@@ -27,7 +27,7 @@ pub fn route( cfg: &mut web::ServiceConfig ) {
         .service(master_reset)
         .service(id_get)
         .service(id_set)
-        .service(log_shipping_api::log_shipping_start_api)
+        .service(log_shipping_api::log_shipping_start)
         .service(log_shipping_api::log_shipping_state)
         ;
 }

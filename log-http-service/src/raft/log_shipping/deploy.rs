@@ -6,11 +6,11 @@ use log::info;
 use log_http_client::{BlockWrite, QueueBlockId, QueueClient};
 use logs::logqueue::*;
 
-use crate::{queue_api::ApiErr, state::AppState, QUEUE};
+use crate::{queue_api::ApiErr, state::AppState, QUEUE, queue};
 use super::*;
 
 /// Составить план наката логов
-pub async fn try_build_cargo( queue: QUEUE, client: QueueClient ) -> Result<Option<Cargo>,ApiErr> {
+async fn try_build_cargo( queue: QUEUE, client: QueueClient ) -> Result<Option<Cargo>,ApiErr> {
     let last_rec = { queue.lock()?.last_record()? };
     match last_rec {
         None => Ok(None),
@@ -192,13 +192,62 @@ async fn log_shipping_impl( client: QueueClient, cargo: Transfer, queue: QUEUE )
     Ok(())
 }
 
+impl LogShipping {
+    /// Старт доставки логово
+    fn start( &self, qc: QueueClient, tr: Transfer, queue: QUEUE )  -> Result<TransferId,LogShippingError> {
+        let tr_id = self.add_job(tr.clone())?;
+        log_shipping_start(qc, tr.clone(), queue);
+        Ok(tr_id)
+    }
+
+    /// Удалеяет уже завершенные задачи
+    fn cleanup( &self ) -> Result<Vec<TransferId>,LogShippingError> {
+        let mut jobs = self.jobs.lock()?;
+
+        let mut remove_ids: Vec<TransferId> = Vec::new();
+        for (k,tr) in jobs.iter() {
+            match tr.is_finished()? {
+                true => { remove_ids.push(k.clone()); },
+                _ => {}
+            }
+        }
+
+        for t_id in remove_ids.clone() {
+            jobs.remove(&t_id);
+        }
+
+        Ok(remove_ids)
+    }
+}
+
+
 impl AppState {
-    pub fn start_log_shipping( &self, target_node_id: &str ) -> Result<(),ApiErr> {
+    /// Запуск асинхронной доставки логов на указанный узел
+    pub async fn start_log_shipping( &self, target_node_id: &str ) -> Result<Option<(TransferId,Transfer)>,ApiErr> {
         let state = self.raft.lock()?;
+        let target_node = state.find_node(target_node_id)?;
+        let queue: QUEUE = queue(|queue| { queue.clone() });
+        let target_client: QueueClient = target_node.client.clone();
+        match try_build_cargo( queue.clone(), target_client.clone() ).await? {
+            None => Ok(None),
+            Some(cargo) => {
+                let transfer = Transfer::from(cargo);
+                let transfer_id = target_node.log_shipping.start(target_client, transfer.clone(), queue)?;
+                Ok(Some((transfer_id,transfer)))
+            }
+        }
+    }
 
-        let node = state.nodes.iter().find(|n| n.id == target_node_id );
-
-        Ok(())
+    /// Удаляет уже завершенные задачи
+    pub fn cleanup_log_shipping_jobs( &self ) -> Result<Vec<(String, Vec<TransferId>)>,ApiErr> {
+        let state = self.raft.lock()?;
+        let r: Vec<(String, Vec<TransferId>)> = state.nodes.iter().filter_map(|node| {
+            match node.log_shipping.cleanup().ok() {
+                Some(k) => Some( (node.id.clone(), k) ),
+                _ => None
+            }
+        }).collect();
+        Ok(r)
     }
 }
 

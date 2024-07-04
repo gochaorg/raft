@@ -53,3 +53,8 @@ impl From<PoisonError<std::sync::MutexGuard<'_, HashMap<TransferId, Transfer>>>>
     }
 }
 
+impl From<PoisonError<std::sync::MutexGuard<'_, std::option::Option<tokio::task::AbortHandle>>>> for LogShippingError {
+    fn from(value: PoisonError<std::sync::MutexGuard<'_, std::option::Option<tokio::task::AbortHandle>>>) -> Self {
+        Self::TransferLockError(format!("lock error: {}", value.to_string()))
+    }
+}

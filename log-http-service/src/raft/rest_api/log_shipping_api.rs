@@ -2,39 +2,29 @@ use std::collections::HashSet;
 
 use actix_web::{get, post, web, HttpResponse};
 use chrono::{Duration, Utc};
-use log_http_client::QueueClient;
 use serde::Serialize;
-use crate::{queue, queue_api::ApiErr, raft::log_shipping::{try_build_cargo, Transfer, TransferId}, state::AppState, QUEUE};
+use crate::{queue_api::ApiErr, raft::log_shipping::TransferId, state::AppState};
 
 #[post("/logShipping/{node}")]
-pub async fn log_shipping_start_api( state: web::Data<AppState>, path: web::Path<String> ) -> Result<HttpResponse,ApiErr> {
-    let state = state.raft.lock()?;
+pub async fn log_shipping_start( state: web::Data<AppState>, path: web::Path<String> ) -> Result<HttpResponse,ApiErr> {
     let node_id = path.into_inner();
+    let transfer_id = state.start_log_shipping(&node_id).await?;
 
     #[derive(Serialize,Default)]
     struct Resp {
+        has_job: bool,                
         job_id: Option<u32>,
         cargo_size: Option<usize>,
     }
 
-    let node = state.find_node(&node_id)?;
-    let qc: QueueClient = node.client.clone();
-    let queue: QUEUE = queue(|queue| { queue.clone() });
-    
-    match try_build_cargo(queue.clone(), qc.clone()).await? {
-        None => Ok(HttpResponse::Ok().json(Resp::default())),
-        Some( cargo ) => {
-            let transfer = Transfer::from(cargo);
-            let transfer_id = node.log_shipping.start(qc, transfer.clone(), queue)?;
-
-            Ok(HttpResponse::Ok().json(
-                Resp {
-                    job_id: Some(transfer_id.0),
-                    cargo_size: Some(transfer.blocks_ids.len())
-                }
-            ))
+    Ok(HttpResponse::Ok().json(match transfer_id {
+        None => Resp { has_job:false, job_id:None, cargo_size:None },
+        Some((transfer_id,transfer)) => Resp { 
+            has_job:true, 
+            job_id:Some(transfer_id.0), 
+            cargo_size:Some(transfer.blocks_ids.len())
         }
-    }
+    }))
 }
 
 #[get("/logShipping/{node}/{job}/log")]
@@ -70,24 +60,8 @@ pub async fn log_shipping_state( state: web::Data<AppState>, path: web::Path<(St
 
 #[post("/logShipping/clean")]
 pub async fn log_shipping_clean( state: web::Data<AppState> ) -> Result<HttpResponse,ApiErr> {
-    let state = state.raft.lock()?;
-
-    let mut remove_set : HashSet<TransferId> = HashSet::new();
-    for node in state.nodes.iter() {
-        let log_ship_map = node.log_shipping.jobs.lock()?;
-        for (k,cargo) in log_ship_map.iter() {
-            let fin = cargo.finished.lock()?;
-            if fin.is_some() {
-                let fin = fin.unwrap();
-                let dur = Utc::now().signed_duration_since(fin);
-                if dur > Duration::seconds(30) {
-                    remove_set.insert(k.clone());
-                }
-            }            
-        }
-    }
-
-    Ok(HttpResponse::Ok().body("body"))
+    let removed = state.cleanup_log_shipping_jobs()?;
+    Ok(HttpResponse::Ok().json(removed))
 }
 
 
